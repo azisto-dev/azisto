@@ -7,21 +7,18 @@ export default function Splash() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log("Splash loaded");
-
     const timer = setTimeout(() => {
-      console.log("Redirecting to login...");
-      router.replace("/login");
+      router.replace("/home");
     }, 2000);
 
     return () => clearTimeout(timer);
   }, [router]);
 
   return (
-    <div className="flex items-center justify-center h-screen bg-white">
-      <h1 className="text-4xl font-bold tracking-widest">
+    <main className="flex min-h-screen items-center justify-center bg-white">
+      <h1 className="text-4xl font-bold tracking-widest text-slate-950">
         AZI<span className="text-red-500">•</span>STO
       </h1>
-    </div>
+    </main>
   );
 }
