@@ -52,11 +52,13 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
       <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <div className="mb-8 text-center">
-          <p className="text-3xl font-bold tracking-widest text-slate-950">
-            AZI<span className="text-red-500">•</span>STO
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold text-slate-900">
+        <div className="mb-8 pt-4 text-center">
+          <img
+            src="/azisto-logo-cropped.png"
+            alt="AZISTO - Your on-demand assistant"
+            className="mx-auto w-full max-w-[250px] object-contain"
+          />
+          <h1 className="mt-4 text-2xl font-semibold text-slate-900">
             Login or sign up
           </h1>
         </div>

@@ -15,10 +15,12 @@ export default function Splash() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white">
-      <h1 className="text-4xl font-bold tracking-widest text-slate-950">
-        AZI<span className="text-red-500">•</span>STO
-      </h1>
+    <main className="flex min-h-screen items-center justify-center bg-white px-6">
+      <img
+        src="/azisto-logo.png"
+        alt="AZISTO - Your on-demand assistant"
+        className="max-h-[80vh] w-full max-w-[620px] object-contain"
+      />
     </main>
   );
 }

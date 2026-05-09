@@ -1,142 +1,259 @@
 import Link from "next/link";
 
-const categories = [
+const services = [
   {
-    name: "Home Services",
-    description: "Repairs, installs, and maintenance for your place.",
-    subcategories: ["Plumbing", "Electrical", "Appliance repair"],
+    name: "Home Care",
+    image: "/service-icons/home-care.png",
+    imageAlt: "Premium home care icon",
+    imageClassName: "rounded-[18px]",
   },
   {
-    name: "Cleaning",
-    description: "Regular, deep, move-out, and short-term rental cleaning.",
-    subcategories: ["House cleaning", "Deep cleaning", "Move-out cleaning"],
+    name: "Car Care",
+    image: "/service-icons/car-care.png",
+    imageAlt: "Premium car care icon",
+    imageClassName: "rounded-[18px]",
   },
   {
-    name: "Outdoor",
-    description: "Yard care and seasonal help for Canadian homes.",
-    subcategories: ["Lawn care", "Snow removal", "Landscaping"],
+    name: "Pet Care",
+    image: "/service-icons/pet-care.png",
+    imageAlt: "Premium pet care icon",
+    imageClassName: "rounded-[18px]",
   },
   {
-    name: "Automotive",
-    description: "Mobile help for vehicles, tires, detailing, and checks.",
-    subcategories: ["Car detailing", "Tire change", "Battery boost"],
+    name: "Garden Care",
+    image: "/service-icons/garden-care-direct.png",
+    imageAlt: "Premium garden care icon",
   },
   {
-    name: "Wellness",
-    description: "Personal care and wellness services near you.",
-    subcategories: ["Massage", "Personal training", "Hair services"],
+    name: "Moving",
+    image: "/service-icons/moving-direct.png",
+    imageAlt: "Premium moving icon",
   },
   {
-    name: "Learning",
-    description: "Tutors, coaches, and lessons for every age.",
-    subcategories: ["Math tutoring", "Music lessons", "Language lessons"],
+    name: "Towing",
+    image: "/service-icons/towing.png",
+    imageAlt: "Tow truck carrying a car icon",
   },
 ];
 
 const navItems = [
-  { label: "Home", href: "/home", active: true },
-  { label: "Bookings", href: "/login", active: false },
-  { label: "Messages", href: "/login", active: false },
-  { label: "Profile", href: "/login", active: false },
+  {
+    label: "Home",
+    href: "/home",
+    active: true,
+    path: "M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z",
+  },
+  {
+    label: "Bookings",
+    href: "/login",
+    active: false,
+    path: "M7 3v3M17 3v3M4 8h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
+  },
+  {
+    label: "Messages",
+    href: "/login",
+    active: false,
+    path: "M4 5h16v11H8l-4 4V5ZM8 9h8M8 13h5",
+  },
+  {
+    label: "Profile",
+    href: "/login",
+    active: false,
+    path: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
+  },
 ];
+
+function MenuIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-6 w-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path strokeLinecap="round" d="M5 7h14M5 12h14M5 17h14" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-6 w-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 17H9m9-1V11a6 6 0 1 0-12 0v5l-2 2h16l-2-2ZM10 21h4"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5 text-black"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z"
+      />
+    </svg>
+  );
+}
+
+function NavIcon({ path }: { path: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="mx-auto h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-slate-50 pb-24">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-          <Link
-            href="/home"
-            className="text-2xl font-bold tracking-widest text-slate-950"
-          >
-            AZI<span className="text-red-500">•</span>STO
-          </Link>
+    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+        <div className="flex-1 px-5 pb-6 pt-5">
+          <div className="mb-5 flex items-center justify-between text-xs font-bold">
+            <span>9:41</span>
+            <div className="flex items-center gap-1">
+              <span className="h-2.5 w-3 rounded-sm bg-black" />
+              <span className="h-2.5 w-3 rounded-sm border border-black" />
+              <span className="h-2.5 w-5 rounded-sm bg-black" />
+            </div>
+          </div>
 
-          <Link
-            href="/login"
-            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Login
-          </Link>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-6xl px-5 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-950">
-            Find local services across Canada
-          </h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Browse trusted categories first. Sign in only when you are ready to
-            request, book, message, or manage your profile.
-          </p>
-        </div>
-
-        <div className="mb-8 flex gap-3 rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
-          <input
-            className="min-w-0 flex-1 rounded-md border border-slate-300 px-4 py-3 text-base outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-            type="search"
-            placeholder="Search for cleaning, snow removal, plumbing..."
-          />
-          <Link
-            href="/login"
-            className="rounded-md bg-red-500 px-5 py-3 font-semibold text-white"
-          >
-            Search
-          </Link>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category) => (
-            <section
-              key={category.name}
-              className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200"
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <Link
+              href="/login"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Open menu"
             >
-              <Link href="/login" className="block">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-red-50 text-sm font-bold text-red-600">
-                  {category.name.slice(0, 2).toUpperCase()}
-                </div>
-                <h2 className="text-xl font-semibold text-slate-950">
-                  {category.name}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {category.description}
-                </p>
-              </Link>
+              <MenuIcon />
+            </Link>
 
-              <div className="mt-5 flex flex-wrap gap-2">
-                {category.subcategories.map((subcategory) => (
-                  <Link
-                    key={subcategory}
-                    href="/login"
-                    className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+            <Link href="/home" className="flex justify-center">
+              <img
+                src="/azisto-logo-cropped.png"
+                alt="AZISTO - Your on-demand assistant"
+                className="w-full max-w-[165px] object-contain"
+              />
+            </Link>
+
+            <Link
+              href="/login"
+              className="relative flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-black"
+              aria-label="Notifications"
+            >
+              <BellIcon />
+              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+            </Link>
+          </header>
+
+          <section className="mt-6">
+            <h1 className="text-3xl font-bold leading-tight text-black">
+              Hello, Alex
+            </h1>
+          </section>
+
+          <Link
+            href="/login"
+            className="mt-5 flex h-14 items-center justify-between rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-500 shadow-sm"
+          >
+            <span>What do you need help with?</span>
+            <SearchIcon />
+          </Link>
+
+          <section className="mt-6 grid grid-cols-3 gap-3">
+            {services.map((service) => (
+              <Link
+                key={service.name}
+                href="/login"
+                className="flex min-h-[86px] flex-col items-center justify-start text-center"
+              >
+                <img
+                  src={service.image}
+                  alt={service.imageAlt}
+                  className={`h-16 w-16 object-contain ${
+                    service.imageClassName ?? ""
+                  }`}
+                />
+                <span className="mt-2 text-xs font-bold leading-tight text-black">
+                  {service.name}
+                </span>
+              </Link>
+            ))}
+          </section>
+
+          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-bold text-black">
+              Trusted professionals
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Verified. Rated. Reliable.
+            </p>
+
+            <div className="mt-5 flex items-center justify-between">
+              <div className="flex -space-x-2">
+                {["AJ", "MK", "SR"].map((initials) => (
+                  <div
+                    key={initials}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[10px] font-bold text-white"
                   >
-                    {subcategory}
-                  </Link>
+                    {initials}
+                  </div>
                 ))}
               </div>
-            </section>
-          ))}
-        </div>
-      </section>
 
-      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-2xl grid-cols-4 px-2 py-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`rounded-md px-3 py-3 text-center text-sm font-semibold ${
-                item.active
-                  ? "bg-slate-950 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+              <p className="text-sm font-semibold text-black">
+                <span className="text-yellow-400">★</span> 4.9{" "}
+                <span className="font-normal text-slate-500">
+                  (2.3k reviews)
+                </span>
+              </p>
+            </div>
+          </section>
         </div>
-      </nav>
+
+        <nav className="border-t border-slate-200 bg-white px-3 py-2">
+          <div className="grid grid-cols-4">
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
+                  item.active ? "text-red-500" : "text-slate-500"
+                }`}
+              >
+                <NavIcon path={item.path} />
+                <span className="mt-1 block">{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </nav>
+      </div>
     </main>
   );
 }
