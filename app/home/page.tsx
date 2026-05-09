@@ -30,7 +30,7 @@ const services = [
     imageAlt: "Premium moving icon",
   },
   {
-    name: "Towing",
+    name: "Roadside and Emergency",
     image: "/service-icons/towing.png",
     imageAlt: "Tow truck carrying a car icon",
   },
