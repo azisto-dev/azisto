@@ -3,34 +3,40 @@ import Link from "next/link";
 const services = [
   {
     name: "Home Care",
+    slug: "home-care",
     image: "/service-icons/home-care.png",
     imageAlt: "Premium home care icon",
     imageClassName: "rounded-[18px]",
   },
   {
     name: "Car Care",
+    slug: "car-care",
     image: "/service-icons/car-care.png",
     imageAlt: "Premium car care icon",
     imageClassName: "rounded-[18px]",
   },
   {
     name: "Pet Care",
+    slug: "pet-care",
     image: "/service-icons/pet-care.png",
     imageAlt: "Premium pet care icon",
     imageClassName: "rounded-[18px]",
   },
   {
     name: "Garden Care",
+    slug: "garden-care",
     image: "/service-icons/garden-care-direct.png",
     imageAlt: "Premium garden care icon",
   },
   {
     name: "Moving",
+    slug: "moving",
     image: "/service-icons/moving-direct.png",
     imageAlt: "Premium moving icon",
   },
   {
-    name: "Roadside and Emergency",
+    name: "Roadside & Emergency",
+    slug: "roadside-emergency",
     image: "/service-icons/towing.png",
     imageAlt: "Tow truck carrying a car icon",
   },
@@ -190,7 +196,7 @@ export default function HomePage() {
             {services.map((service) => (
               <Link
                 key={service.name}
-                href="/login"
+                href={`/service/${service.slug}`}
                 className="flex min-h-[86px] flex-col items-center justify-start text-center"
               >
                 <img
