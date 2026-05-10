@@ -4,9 +4,12 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
+  type AuthError,
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function LoginForm() {
   const router = useRouter();
@@ -18,19 +21,62 @@ function LoginForm() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const validateForm = () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      return "Please enter your email address.";
+    }
+
+    if (!emailPattern.test(trimmedEmail)) {
+      return "Please enter a valid email address.";
+    }
+
+    if (!password) {
+      return "Please enter your password.";
+    }
+
+    if (password.length < 6) {
+      return "Password must be at least 6 characters.";
+    }
+
+    return "";
+  };
+
   const getErrorMessage = (error: unknown) => {
-    if (error instanceof Error) {
-      return error.message;
+    const authError = error as Partial<AuthError>;
+
+    if (authError.code === "auth/invalid-credential") {
+      return "The email or password you entered is incorrect.";
+    }
+
+    if (authError.code === "auth/email-already-in-use") {
+      return "An account with this email already exists.";
+    }
+
+    if (authError.code === "auth/too-many-requests") {
+      return "Too many attempts. Please wait a moment and try again.";
+    }
+
+    if (authError.code === "auth/network-request-failed") {
+      return "Network error. Please check your connection and try again.";
     }
 
     return "Something went wrong. Please try again.";
   };
 
   const handleLogin = async () => {
+    const validationMessage = validateForm();
+
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setMessage("");
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       router.push("/home");
     } catch (error) {
       setMessage(getErrorMessage(error));
@@ -40,10 +86,23 @@ function LoginForm() {
   };
 
   const handleSignup = async () => {
+    if (!email.trim() && !password) {
+      setMessage("");
+      router.push("/account-type");
+      return;
+    }
+
+    const validationMessage = validateForm();
+
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setMessage("");
-      await createUserWithEmailAndPassword(auth, email, password);
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
       router.push("/account-type");
     } catch (error) {
       setMessage(getErrorMessage(error));
