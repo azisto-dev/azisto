@@ -3,73 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import {
-  Award,
-  Axe,
-  BatteryCharging,
-  Bike,
-  Blocks,
-  Box,
-  BrickWall,
-  Bug,
-  Building,
-  Building2,
-  Bus,
-  Cable,
-  Car,
-  Check,
-  ChevronLeft,
-  Circle,
-  CircleDot,
-  CircleGauge,
-  CloudLightning,
-  Drill,
-  Droplets,
-  Dumbbell,
-  Ear,
-  Flower2,
-  Footprints,
-  Fuel,
-  Grid2X2,
-  Hammer,
-  HeartHandshake,
-  House,
-  Image as ImageIcon,
-  KeyRound,
-  Leaf,
-  Lightbulb,
-  Link as LinkIcon,
-  type LucideIcon,
-  Map as MapIcon,
-  Mountain,
-  MoveRight,
-  Package,
-  PackageOpen,
-  Paintbrush,
-  PanelTop,
-  PanelsTopLeft,
-  Recycle,
-  Rows3,
-  ScanSearch,
-  Scissors,
-  ShipWheel,
-  Shovel,
-  ShowerHead,
-  Snowflake,
-  Sofa,
-  Sparkles,
-  Sprout,
-  Trash2,
-  TreePine,
-  TriangleAlert,
-  Truck,
-  Warehouse,
-  Waves,
-  Wheat,
-  Wind,
-  Wrench,
-  Zap,
-} from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 
 const services = [
   {
@@ -223,107 +157,179 @@ const services = [
   },
 ];
 
-const subcategoryIcons: Record<string, LucideIcon> = {
-  Handyman: Wrench,
-  "General Cleaning": Sparkles,
-  Painter: Paintbrush,
-  "Pest Control": Bug,
-  Electrical: Zap,
-  Plumbing: Droplets,
-  "HVAC Services": Wind,
-  "Junk Removal": Trash2,
-  "Roofing Services": House,
-  "Drywall Repair & Installation": Hammer,
-  Fencing: PanelsTopLeft,
-  "Deck Building & Repair": Hammer,
-  "Glass & Shower Doors": PanelTop,
-  "Gutter Installation & Cleaning": Waves,
-  "Garage Door Repair & Installation": Warehouse,
-  "Tile Installation": Grid2X2,
-  "Mobile Car Servicing": Car,
-  "Diagnostic Check": ScanSearch,
-  "Car Washing & Detailing": Sparkles,
-  "Tire Replacement": Circle,
-  "Puncture Repair": Wrench,
-  "Alloy Wheel Repair": CircleGauge,
-  "In-home Pet Sitting": House,
-  "Pet Walking": Footprints,
-  Grooming: Scissors,
-  "Washing & Cleaning": ShowerHead,
-  "Nail Trimming": Scissors,
-  "Ear Cleaning": Ear,
-  "Pet Training": Award,
-  "Lawn Mowing & Edging": Leaf,
-  Weeding: Sprout,
-  "Pruning & Trimming": Scissors,
-  "Leaf Blowing & Cleanup": Wind,
-  Mulching: Shovel,
-  "Garden Design & Landscaping": Flower2,
-  "Seasonal Planting": Sprout,
-  "Turf Laying / Seeding": Rows3,
-  "Raised Bed Installation": Box,
-  "Tree Trimming & Shaping": TreePine,
-  "Tree Removal": Axe,
-  "Stump Grinding": Drill,
-  "Storm Damage Cleanup": CloudLightning,
-  "Sprinkler Installation & Repair": Droplets,
-  "Drip Irrigation Setup": Droplets,
-  "Drainage Solutions": Waves,
-  "Soil Fertilizing": Wheat,
-  "Aeration & Scarification": CircleDot,
-  "Weed & Pest Control": Bug,
-  "Composting Services": Recycle,
-  "Patio & Pathway Installation": Blocks,
-  "Retaining Walls": BrickWall,
-  "Outdoor Lighting Installation": Lightbulb,
-  "Organic Gardening": Leaf,
-  "Water Feature Installation": Waves,
-  "Greenhouse Setup": House,
-  "Winter Prep & Snow Removal": Snowflake,
-  "Local Moves": Truck,
-  "Long-distance Moves": MapIcon,
-  "Loading & Unloading": PackageOpen,
-  "Furniture Rearranging": Sofa,
-  "Piano & Heavy Item Moving": Dumbbell,
-  "Full Packing Service": Package,
-  "Partial Packing": Package,
-  "Unpacking & Setup": PackageOpen,
-  "Office & Commercial Moves": Building2,
-  "Apartment Moves": Building,
-  "Senior Moving": HeartHandshake,
-  "Art & Fine Item Transport": ImageIcon,
-  "Emergency Towing": Truck,
-  "Battery Jump-start": BatteryCharging,
-  "Flat Tire Change": Circle,
-  "Fuel Delivery": Fuel,
-  "Lockout Service": KeyRound,
-  "Flatbed Towing": Truck,
-  "Wheel-lift Towing": Wrench,
-  "Hook & Chain Towing": LinkIcon,
-  "Dolly Towing": MoveRight,
-  "Motorcycle Towing": Bike,
-  "Heavy-duty Truck & RV Towing": Truck,
-  "Bus & Commercial Vehicle Towing": Bus,
-  "Off-road Recovery": Mountain,
-  "Winching & Vehicle Extraction": Cable,
-  "Mud / Ditch / Rollover Recovery": TriangleAlert,
-  "Water / Flood Recovery": Waves,
-  "Boat & Trailer Towing": ShipWheel,
+const iconBadgeStyles = {
+  amber:
+    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-100 shadow-amber-100/80",
+  blue:
+    "border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-100 shadow-sky-100/80",
+  cyan:
+    "border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-100 shadow-cyan-100/80",
+  emerald:
+    "border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-green-100 shadow-emerald-100/80",
+  green:
+    "border-green-100 bg-gradient-to-br from-lime-50 via-white to-green-100 shadow-green-100/80",
+  indigo:
+    "border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-100 shadow-indigo-100/80",
+  orange:
+    "border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-100 shadow-orange-100/80",
+  pink:
+    "border-pink-100 bg-gradient-to-br from-pink-50 via-white to-rose-100 shadow-pink-100/80",
+  purple:
+    "border-purple-100 bg-gradient-to-br from-purple-50 via-white to-fuchsia-100 shadow-purple-100/80",
+  rose:
+    "border-rose-100 bg-gradient-to-br from-rose-50 via-white to-red-100 shadow-rose-100/80",
+  slate:
+    "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-slate-100/80",
+  yellow:
+    "border-yellow-100 bg-gradient-to-br from-yellow-50 via-white to-amber-100 shadow-yellow-100/80",
 };
 
-const iconColorStyles = {
-  amber: "bg-amber-50 text-amber-600",
-  blue: "bg-sky-50 text-sky-600",
-  cyan: "bg-cyan-50 text-cyan-600",
-  emerald: "bg-emerald-50 text-emerald-600",
-  green: "bg-green-50 text-green-600",
-  indigo: "bg-indigo-50 text-indigo-600",
-  orange: "bg-orange-50 text-orange-600",
-  pink: "bg-pink-50 text-pink-600",
-  purple: "bg-purple-50 text-purple-600",
-  rose: "bg-rose-50 text-rose-600",
-  slate: "bg-slate-100 text-slate-700",
-  yellow: "bg-yellow-50 text-yellow-600",
+type IconTheme = keyof typeof iconBadgeStyles;
+
+type SubcategoryVisual = {
+  symbol: string;
+  theme: IconTheme;
+  image?: string;
+};
+
+const subcategoryVisuals: Record<string, SubcategoryVisual> = {
+  Handyman: { symbol: "🛠️", theme: "amber" },
+  "General Cleaning": { symbol: "✨", theme: "cyan" },
+  Painter: { symbol: "🎨", theme: "purple" },
+  "Pest Control": {
+    symbol: "🐞",
+    theme: "rose",
+    image: "/subcategory-icons/pest-control-cockroach.svg",
+  },
+  Electrical: { symbol: "⚡", theme: "yellow" },
+  Plumbing: { symbol: "💧", theme: "blue" },
+  "HVAC Services": { symbol: "🌬️", theme: "indigo" },
+  "Junk Removal": { symbol: "🗑️", theme: "slate" },
+  "Roofing Services": { symbol: "🏠", theme: "orange" },
+  "Drywall Repair & Installation": { symbol: "🔨", theme: "amber" },
+  Fencing: {
+    symbol: "🪵",
+    theme: "amber",
+    image: "/subcategory-icons/fencing.svg",
+  },
+  "Deck Building & Repair": { symbol: "🪚", theme: "orange" },
+  "Glass & Shower Doors": {
+    symbol: "🚪",
+    theme: "cyan",
+    image: "/subcategory-icons/glass-shower-door.svg",
+  },
+  "Gutter Installation & Cleaning": { symbol: "💦", theme: "blue" },
+  "Garage Door Repair & Installation": {
+    symbol: "🏘️",
+    theme: "slate",
+    image: "/subcategory-icons/garage-door.svg",
+  },
+  "Tile Installation": { symbol: "▦", theme: "purple" },
+  "Mobile Car Servicing": { symbol: "🚗", theme: "blue" },
+  "Diagnostic Check": { symbol: "🔎", theme: "indigo" },
+  "Car Washing & Detailing": { symbol: "🫧", theme: "cyan" },
+  "Tire Replacement": { symbol: "🛞", theme: "slate" },
+  "Puncture Repair": { symbol: "🔧", theme: "amber" },
+  "Alloy Wheel Repair": {
+    symbol: "⚙️",
+    theme: "slate",
+    image: "/subcategory-icons/alloy-wheel.svg",
+  },
+  "In-home Pet Sitting": { symbol: "🐾", theme: "pink" },
+  "Pet Walking": { symbol: "🐕", theme: "orange" },
+  Grooming: { symbol: "✂️", theme: "purple" },
+  "Washing & Cleaning": { symbol: "🫧", theme: "cyan" },
+  "Nail Trimming": {
+    symbol: "💅",
+    theme: "pink",
+    image: "/subcategory-icons/pet-nails.svg",
+  },
+  "Ear Cleaning": { symbol: "👂", theme: "amber" },
+  "Pet Training": {
+    symbol: "🏅",
+    theme: "yellow",
+    image: "/subcategory-icons/pet-training.svg",
+  },
+  "Lawn Mowing & Edging": { symbol: "🌱", theme: "green" },
+  Weeding: { symbol: "🌿", theme: "emerald" },
+  "Pruning & Trimming": { symbol: "✂️", theme: "green" },
+  "Leaf Blowing & Cleanup": { symbol: "🍃", theme: "emerald" },
+  Mulching: { symbol: "🪴", theme: "amber" },
+  "Garden Design & Landscaping": { symbol: "🌸", theme: "pink" },
+  "Seasonal Planting": { symbol: "🌷", theme: "green" },
+  "Turf Laying / Seeding": { symbol: "🌾", theme: "green" },
+  "Raised Bed Installation": {
+    symbol: "🥕",
+    theme: "orange",
+    image: "/subcategory-icons/raised-garden-bed.svg",
+  },
+  "Tree Trimming & Shaping": { symbol: "🌲", theme: "emerald" },
+  "Tree Removal": { symbol: "🪓", theme: "amber" },
+  "Stump Grinding": { symbol: "🪵", theme: "amber" },
+  "Storm Damage Cleanup": { symbol: "⛈️", theme: "indigo" },
+  "Sprinkler Installation & Repair": { symbol: "💦", theme: "blue" },
+  "Drip Irrigation Setup": { symbol: "💧", theme: "blue" },
+  "Drainage Solutions": { symbol: "🌊", theme: "blue" },
+  "Soil Fertilizing": { symbol: "🌻", theme: "yellow" },
+  "Aeration & Scarification": { symbol: "🟤", theme: "amber" },
+  "Weed & Pest Control": { symbol: "🐛", theme: "rose" },
+  "Composting Services": { symbol: "♻️", theme: "green" },
+  "Patio & Pathway Installation": { symbol: "🧱", theme: "orange" },
+  "Retaining Walls": { symbol: "🧱", theme: "slate" },
+  "Outdoor Lighting Installation": { symbol: "💡", theme: "yellow" },
+  "Organic Gardening": { symbol: "🍃", theme: "green" },
+  "Water Feature Installation": { symbol: "⛲", theme: "blue" },
+  "Greenhouse Setup": { symbol: "🏡", theme: "emerald" },
+  "Winter Prep & Snow Removal": { symbol: "❄️", theme: "blue" },
+  "Local Moves": { symbol: "🚚", theme: "orange" },
+  "Long-distance Moves": { symbol: "🗺️", theme: "blue" },
+  "Loading & Unloading": { symbol: "📦", theme: "amber" },
+  "Furniture Rearranging": { symbol: "🛋️", theme: "purple" },
+  "Piano & Heavy Item Moving": { symbol: "🏋️", theme: "slate" },
+  "Full Packing Service": { symbol: "📦", theme: "orange" },
+  "Partial Packing": {
+    symbol: "📬",
+    theme: "amber",
+    image: "/subcategory-icons/wrapped-furniture.svg",
+  },
+  "Unpacking & Setup": {
+    symbol: "📭",
+    theme: "green",
+    image: "/subcategory-icons/box-open.svg",
+  },
+  "Office & Commercial Moves": { symbol: "🏢", theme: "indigo" },
+  "Apartment Moves": { symbol: "🏙️", theme: "blue" },
+  "Senior Moving": { symbol: "🤝", theme: "pink" },
+  "Art & Fine Item Transport": { symbol: "🖼️", theme: "purple" },
+  "Emergency Towing": { symbol: "🚨", theme: "rose" },
+  "Battery Jump-start": { symbol: "🔋", theme: "yellow" },
+  "Flat Tire Change": { symbol: "🛞", theme: "slate" },
+  "Fuel Delivery": { symbol: "⛽", theme: "amber" },
+  "Lockout Service": { symbol: "🔑", theme: "purple" },
+  "Flatbed Towing": {
+    symbol: "🚚",
+    theme: "orange",
+    image: "/subcategory-icons/flatbed-truck.svg",
+  },
+  "Wheel-lift Towing": {
+    symbol: "🔧",
+    theme: "amber",
+    image: "/subcategory-icons/wheel-lift-tow-truck.svg",
+  },
+  "Hook & Chain Towing": { symbol: "🔗", theme: "slate" },
+  "Dolly Towing": { symbol: "➡️", theme: "blue" },
+  "Motorcycle Towing": { symbol: "🏍️", theme: "orange" },
+  "Heavy-duty Truck & RV Towing": { symbol: "🚛", theme: "orange" },
+  "Bus & Commercial Vehicle Towing": { symbol: "🚌", theme: "yellow" },
+  "Off-road Recovery": { symbol: "⛰️", theme: "emerald" },
+  "Winching & Vehicle Extraction": { symbol: "🪝", theme: "slate" },
+  "Mud / Ditch / Rollover Recovery": { symbol: "⚠️", theme: "amber" },
+  "Water / Flood Recovery": { symbol: "🌊", theme: "blue" },
+  "Boat & Trailer Towing": {
+    symbol: "⚓",
+    theme: "blue",
+    image: "/subcategory-icons/boat-trailer.svg",
+  },
 };
 
 function getCurrentSlug(pathname: string) {
@@ -337,61 +343,6 @@ function findService(slug: string) {
   );
 }
 
-function getSubcategoryIconStyle(name: string) {
-  const lowerName = name.toLowerCase();
-
-  if (lowerName.includes("clean") || lowerName.includes("wash")) {
-    return iconColorStyles.cyan;
-  }
-  if (lowerName.includes("paint") || lowerName.includes("art")) {
-    return iconColorStyles.purple;
-  }
-  if (lowerName.includes("pest") || lowerName.includes("bug")) {
-    return iconColorStyles.rose;
-  }
-  if (lowerName.includes("electrical") || lowerName.includes("battery")) {
-    return iconColorStyles.yellow;
-  }
-  if (lowerName.includes("plumb") || lowerName.includes("water")) {
-    return iconColorStyles.blue;
-  }
-  if (lowerName.includes("hvac") || lowerName.includes("wind")) {
-    return iconColorStyles.indigo;
-  }
-  if (lowerName.includes("garden") || lowerName.includes("lawn")) {
-    return iconColorStyles.green;
-  }
-  if (lowerName.includes("tree") || lowerName.includes("leaf")) {
-    return iconColorStyles.emerald;
-  }
-  if (lowerName.includes("snow") || lowerName.includes("winter")) {
-    return iconColorStyles.blue;
-  }
-  if (lowerName.includes("move") || lowerName.includes("packing")) {
-    return iconColorStyles.orange;
-  }
-  if (lowerName.includes("pet") || lowerName.includes("grooming")) {
-    return iconColorStyles.pink;
-  }
-  if (lowerName.includes("towing") || lowerName.includes("recovery")) {
-    return iconColorStyles.orange;
-  }
-  if (lowerName.includes("fuel")) {
-    return iconColorStyles.amber;
-  }
-  if (lowerName.includes("lockout") || lowerName.includes("key")) {
-    return iconColorStyles.purple;
-  }
-  if (lowerName.includes("car") || lowerName.includes("tire")) {
-    return iconColorStyles.blue;
-  }
-  if (lowerName.includes("repair") || lowerName.includes("handyman")) {
-    return iconColorStyles.amber;
-  }
-
-  return iconColorStyles.slate;
-}
-
 function SubcategoryIcon({
   name,
   isSelected,
@@ -399,16 +350,36 @@ function SubcategoryIcon({
   name: string;
   isSelected: boolean;
 }) {
-  const Icon = subcategoryIcons[name] ?? CircleDot;
-  const colorClass = getSubcategoryIconStyle(name);
+  const visual = subcategoryVisuals[name] ?? {
+    symbol: "✨",
+    theme: "slate" as IconTheme,
+  };
+  const badgeClass = iconBadgeStyles[visual.theme];
 
   return (
     <span
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-        isSelected ? "bg-red-500 text-white" : colorClass
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${
+        isSelected
+          ? "border-red-300 bg-gradient-to-br from-red-500 to-red-600 shadow-red-100"
+          : badgeClass
       }`}
     >
-      <Icon aria-hidden="true" className="h-5 w-5" strokeWidth={2.2} />
+      <span
+        aria-hidden="true"
+        className={`text-[25px] leading-none drop-shadow-sm ${
+          isSelected ? "scale-95 saturate-150" : "saturate-125"
+        }`}
+      >
+        {visual.image ? (
+          <img
+            src={visual.image}
+            alt=""
+            className="h-8 w-8 object-contain"
+          />
+        ) : (
+          visual.symbol
+        )}
+      </span>
     </span>
   );
 }
