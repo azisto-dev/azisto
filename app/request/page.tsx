@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { Calendar, Camera, CheckCircle2, ChevronLeft, Clock } from "lucide-react";
+import { Calendar, Camera, ChevronLeft, Clock } from "lucide-react";
 
 const urgencyOptions = [
   "Flexible",
@@ -32,15 +32,15 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 function RequestForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const selectedService = searchParams.get("service");
   const selectedItems = searchParams.getAll("item");
   const [urgency, setUrgency] = useState("Flexible");
-  const [isSubmitted, setIsSubmitted] = useState(false);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitted(true);
+    router.push("/login?reason=submit-request");
   }
 
   return (
@@ -198,19 +198,6 @@ function RequestForm() {
                 })}
               </div>
             </div>
-
-            {isSubmitted ? (
-              <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
-                <CheckCircle2
-                  aria-hidden="true"
-                  className="mt-0.5 h-5 w-5 shrink-0"
-                />
-                <p>
-                  Request captured for now. We will connect this to accounts and
-                  Firebase in a later step.
-                </p>
-              </div>
-            ) : null}
 
             <button
               type="submit"

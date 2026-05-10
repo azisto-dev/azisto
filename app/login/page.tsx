@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const showSubmitRequestNotice =
+    searchParams.get("reason") === "submit-request";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -64,6 +67,12 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-4">
+          {showSubmitRequestNotice ? (
+            <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+              Please sign in or create an account to submit your request.
+            </div>
+          ) : null}
+
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Email</span>
             <input
@@ -115,5 +124,13 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
