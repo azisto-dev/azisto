@@ -434,6 +434,12 @@ export default function ServiceDetailPage() {
   const selectedCount = selectedItems.length;
   const continueLabel =
     selectedCount === 0 ? "Continue" : `Continue (${selectedCount} selected)`;
+  const requestParams = new URLSearchParams();
+
+  requestParams.set("service", service.name);
+  selectedItems.forEach((item) => {
+    requestParams.append("item", item);
+  });
 
   return (
     <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
@@ -534,7 +540,7 @@ export default function ServiceDetailPage() {
 
         <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
           <Link
-            href="/login"
+            href={`/request?${requestParams.toString()}`}
             className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100"
           >
             {continueLabel}
