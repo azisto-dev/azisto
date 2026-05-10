@@ -6,7 +6,7 @@ const accountTypes = [
     description:
       "Find trusted help for home, car, pet, garden, moving, and roadside services.",
     buttonText: "Continue as Customer",
-    href: "/home",
+    href: "/customer/onboarding",
   },
   {
     title: "Contractor",
