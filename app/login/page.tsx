@@ -31,7 +31,7 @@ function LoginForm() {
       setIsLoading(true);
       setMessage("");
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/home");
+      router.push("/account-type");
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -44,7 +44,7 @@ function LoginForm() {
       setIsLoading(true);
       setMessage("");
       await createUserWithEmailAndPassword(auth, email, password);
-      router.push("/home");
+      router.push("/account-type");
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
