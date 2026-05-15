@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { ChevronLeft } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
@@ -46,13 +47,80 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function getCustomerSaveErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const errorCode =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "";
+  const details = `${errorCode} ${message}`.toLowerCase();
+
+  if (
+    errorCode === "permission-denied" ||
+    errorCode === "firestore/permission-denied" ||
+    details.includes("permission-denied") ||
+    details.includes("missing or insufficient permissions")
+  ) {
+    return "Firestore permission denied. Check Firebase rules.";
+  }
+
+  if (
+    errorCode === "unauthenticated" ||
+    errorCode === "firestore/unauthenticated" ||
+    details.includes("unauthenticated") ||
+    details.includes("auth/user-token-expired") ||
+    details.includes("auth/id-token-expired") ||
+    details.includes("securetoken") ||
+    details.includes("id token")
+  ) {
+    return "Please sign in again.";
+  }
+
+  if (
+    errorCode === "unavailable" ||
+    errorCode === "firestore/unavailable" ||
+    errorCode === "deadline-exceeded" ||
+    errorCode === "firestore/deadline-exceeded" ||
+    details.includes("unavailable") ||
+    details.includes("deadline-exceeded") ||
+    details.includes("network")
+  ) {
+    return "Firebase connection failed. Try again.";
+  }
+
+  return "Unable to save your customer profile. Please try again.";
+}
+
 export default function CustomerOnboardingPage() {
   const router = useRouter();
   const [form, setForm] = useState<CustomerForm>(initialForm);
   const [preferredContactMethod, setPreferredContactMethod] =
     useState("In-app message");
   const [errorMessage, setErrorMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("Customer onboarding: auth state loaded");
+
+      if (user) {
+        console.log("Customer onboarding auth user UID:", user.uid);
+        setCurrentUser(user);
+      } else {
+        console.log(
+          "Customer onboarding: no auth user, redirecting to login",
+        );
+        setCurrentUser(null);
+        router.replace("/login?reason=customer-onboarding");
+      }
+
+      setAuthLoading(false);
+    });
+
+    return unsubscribe;
+  }, [router]);
 
   function updateField(field: keyof CustomerForm, value: string) {
     setForm((currentForm) => ({
@@ -62,9 +130,16 @@ export default function CustomerOnboardingPage() {
   }
 
   async function handleContinue() {
-    const user = auth.currentUser;
+    if (isSaving || authLoading) {
+      return;
+    }
+
+    const user = currentUser;
 
     if (!user) {
+      console.log(
+        "Customer onboarding: no loaded user, redirecting to login",
+      );
       router.push("/login?reason=customer-onboarding");
       return;
     }
@@ -72,6 +147,9 @@ export default function CustomerOnboardingPage() {
     try {
       setIsSaving(true);
       setErrorMessage("");
+
+      console.log("Customer onboarding current user UID:", user.uid);
+      console.log("Customer onboarding: before saving customer");
 
       await setDoc(
         doc(db, "customers", user.uid),
@@ -91,13 +169,11 @@ export default function CustomerOnboardingPage() {
         { merge: true },
       );
 
+      console.log("Customer onboarding: customer saved successfully");
       router.push("/home");
     } catch (error) {
-      if (error instanceof Error) {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage("Unable to save your customer profile.");
-      }
+      console.error("Customer onboarding Firestore error:", error);
+      setErrorMessage(getCustomerSaveErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -248,6 +324,12 @@ export default function CustomerOnboardingPage() {
               </div>
             </section>
 
+            {authLoading ? (
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                Checking account...
+              </p>
+            ) : null}
+
             {errorMessage ? (
               <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
                 {errorMessage}
@@ -257,10 +339,14 @@ export default function CustomerOnboardingPage() {
             <button
               type="button"
               onClick={handleContinue}
-              disabled={isSaving}
+              disabled={isSaving || authLoading}
               className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
             >
-              {isSaving ? "Saving..." : "Continue"}
+              {authLoading
+                ? "Checking account..."
+                : isSaving
+                  ? "Saving..."
+                  : "Continue"}
             </button>
           </form>
         </div>

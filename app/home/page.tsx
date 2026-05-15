@@ -184,13 +184,23 @@ export default function HomePage() {
             </h1>
           </section>
 
-          <Link
-            href="/login"
-            className="mt-5 flex h-14 items-center justify-between rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-500 shadow-sm"
-          >
-            <span>What do you need help with?</span>
-            <SearchIcon />
-          </Link>
+          <div className="mt-5 flex h-14 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-500 shadow-sm">
+            <Link
+              href="/login"
+              className="flex min-w-0 flex-1 items-center justify-between gap-3"
+            >
+              <span className="truncate">What do you need help with?</span>
+              <SearchIcon />
+            </Link>
+
+            <Link
+              href="/ai-assistant"
+              className="azisto-ai-glow flex h-9 shrink-0 items-center justify-center rounded-full border border-red-100 bg-white/80 px-3 text-xs font-bold text-red-500 shadow-lg shadow-red-100/70 backdrop-blur"
+              aria-label="Open AZISTO AI assistant"
+            >
+              ✨ AI
+            </Link>
+          </div>
 
           <section className="mt-6 grid grid-cols-3 gap-3">
             {services.map((service) => (

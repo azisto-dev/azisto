@@ -12,3 +12,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes azisto-ai-glow {
+  0%,
+  100% {
+    box-shadow: 0 8px 20px rgb(239 68 68 / 0.12);
+  }
+
+  50% {
+    box-shadow: 0 8px 24px rgb(239 68 68 / 0.22);
+  }
+}
+
+.azisto-ai-glow {
+  animation: azisto-ai-glow 3.8s ease-in-out infinite;
+}
