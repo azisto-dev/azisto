@@ -62,6 +62,10 @@ function LoginForm() {
       return "Network error. Please check your connection and try again.";
     }
 
+    if (error instanceof Error && error.message === "auth-state-missing") {
+      return "Your account was created, but sign-in did not finish. Please try logging in.";
+    }
+
     return "Something went wrong. Please try again.";
   };
 
@@ -86,12 +90,6 @@ function LoginForm() {
   };
 
   const handleSignup = async () => {
-    if (!email.trim() && !password) {
-      setMessage("");
-      router.push("/account-type");
-      return;
-    }
-
     const validationMessage = validateForm();
 
     if (validationMessage) {
@@ -102,9 +100,22 @@ function LoginForm() {
     try {
       setIsLoading(true);
       setMessage("");
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+      console.log("Signup successful user UID:", userCredential.user.uid);
+      await auth.authStateReady();
+
+      if (!auth.currentUser) {
+        throw new Error("auth-state-missing");
+      }
+
+      console.log("Signup auth state ready for UID:", userCredential.user.uid);
       router.push("/account-type");
     } catch (error) {
+      console.error("Signup failed:", error);
       setMessage(getErrorMessage(error));
     } finally {
       setIsLoading(false);

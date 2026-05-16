@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { ChevronLeft } from "lucide-react";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 const contactMethods = ["In-app message", "Phone call", "Text message"];
 
@@ -17,6 +16,10 @@ type CustomerForm = {
   city: string;
   province: string;
   postalCode: string;
+};
+
+type CustomerProfilePayload = CustomerForm & {
+  preferredContactMethod: string;
 };
 
 const initialForm: CustomerForm = {
@@ -48,12 +51,15 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 function getCustomerSaveErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  const errorCode =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { code?: unknown }).code)
-      : "";
+  const { code: errorCode, message } = getFirebaseErrorDetails(error);
   const details = `${errorCode} ${message}`.toLowerCase();
+
+  if (
+    details.includes("permission denied on resource project") ||
+    details.includes("consumer_invalid")
+  ) {
+    return "Firestore project access was denied. Check that this web app uses the exact Firebase config from project azisto, and that the API key belongs to that same project with Cloud Firestore API allowed.";
+  }
 
   if (
     errorCode === "permission-denied" ||
@@ -91,6 +97,64 @@ function getCustomerSaveErrorMessage(error: unknown) {
   return "Unable to save your customer profile. Please try again.";
 }
 
+function getFirebaseErrorDetails(error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : "unknown";
+  const message = error instanceof Error ? error.message : "Unknown error";
+
+  return { code, message };
+}
+
+function formatCustomerSaveError(error: unknown) {
+  const { code, message } = getFirebaseErrorDetails(error);
+
+  return `${getCustomerSaveErrorMessage(error)}\n\nCode: ${code}\nMessage: ${message}`;
+}
+
+function createCustomerSaveError(code: string, message: string) {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+async function saveCustomerProfileWithApi(
+  user: User,
+  payload: CustomerProfilePayload,
+) {
+  const token = await user.getIdToken();
+
+  console.log("Customer onboarding: before profile API save with UID:", user.uid);
+
+  const response = await fetch("/api/customers/profile", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const responseBody = (await response.json().catch(() => null)) as {
+      code?: unknown;
+      message?: unknown;
+    } | null;
+
+    throw createCustomerSaveError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+
+  console.log("Customer onboarding: after profile API save success");
+}
+
 export default function CustomerOnboardingPage() {
   const router = useRouter();
   const [form, setForm] = useState<CustomerForm>(initialForm);
@@ -100,6 +164,7 @@ export default function CustomerOnboardingPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const authLoaded = !authLoading;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -107,6 +172,7 @@ export default function CustomerOnboardingPage() {
 
       if (user) {
         console.log("Customer onboarding auth user UID:", user.uid);
+        console.log("Customer onboarding auth user email:", user.email);
         setCurrentUser(user);
       } else {
         console.log(
@@ -138,7 +204,7 @@ export default function CustomerOnboardingPage() {
 
     if (!user) {
       console.log(
-        "Customer onboarding: no loaded user, redirecting to login",
+        "Customer onboarding: no auth state user, redirecting to login",
       );
       router.push("/login?reason=customer-onboarding");
       return;
@@ -149,31 +215,31 @@ export default function CustomerOnboardingPage() {
       setErrorMessage("");
 
       console.log("Customer onboarding current user UID:", user.uid);
-      console.log("Customer onboarding: before saving customer");
+      console.log("Customer onboarding: before API save with UID:", user.uid);
 
-      await setDoc(
-        doc(db, "customers", user.uid),
-        {
-          userId: user.uid,
-          fullName: form.fullName,
-          phoneNumber: form.phoneNumber,
-          address: form.address,
-          city: form.city,
-          province: form.province,
-          postalCode: form.postalCode,
-          preferredContactMethod,
-          role: "customer",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      const payload: CustomerProfilePayload = {
+        fullName: form.fullName,
+        phoneNumber: form.phoneNumber,
+        address: form.address,
+        city: form.city,
+        province: form.province,
+        postalCode: form.postalCode,
+        preferredContactMethod,
+      };
 
-      console.log("Customer onboarding: customer saved successfully");
+      await saveCustomerProfileWithApi(user, payload);
+
+      console.log("Customer onboarding: customer profile saved");
       router.push("/home");
     } catch (error) {
-      console.error("Customer onboarding Firestore error:", error);
-      setErrorMessage(getCustomerSaveErrorMessage(error));
+      const { code, message } = getFirebaseErrorDetails(error);
+
+      console.error("Customer onboarding Firestore error:", {
+        code,
+        message,
+        error,
+      });
+      setErrorMessage(formatCustomerSaveError(error));
     } finally {
       setIsSaving(false);
     }
@@ -330,8 +396,16 @@ export default function CustomerOnboardingPage() {
               </p>
             ) : null}
 
+            {process.env.NODE_ENV === "development" ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+                <p>authLoaded: {String(authLoaded)}</p>
+                <p>user.uid: {currentUser?.uid ?? "none"}</p>
+                <p>user.email: {currentUser?.email ?? "none"}</p>
+              </div>
+            ) : null}
+
             {errorMessage ? (
-              <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+              <p className="whitespace-pre-line rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
                 {errorMessage}
               </p>
             ) : null}
