@@ -164,7 +164,6 @@ export default function CustomerOnboardingPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const authLoaded = !authLoading;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -394,14 +393,6 @@ export default function CustomerOnboardingPage() {
               <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                 Checking account...
               </p>
-            ) : null}
-
-            {process.env.NODE_ENV === "development" ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-                <p>authLoaded: {String(authLoaded)}</p>
-                <p>user.uid: {currentUser?.uid ?? "none"}</p>
-                <p>user.email: {currentUser?.email ?? "none"}</p>
-              </div>
             ) : null}
 
             {errorMessage ? (
