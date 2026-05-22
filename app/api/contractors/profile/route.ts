@@ -76,7 +76,17 @@ function readBoolean(value: unknown) {
 }
 
 function readDocumentStatus(value: unknown, fallback: string) {
-  return readText(value) || fallback;
+  const status = readText(value);
+
+  return ["uploaded", "not_uploaded", "not_required"].includes(status)
+    ? status
+    : fallback;
+}
+
+function readUploadSize(value: unknown) {
+  const size = readNumber(value);
+
+  return size > 0 ? size : 0;
 }
 
 function readTradeLicences(value: unknown) {
@@ -91,7 +101,12 @@ function readTradeLicences(value: unknown) {
       category: readText(tradeLicence.category),
       documentName: readText(tradeLicence.documentName),
       status: readDocumentStatus(tradeLicence.status, "not_uploaded"),
+      fileName: readText(tradeLicence.fileName),
       fileUrl: readText(tradeLicence.fileUrl),
+      storagePath: readText(tradeLicence.storagePath),
+      contentType: readText(tradeLicence.contentType),
+      size: readUploadSize(tradeLicence.size),
+      uploadedAt: readText(tradeLicence.uploadedAt),
       reviewedAt: null,
       rejectionReason: readText(tradeLicence.rejectionReason),
     };
@@ -112,14 +127,24 @@ function readContractorDocuments(value: unknown) {
   return {
     governmentId: {
       status: readDocumentStatus(governmentId.status, "not_uploaded"),
+      fileName: readText(governmentId.fileName),
       fileUrl: readText(governmentId.fileUrl),
+      storagePath: readText(governmentId.storagePath),
+      contentType: readText(governmentId.contentType),
+      size: readUploadSize(governmentId.size),
+      uploadedAt: readText(governmentId.uploadedAt),
       expiryDate: readText(governmentId.expiryDate),
       reviewedAt: null,
       rejectionReason: readText(governmentId.rejectionReason),
     },
     businessLicence: {
       status: readDocumentStatus(businessLicence.status, "not_uploaded"),
+      fileName: readText(businessLicence.fileName),
       fileUrl: readText(businessLicence.fileUrl),
+      storagePath: readText(businessLicence.storagePath),
+      contentType: readText(businessLicence.contentType),
+      size: readUploadSize(businessLicence.size),
+      uploadedAt: readText(businessLicence.uploadedAt),
       licenceNumber: readText(businessLicence.licenceNumber),
       municipality: readText(businessLicence.municipality),
       expiryDate: readText(businessLicence.expiryDate),
@@ -131,7 +156,12 @@ function readContractorDocuments(value: unknown) {
         commercialGeneralLiability.status,
         "not_uploaded",
       ),
+      fileName: readText(commercialGeneralLiability.fileName),
       fileUrl: readText(commercialGeneralLiability.fileUrl),
+      storagePath: readText(commercialGeneralLiability.storagePath),
+      contentType: readText(commercialGeneralLiability.contentType),
+      size: readUploadSize(commercialGeneralLiability.size),
+      uploadedAt: readText(commercialGeneralLiability.uploadedAt),
       provider: readText(commercialGeneralLiability.provider),
       policyNumber: readText(commercialGeneralLiability.policyNumber),
       coverageAmount: readText(commercialGeneralLiability.coverageAmount),
@@ -142,7 +172,12 @@ function readContractorDocuments(value: unknown) {
     worksafeBC: {
       status: readDocumentStatus(worksafeBC.status, "not_uploaded"),
       accountNumber: readText(worksafeBC.accountNumber),
+      fileName: readText(worksafeBC.fileName),
       clearanceLetterUrl: readText(worksafeBC.clearanceLetterUrl),
+      storagePath: readText(worksafeBC.storagePath),
+      contentType: readText(worksafeBC.contentType),
+      size: readUploadSize(worksafeBC.size),
+      uploadedAt: readText(worksafeBC.uploadedAt),
       expiryDate: readText(worksafeBC.expiryDate),
       reviewedAt: null,
       rejectionReason: readText(worksafeBC.rejectionReason),
@@ -154,14 +189,96 @@ function readContractorDocuments(value: unknown) {
     vehicleDocuments: {
       status: readDocumentStatus(vehicleDocuments.status, "not_required"),
       driverLicenceUrl: readText(vehicleDocuments.driverLicenceUrl),
+      driverLicenceFileName: readText(vehicleDocuments.driverLicenceFileName),
+      driverLicenceStoragePath: readText(
+        vehicleDocuments.driverLicenceStoragePath,
+      ),
+      driverLicenceContentType: readText(
+        vehicleDocuments.driverLicenceContentType,
+      ),
+      driverLicenceSize: readUploadSize(vehicleDocuments.driverLicenceSize),
+      driverLicenceUploadedAt: readText(
+        vehicleDocuments.driverLicenceUploadedAt,
+      ),
       vehicleRegistrationUrl: readText(vehicleDocuments.vehicleRegistrationUrl),
+      vehicleRegistrationFileName: readText(
+        vehicleDocuments.vehicleRegistrationFileName,
+      ),
+      vehicleRegistrationStoragePath: readText(
+        vehicleDocuments.vehicleRegistrationStoragePath,
+      ),
+      vehicleRegistrationContentType: readText(
+        vehicleDocuments.vehicleRegistrationContentType,
+      ),
+      vehicleRegistrationSize: readUploadSize(
+        vehicleDocuments.vehicleRegistrationSize,
+      ),
+      vehicleRegistrationUploadedAt: readText(
+        vehicleDocuments.vehicleRegistrationUploadedAt,
+      ),
       commercialVehicleInsuranceUrl: readText(
         vehicleDocuments.commercialVehicleInsuranceUrl,
       ),
+      commercialVehicleInsuranceFileName: readText(
+        vehicleDocuments.commercialVehicleInsuranceFileName,
+      ),
+      commercialVehicleInsuranceStoragePath: readText(
+        vehicleDocuments.commercialVehicleInsuranceStoragePath,
+      ),
+      commercialVehicleInsuranceContentType: readText(
+        vehicleDocuments.commercialVehicleInsuranceContentType,
+      ),
+      commercialVehicleInsuranceSize: readUploadSize(
+        vehicleDocuments.commercialVehicleInsuranceSize,
+      ),
+      commercialVehicleInsuranceUploadedAt: readText(
+        vehicleDocuments.commercialVehicleInsuranceUploadedAt,
+      ),
       cargoInsuranceUrl: readText(vehicleDocuments.cargoInsuranceUrl),
+      cargoInsuranceFileName: readText(vehicleDocuments.cargoInsuranceFileName),
+      cargoInsuranceStoragePath: readText(
+        vehicleDocuments.cargoInsuranceStoragePath,
+      ),
+      cargoInsuranceContentType: readText(
+        vehicleDocuments.cargoInsuranceContentType,
+      ),
+      cargoInsuranceSize: readUploadSize(vehicleDocuments.cargoInsuranceSize),
+      cargoInsuranceUploadedAt: readText(
+        vehicleDocuments.cargoInsuranceUploadedAt,
+      ),
       towingInsuranceUrl: readText(vehicleDocuments.towingInsuranceUrl),
+      towingInsuranceFileName: readText(
+        vehicleDocuments.towingInsuranceFileName,
+      ),
+      towingInsuranceStoragePath: readText(
+        vehicleDocuments.towingInsuranceStoragePath,
+      ),
+      towingInsuranceContentType: readText(
+        vehicleDocuments.towingInsuranceContentType,
+      ),
+      towingInsuranceSize: readUploadSize(
+        vehicleDocuments.towingInsuranceSize,
+      ),
+      towingInsuranceUploadedAt: readText(
+        vehicleDocuments.towingInsuranceUploadedAt,
+      ),
       garageKeepersLiabilityUrl: readText(
         vehicleDocuments.garageKeepersLiabilityUrl,
+      ),
+      garageKeepersLiabilityFileName: readText(
+        vehicleDocuments.garageKeepersLiabilityFileName,
+      ),
+      garageKeepersLiabilityStoragePath: readText(
+        vehicleDocuments.garageKeepersLiabilityStoragePath,
+      ),
+      garageKeepersLiabilityContentType: readText(
+        vehicleDocuments.garageKeepersLiabilityContentType,
+      ),
+      garageKeepersLiabilitySize: readUploadSize(
+        vehicleDocuments.garageKeepersLiabilitySize,
+      ),
+      garageKeepersLiabilityUploadedAt: readText(
+        vehicleDocuments.garageKeepersLiabilityUploadedAt,
       ),
       vehicleType: readText(vehicleDocuments.vehicleType),
       licencePlate: readText(vehicleDocuments.licencePlate),
@@ -171,7 +288,12 @@ function readContractorDocuments(value: unknown) {
     },
     drivingAbstract: {
       status: readDocumentStatus(drivingAbstract.status, "not_required"),
+      fileName: readText(drivingAbstract.fileName),
       fileUrl: readText(drivingAbstract.fileUrl),
+      storagePath: readText(drivingAbstract.storagePath),
+      contentType: readText(drivingAbstract.contentType),
+      size: readUploadSize(drivingAbstract.size),
+      uploadedAt: readText(drivingAbstract.uploadedAt),
       issueDate: readText(drivingAbstract.issueDate),
       licenceClass: readText(drivingAbstract.licenceClass),
       licenceExpiryDate: readText(drivingAbstract.licenceExpiryDate),

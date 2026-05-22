@@ -1,4 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { fetchSessionProfile } from "@/lib/sessionProfile";
 
 const services = [
   {
@@ -42,32 +49,48 @@ const services = [
   },
 ];
 
-const navItems = [
-  {
-    label: "Home",
-    href: "/home",
-    active: true,
-    path: "M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z",
-  },
-  {
-    label: "Bookings",
-    href: "/login",
-    active: false,
-    path: "M7 3v3M17 3v3M4 8h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
-  },
-  {
-    label: "Messages",
-    href: "/login",
-    active: false,
-    path: "M4 5h16v11H8l-4 4V5ZM8 9h8M8 13h5",
-  },
-  {
-    label: "Profile",
-    href: "/login",
-    active: false,
-    path: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
-  },
-];
+function getNavItems(role: "customer" | "contractor" | "unknown") {
+  const jobsHref =
+    role === "contractor"
+      ? "/contractor/my-jobs"
+      : role === "customer"
+        ? "/customer/jobs"
+        : "/login";
+  const messagesHref = role === "unknown" ? "/login" : "/messages";
+  const profileHref =
+    role === "contractor"
+      ? "/contractor/pending-verification"
+      : role === "customer"
+        ? "/customer/jobs"
+        : "/login";
+
+  return [
+    {
+      label: "Home",
+      href: "/home",
+      active: true,
+      path: "M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z",
+    },
+    {
+      label: "Bookings",
+      href: jobsHref,
+      active: false,
+      path: "M7 3v3M17 3v3M4 8h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
+    },
+    {
+      label: "Messages",
+      href: messagesHref,
+      active: false,
+      path: "M4 5h16v11H8l-4 4V5ZM8 9h8M8 13h5",
+    },
+    {
+      label: "Profile",
+      href: profileHref,
+      active: false,
+      path: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
+    },
+  ];
+}
 
 function MenuIcon() {
   return (
@@ -138,6 +161,60 @@ function NavIcon({ path }: { path: string }) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
+    "unknown",
+  );
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const navItems = getNavItems(role);
+  const signedInHref = role === "unknown" ? "/login" : "/messages";
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Home auth state loaded");
+
+      if (!user) {
+        console.log("Home current uid: none");
+        console.log("Home redirect reason: none, public home");
+        setRole("unknown");
+        return;
+      }
+
+      console.log("Home current uid:", user.uid);
+
+      try {
+        const profile = await fetchSessionProfile(user);
+        console.log("Home role API result:", profile);
+        setRole(profile.role);
+      } catch (error) {
+        console.error("Home role lookup failed:", error);
+        setRole("unknown");
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    try {
+      setIsLoggingOut(true);
+      console.log("Home logout: user clicked logout");
+      await signOut(auth);
+      setRole("unknown");
+      setIsMenuOpen(false);
+      router.push("/login");
+    } catch (error) {
+      console.error("Home logout failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
@@ -151,14 +228,61 @@ export default function HomePage() {
             </div>
           </div>
 
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/login"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Open menu"
-            >
-              <MenuIcon />
-            </Link>
+          <header className="relative mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen((currentValue) => !currentValue)}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Open menu"
+                aria-expanded={isMenuOpen}
+              >
+                <MenuIcon />
+              </button>
+
+              {isMenuOpen ? (
+                <div className="absolute left-0 top-12 z-20 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70">
+                  <Link
+                    href={
+                      role === "contractor"
+                        ? "/contractor/my-jobs"
+                        : role === "customer"
+                          ? "/customer/jobs"
+                          : "/login"
+                    }
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50"
+                  >
+                    My jobs
+                  </Link>
+                  <Link
+                    href={role === "unknown" ? "/login" : "/messages"}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50"
+                  >
+                    Messages
+                  </Link>
+                  {role === "unknown" ? (
+                    <Link
+                      href="/login"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="block rounded-xl px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50"
+                    >
+                      Sign in
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className="block w-full rounded-xl px-4 py-3 text-left text-sm font-bold text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                      {isLoggingOut ? "Logging out..." : "Logout"}
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
 
             <Link href="/home" className="flex justify-center">
               <img
@@ -169,7 +293,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/login"
+              href={signedInHref}
               className="relative flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-black"
               aria-label="Notifications"
             >
@@ -186,7 +310,7 @@ export default function HomePage() {
 
           <div className="mt-5 flex h-14 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-500 shadow-sm">
             <Link
-              href="/login"
+              href={role === "unknown" ? "/login" : "/service/home-care"}
               className="flex min-w-0 flex-1 items-center justify-between gap-3"
             >
               <span className="truncate">What do you need help with?</span>

@@ -7,7 +7,11 @@ import {
   type AuthError,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, authPersistenceReady } from "@/lib/firebase";
+import {
+  fetchSessionProfile,
+  getDefaultRouteForSession,
+} from "@/lib/sessionProfile";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,8 +84,20 @@ function LoginForm() {
     try {
       setIsLoading(true);
       setMessage("");
+      await authPersistenceReady;
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      router.push("/home");
+      await auth.authStateReady();
+      console.log("Login auth state loaded");
+      console.log("Login current uid:", auth.currentUser?.uid ?? "none");
+      if (!auth.currentUser) {
+        throw new Error("auth-state-missing");
+      }
+
+      const profile = await fetchSessionProfile(auth.currentUser);
+      console.log("Login role API result:", profile);
+      const nextRoute = getDefaultRouteForSession(profile);
+      console.log("Login redirect reason:", `role:${profile.role}`);
+      router.push(nextRoute);
     } catch (error) {
       setMessage(getErrorMessage(error));
     } finally {
@@ -100,6 +116,7 @@ function LoginForm() {
     try {
       setIsLoading(true);
       setMessage("");
+      await authPersistenceReady;
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -113,6 +130,7 @@ function LoginForm() {
       }
 
       console.log("Signup auth state ready for UID:", userCredential.user.uid);
+      console.log("Signup redirect reason: new account needs account type");
       router.push("/account-type");
     } catch (error) {
       console.error("Signup failed:", error);

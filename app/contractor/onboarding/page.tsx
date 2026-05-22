@@ -4,8 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { ChevronLeft, FileText, ShieldCheck, Upload } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { auth, authPersistenceReady, storage } from "@/lib/firebase";
+
+const allowedUploadTypes = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+const maxUploadSizeBytes = 10 * 1024 * 1024;
+const acceptedUploadTypes = allowedUploadTypes.join(",");
 
 const documentTabs = [
   { id: "required", label: "Required Documents" },
@@ -62,6 +72,21 @@ const tradeLicenceOptions = [
 ];
 
 type DocumentTabId = (typeof documentTabs)[number]["id"];
+type UploadDocumentType =
+  | "governmentId"
+  | "businessLicence"
+  | "commercialGeneralLiability"
+  | "worksafeBC"
+  | "tradeLicence"
+  | "driverLicence"
+  | "vehicleRegistration"
+  | "commercialVehicleInsurance"
+  | "cargoInsurance"
+  | "towingInsurance"
+  | "garageKeepersLiability"
+  | "drivingAbstract";
+type TradeLicenceUploadKey = `tradeLicence-${string}`;
+type UploadKey = UploadDocumentType | TradeLicenceUploadKey;
 
 type ContractorForm = {
   displayName: string;
@@ -99,6 +124,24 @@ type DocumentForm = {
   driverLicenceExpiryDate: string;
   drivingRecordConfirmed: boolean;
 };
+
+type UploadedDocumentFile = {
+  status: "uploaded";
+  fileName: string;
+  fileUrl: string;
+  storagePath: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+};
+
+type UploadState = {
+  isUploading: boolean;
+  error: string;
+  file?: UploadedDocumentFile;
+};
+
+type UploadStates = Partial<Record<UploadKey, UploadState>>;
 
 const initialForm: ContractorForm = {
   displayName: "",
@@ -183,33 +226,75 @@ function TextInput({
   );
 }
 
-function UploadPlaceholder({
+function UploadCard({
   label,
-  onClick,
+  uploadKey,
+  documentType,
+  uploadState,
+  onUpload,
 }: {
   label: string;
-  onClick: (label: string) => void;
+  uploadKey: UploadKey;
+  documentType: UploadDocumentType;
+  uploadState?: UploadState;
+  onUpload: (
+    uploadKey: UploadKey,
+    documentType: UploadDocumentType,
+    fileList: FileList | null,
+  ) => void;
 }) {
+  const uploadedFileName = uploadState?.file?.fileName;
+  const isUploading = Boolean(uploadState?.isUploading);
+
   return (
-    <button
-      type="button"
-      onClick={() => onClick(label)}
-      className="flex min-h-16 w-full items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left transition hover:border-red-200 hover:bg-red-50/50"
+    <label
+      className={`block rounded-xl border border-dashed px-4 py-3 transition ${
+        isUploading
+          ? "cursor-wait border-red-200 bg-red-50"
+          : "cursor-pointer border-slate-300 bg-slate-50 hover:border-red-200 hover:bg-red-50/50"
+      }`}
     >
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-red-500 shadow-sm">
-          <FileText aria-hidden="true" className="h-5 w-5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-sm font-bold text-black">{label}</span>
-          <span className="block truncate text-xs leading-5 text-slate-500">
-            Upload file
+      <span className="flex min-h-16 items-center justify-between">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-red-500 shadow-sm">
+            <FileText aria-hidden="true" className="h-5 w-5" />
           </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-black">{label}</span>
+            <span className="block text-xs leading-5 text-slate-500">
+              PDF, JPG, PNG, WEBP. Max 10 MB.
+            </span>
+            {uploadedFileName ? (
+              <span className="mt-1 block truncate text-xs font-semibold text-emerald-600">
+                Uploaded: {uploadedFileName}
+              </span>
+            ) : null}
+          </span>
+        </span>
+
+        <span className="ml-3 flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-red-500 shadow-sm">
+          <Upload aria-hidden="true" className="h-4 w-4" />
+          {isUploading ? "Uploading..." : uploadedFileName ? "Replace" : "Upload"}
         </span>
       </span>
 
-      <Upload aria-hidden="true" className="ml-3 h-5 w-5 shrink-0 text-slate-500" />
-    </button>
+      {uploadState?.error ? (
+        <span className="mt-2 block text-xs font-semibold leading-5 text-red-600">
+          {uploadState.error}
+        </span>
+      ) : null}
+
+      <input
+        type="file"
+        accept={acceptedUploadTypes}
+        disabled={isUploading}
+        className="sr-only"
+        onChange={(event) => {
+          onUpload(uploadKey, documentType, event.currentTarget.files);
+          event.currentTarget.value = "";
+        }}
+      />
+    </label>
   );
 }
 
@@ -299,25 +384,133 @@ function needsDrivingAbstract(selectedServices: string[]) {
   ]);
 }
 
+function getTradeLicenceUploadKey(optionId: string): TradeLicenceUploadKey {
+  return `tradeLicence-${optionId}`;
+}
+
+function getCleanFileName(fileName: string) {
+  const safeFileName = fileName
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .replace(/-+/g, "-");
+
+  return safeFileName || "document";
+}
+
+function validateUploadFile(file: File) {
+  if (!allowedUploadTypes.includes(file.type)) {
+    throw new Error("Please upload a PDF, JPG, PNG, or WEBP file.");
+  }
+
+  if (file.size > maxUploadSizeBytes) {
+    throw new Error("File must be 10 MB or smaller.");
+  }
+}
+
+async function uploadContractorDocument(
+  user: User,
+  documentType: UploadDocumentType,
+  file: File,
+) {
+  validateUploadFile(file);
+
+  const timestamp = Date.now();
+  const safeFileName = getCleanFileName(file.name);
+  const storagePath = `contractor-documents/${user.uid}/${documentType}/${timestamp}-${safeFileName}`;
+  const storageReference = ref(storage, storagePath);
+
+  await uploadBytes(storageReference, file, {
+    contentType: file.type,
+  });
+
+  const fileUrl = await getDownloadURL(storageReference);
+
+  return {
+    status: "uploaded" as const,
+    fileName: file.name,
+    fileUrl,
+    storagePath,
+    contentType: file.type,
+    size: file.size,
+    uploadedAt: new Date(timestamp).toISOString(),
+  };
+}
+
+function getUploadedFile(uploadStates: UploadStates, uploadKey: UploadKey) {
+  return uploadStates[uploadKey]?.file ?? null;
+}
+
+function getUploadStatus(uploadedFile: UploadedDocumentFile | null) {
+  return uploadedFile ? "uploaded" : "not_uploaded";
+}
+
 function buildContractorDocuments(
   form: ContractorForm,
   documentForm: DocumentForm,
   selectedServices: string[],
+  uploadStates: UploadStates,
 ) {
   const vehicleDocumentsRequired = needsVehicleDocuments(selectedServices);
   const drivingAbstractRequired = needsDrivingAbstract(selectedServices);
+  const governmentIdUpload = getUploadedFile(uploadStates, "governmentId");
+  const businessLicenceUpload = getUploadedFile(uploadStates, "businessLicence");
+  const liabilityUpload = getUploadedFile(
+    uploadStates,
+    "commercialGeneralLiability",
+  );
+  const worksafeUpload = getUploadedFile(uploadStates, "worksafeBC");
+  const driverLicenceUpload = getUploadedFile(uploadStates, "driverLicence");
+  const vehicleRegistrationUpload = getUploadedFile(
+    uploadStates,
+    "vehicleRegistration",
+  );
+  const commercialVehicleInsuranceUpload = getUploadedFile(
+    uploadStates,
+    "commercialVehicleInsurance",
+  );
+  const cargoInsuranceUpload = getUploadedFile(uploadStates, "cargoInsurance");
+  const towingInsuranceUpload = getUploadedFile(
+    uploadStates,
+    "towingInsurance",
+  );
+  const garageKeepersUpload = getUploadedFile(
+    uploadStates,
+    "garageKeepersLiability",
+  );
+  const drivingAbstractUpload = getUploadedFile(
+    uploadStates,
+    "drivingAbstract",
+  );
+  const hasVehicleUpload = Boolean(
+    driverLicenceUpload ||
+      vehicleRegistrationUpload ||
+      commercialVehicleInsuranceUpload ||
+      cargoInsuranceUpload ||
+      towingInsuranceUpload ||
+      garageKeepersUpload,
+  );
 
   return {
     governmentId: {
-      status: "not_uploaded",
-      fileUrl: "",
+      status: getUploadStatus(governmentIdUpload),
+      fileName: governmentIdUpload?.fileName ?? "",
+      fileUrl: governmentIdUpload?.fileUrl ?? "",
+      storagePath: governmentIdUpload?.storagePath ?? "",
+      contentType: governmentIdUpload?.contentType ?? "",
+      size: governmentIdUpload?.size ?? 0,
+      uploadedAt: governmentIdUpload?.uploadedAt ?? "",
       expiryDate: documentForm.governmentIdExpiryDate,
       reviewedAt: null,
       rejectionReason: "",
     },
     businessLicence: {
-      status: "not_uploaded",
-      fileUrl: "",
+      status: getUploadStatus(businessLicenceUpload),
+      fileName: businessLicenceUpload?.fileName ?? "",
+      fileUrl: businessLicenceUpload?.fileUrl ?? "",
+      storagePath: businessLicenceUpload?.storagePath ?? "",
+      contentType: businessLicenceUpload?.contentType ?? "",
+      size: businessLicenceUpload?.size ?? 0,
+      uploadedAt: businessLicenceUpload?.uploadedAt ?? "",
       licenceNumber: form.businessLicenceNumber,
       municipality: documentForm.businessLicenceMunicipality,
       expiryDate: form.businessLicenceExpiryDate,
@@ -325,8 +518,13 @@ function buildContractorDocuments(
       rejectionReason: "",
     },
     commercialGeneralLiability: {
-      status: "not_uploaded",
-      fileUrl: "",
+      status: getUploadStatus(liabilityUpload),
+      fileName: liabilityUpload?.fileName ?? "",
+      fileUrl: liabilityUpload?.fileUrl ?? "",
+      storagePath: liabilityUpload?.storagePath ?? "",
+      contentType: liabilityUpload?.contentType ?? "",
+      size: liabilityUpload?.size ?? 0,
+      uploadedAt: liabilityUpload?.uploadedAt ?? "",
       provider: form.insuranceProviderName,
       policyNumber: form.insurancePolicyNumber,
       coverageAmount: form.coverageAmount,
@@ -335,32 +533,95 @@ function buildContractorDocuments(
       rejectionReason: "",
     },
     worksafeBC: {
-      status: "not_uploaded",
+      status: getUploadStatus(worksafeUpload),
       accountNumber: documentForm.worksafeAccountNumber,
-      clearanceLetterUrl: "",
+      fileName: worksafeUpload?.fileName ?? "",
+      clearanceLetterUrl: worksafeUpload?.fileUrl ?? "",
+      storagePath: worksafeUpload?.storagePath ?? "",
+      contentType: worksafeUpload?.contentType ?? "",
+      size: worksafeUpload?.size ?? 0,
+      uploadedAt: worksafeUpload?.uploadedAt ?? "",
       expiryDate: documentForm.worksafeClearanceExpiryDate,
       reviewedAt: null,
       rejectionReason: "",
       confirmedCoverageResponsibility: documentForm.worksafeConfirmed,
     },
     tradeLicences: getVisibleTradeLicenceOptions(selectedServices).map(
-      (option) => ({
-        category: option.title,
-        documentName: option.proofLabel,
-        status: "not_uploaded",
-        fileUrl: "",
-        reviewedAt: null,
-        rejectionReason: "",
-      }),
+      (option) => {
+        const tradeLicenceUpload = getUploadedFile(
+          uploadStates,
+          getTradeLicenceUploadKey(option.id),
+        );
+
+        return {
+          category: option.title,
+          documentName: option.proofLabel,
+          status: getUploadStatus(tradeLicenceUpload),
+          fileName: tradeLicenceUpload?.fileName ?? "",
+          fileUrl: tradeLicenceUpload?.fileUrl ?? "",
+          storagePath: tradeLicenceUpload?.storagePath ?? "",
+          contentType: tradeLicenceUpload?.contentType ?? "",
+          size: tradeLicenceUpload?.size ?? 0,
+          uploadedAt: tradeLicenceUpload?.uploadedAt ?? "",
+          reviewedAt: null,
+          rejectionReason: "",
+        };
+      },
     ),
     vehicleDocuments: {
-      status: vehicleDocumentsRequired ? "not_uploaded" : "not_required",
-      driverLicenceUrl: "",
-      vehicleRegistrationUrl: "",
-      commercialVehicleInsuranceUrl: "",
-      cargoInsuranceUrl: "",
-      towingInsuranceUrl: "",
-      garageKeepersLiabilityUrl: "",
+      status: hasVehicleUpload
+        ? "uploaded"
+        : vehicleDocumentsRequired
+          ? "not_uploaded"
+          : "not_required",
+      driverLicenceUrl: driverLicenceUpload?.fileUrl ?? "",
+      driverLicenceFileName: driverLicenceUpload?.fileName ?? "",
+      driverLicenceStoragePath: driverLicenceUpload?.storagePath ?? "",
+      driverLicenceContentType: driverLicenceUpload?.contentType ?? "",
+      driverLicenceSize: driverLicenceUpload?.size ?? 0,
+      driverLicenceUploadedAt: driverLicenceUpload?.uploadedAt ?? "",
+      vehicleRegistrationUrl: vehicleRegistrationUpload?.fileUrl ?? "",
+      vehicleRegistrationFileName: vehicleRegistrationUpload?.fileName ?? "",
+      vehicleRegistrationStoragePath:
+        vehicleRegistrationUpload?.storagePath ?? "",
+      vehicleRegistrationContentType:
+        vehicleRegistrationUpload?.contentType ?? "",
+      vehicleRegistrationSize: vehicleRegistrationUpload?.size ?? 0,
+      vehicleRegistrationUploadedAt:
+        vehicleRegistrationUpload?.uploadedAt ?? "",
+      commercialVehicleInsuranceUrl:
+        commercialVehicleInsuranceUpload?.fileUrl ?? "",
+      commercialVehicleInsuranceFileName:
+        commercialVehicleInsuranceUpload?.fileName ?? "",
+      commercialVehicleInsuranceStoragePath:
+        commercialVehicleInsuranceUpload?.storagePath ?? "",
+      commercialVehicleInsuranceContentType:
+        commercialVehicleInsuranceUpload?.contentType ?? "",
+      commercialVehicleInsuranceSize:
+        commercialVehicleInsuranceUpload?.size ?? 0,
+      commercialVehicleInsuranceUploadedAt:
+        commercialVehicleInsuranceUpload?.uploadedAt ?? "",
+      cargoInsuranceUrl: cargoInsuranceUpload?.fileUrl ?? "",
+      cargoInsuranceFileName: cargoInsuranceUpload?.fileName ?? "",
+      cargoInsuranceStoragePath: cargoInsuranceUpload?.storagePath ?? "",
+      cargoInsuranceContentType: cargoInsuranceUpload?.contentType ?? "",
+      cargoInsuranceSize: cargoInsuranceUpload?.size ?? 0,
+      cargoInsuranceUploadedAt: cargoInsuranceUpload?.uploadedAt ?? "",
+      towingInsuranceUrl: towingInsuranceUpload?.fileUrl ?? "",
+      towingInsuranceFileName: towingInsuranceUpload?.fileName ?? "",
+      towingInsuranceStoragePath: towingInsuranceUpload?.storagePath ?? "",
+      towingInsuranceContentType: towingInsuranceUpload?.contentType ?? "",
+      towingInsuranceSize: towingInsuranceUpload?.size ?? 0,
+      towingInsuranceUploadedAt: towingInsuranceUpload?.uploadedAt ?? "",
+      garageKeepersLiabilityUrl: garageKeepersUpload?.fileUrl ?? "",
+      garageKeepersLiabilityFileName: garageKeepersUpload?.fileName ?? "",
+      garageKeepersLiabilityStoragePath:
+        garageKeepersUpload?.storagePath ?? "",
+      garageKeepersLiabilityContentType:
+        garageKeepersUpload?.contentType ?? "",
+      garageKeepersLiabilitySize: garageKeepersUpload?.size ?? 0,
+      garageKeepersLiabilityUploadedAt:
+        garageKeepersUpload?.uploadedAt ?? "",
       vehicleType: documentForm.vehicleType,
       licencePlate: documentForm.licencePlate,
       insuranceExpiryDate: documentForm.vehicleInsuranceExpiryDate,
@@ -368,8 +629,17 @@ function buildContractorDocuments(
       rejectionReason: "",
     },
     drivingAbstract: {
-      status: drivingAbstractRequired ? "not_uploaded" : "not_required",
-      fileUrl: "",
+      status: drivingAbstractUpload
+        ? "uploaded"
+        : drivingAbstractRequired
+          ? "not_uploaded"
+          : "not_required",
+      fileName: drivingAbstractUpload?.fileName ?? "",
+      fileUrl: drivingAbstractUpload?.fileUrl ?? "",
+      storagePath: drivingAbstractUpload?.storagePath ?? "",
+      contentType: drivingAbstractUpload?.contentType ?? "",
+      size: drivingAbstractUpload?.size ?? 0,
+      uploadedAt: drivingAbstractUpload?.uploadedAt ?? "",
       issueDate: documentForm.drivingAbstractIssueDate,
       licenceClass: documentForm.driverLicenceClass,
       licenceExpiryDate: documentForm.driverLicenceExpiryDate,
@@ -384,6 +654,7 @@ async function saveContractorProfileWithApi(
   user: User,
   form: ContractorForm,
   documentForm: DocumentForm,
+  uploadStates: UploadStates,
 ) {
   const token = await user.getIdToken();
   const selectedServices = parseSelectedServices(form.servicesOffered);
@@ -391,6 +662,7 @@ async function saveContractorProfileWithApi(
     form,
     documentForm,
     selectedServices,
+    uploadStates,
   );
 
   const response = await fetch("/api/contractors/profile", {
@@ -445,7 +717,7 @@ export default function ContractorOnboardingPage() {
   const [verificationStatus, setVerificationStatus] = useState("Not submitted");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [uploadNotice, setUploadNotice] = useState("");
+  const [uploadStates, setUploadStates] = useState<UploadStates>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const selectedServices = parseSelectedServices(form.servicesOffered);
@@ -453,12 +725,20 @@ export default function ContractorOnboardingPage() {
   const drivingAbstractRequired = needsDrivingAbstract(selectedServices);
   const visibleTradeLicenceOptions =
     getVisibleTradeLicenceOptions(selectedServices);
+  const isUploadingDocument = Object.values(uploadStates).some(
+    (uploadState) => uploadState?.isUploading,
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("Contractor onboarding: auth state loaded");
       if (user) {
+        console.log("Contractor onboarding current uid:", user.uid);
         setCurrentUser(user);
       } else {
+        console.log(
+          "Contractor onboarding redirect reason: no signed-in user",
+        );
         setCurrentUser(null);
         router.replace("/login?reason=contractor-onboarding");
       }
@@ -486,12 +766,69 @@ export default function ContractorOnboardingPage() {
     }));
   }
 
-  function handleUploadPlaceholder(label: string) {
-    setUploadNotice(`Document upload coming soon: ${label}`);
+  async function handleDocumentUpload(
+    uploadKey: UploadKey,
+    documentType: UploadDocumentType,
+    fileList: FileList | null,
+  ) {
+    const file = fileList?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const user = currentUser;
+
+    if (!user) {
+      setUploadStates((currentStates) => ({
+        ...currentStates,
+        [uploadKey]: {
+          ...currentStates[uploadKey],
+          isUploading: false,
+          error: "Please sign in before uploading documents.",
+        },
+      }));
+      return;
+    }
+
+    setUploadStates((currentStates) => ({
+      ...currentStates,
+      [uploadKey]: {
+        ...currentStates[uploadKey],
+        isUploading: true,
+        error: "",
+      },
+    }));
+
+    try {
+      const uploadedFile = await uploadContractorDocument(
+        user,
+        documentType,
+        file,
+      );
+
+      setUploadStates((currentStates) => ({
+        ...currentStates,
+        [uploadKey]: {
+          isUploading: false,
+          error: "",
+          file: uploadedFile,
+        },
+      }));
+    } catch (error) {
+      setUploadStates((currentStates) => ({
+        ...currentStates,
+        [uploadKey]: {
+          ...currentStates[uploadKey],
+          isUploading: false,
+          error: getErrorMessage(error),
+        },
+      }));
+    }
   }
 
   async function handleContinue() {
-    if (isSaving || authLoading) {
+    if (isSaving || authLoading || isUploadingDocument) {
       return;
     }
 
@@ -504,10 +841,14 @@ export default function ContractorOnboardingPage() {
     try {
       setIsSaving(true);
       setErrorMessage("");
+      await authPersistenceReady;
 
-      await saveContractorProfileWithApi(user, form, documentForm);
+      await saveContractorProfileWithApi(user, form, documentForm, uploadStates);
 
       setVerificationStatus("Pending review");
+      console.log(
+        "Contractor onboarding redirect reason: contractor profile saved",
+      );
       router.push("/contractor/pending-verification");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -838,17 +1179,14 @@ export default function ContractorOnboardingPage() {
                 })}
               </div>
 
-              {uploadNotice ? (
-                <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
-                  {uploadNotice}
-                </p>
-              ) : null}
-
               {activeDocumentTab === "required" ? (
                 <div className="space-y-4">
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Government photo ID"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="governmentId"
+                    documentType="governmentId"
+                    uploadState={uploadStates.governmentId}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Government ID expiry date"
@@ -858,9 +1196,12 @@ export default function ContractorOnboardingPage() {
                       updateDocumentField("governmentIdExpiryDate", value)
                     }
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Business licence, if applicable"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="businessLicence"
+                    documentType="businessLicence"
+                    uploadState={uploadStates.businessLicence}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Business legal name"
@@ -895,9 +1236,12 @@ export default function ContractorOnboardingPage() {
 
               {activeDocumentTab === "insurance" ? (
                 <div className="space-y-4">
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Commercial general liability insurance"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="commercialGeneralLiability"
+                    documentType="commercialGeneralLiability"
+                    uploadState={uploadStates.commercialGeneralLiability}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Insurance provider"
@@ -942,9 +1286,12 @@ export default function ContractorOnboardingPage() {
                       updateDocumentField("worksafeAccountNumber", value)
                     }
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="WorkSafeBC clearance letter"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="worksafeBC"
+                    documentType="worksafeBC"
+                    uploadState={uploadStates.worksafeBC}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Clearance expiry date"
@@ -981,9 +1328,14 @@ export default function ContractorOnboardingPage() {
                         {option.title}
                       </p>
                       <div className="mt-3">
-                        <UploadPlaceholder
+                        <UploadCard
                           label={option.proofLabel}
-                          onClick={handleUploadPlaceholder}
+                          uploadKey={getTradeLicenceUploadKey(option.id)}
+                          documentType="tradeLicence"
+                          uploadState={
+                            uploadStates[getTradeLicenceUploadKey(option.id)]
+                          }
+                          onUpload={handleDocumentUpload}
                         />
                       </div>
                     </div>
@@ -998,29 +1350,47 @@ export default function ContractorOnboardingPage() {
                       ? "Vehicle documents are expected for the services listed."
                       : "Vehicle documents are not required for the current services, but you can add details if needed."}
                   </p>
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Driver's licence"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="driverLicence"
+                    documentType="driverLicence"
+                    uploadState={uploadStates.driverLicence}
+                    onUpload={handleDocumentUpload}
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Vehicle registration"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="vehicleRegistration"
+                    documentType="vehicleRegistration"
+                    uploadState={uploadStates.vehicleRegistration}
+                    onUpload={handleDocumentUpload}
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Commercial vehicle insurance"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="commercialVehicleInsurance"
+                    documentType="commercialVehicleInsurance"
+                    uploadState={uploadStates.commercialVehicleInsurance}
+                    onUpload={handleDocumentUpload}
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Cargo insurance for moving"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="cargoInsurance"
+                    documentType="cargoInsurance"
+                    uploadState={uploadStates.cargoInsurance}
+                    onUpload={handleDocumentUpload}
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="On-hook / towing insurance"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="towingInsurance"
+                    documentType="towingInsurance"
+                    uploadState={uploadStates.towingInsurance}
+                    onUpload={handleDocumentUpload}
                   />
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Garage keeper's liability"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="garageKeepersLiability"
+                    documentType="garageKeepersLiability"
+                    uploadState={uploadStates.garageKeepersLiability}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Vehicle type"
@@ -1054,9 +1424,12 @@ export default function ContractorOnboardingPage() {
                       ? "A driving abstract is expected for this service mix."
                       : "A driving abstract is not required for the current services, but you can add it if needed."}
                   </p>
-                  <UploadPlaceholder
+                  <UploadCard
                     label="Driving abstract"
-                    onClick={handleUploadPlaceholder}
+                    uploadKey="drivingAbstract"
+                    documentType="drivingAbstract"
+                    uploadState={uploadStates.drivingAbstract}
+                    onUpload={handleDocumentUpload}
                   />
                   <TextInput
                     label="Driving abstract issue date"
@@ -1109,12 +1482,14 @@ export default function ContractorOnboardingPage() {
             <button
               type="button"
               onClick={handleContinue}
-              disabled={isSaving || authLoading}
+              disabled={isSaving || authLoading || isUploadingDocument}
               className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
             >
               {authLoading
                 ? "Checking account..."
-                : isSaving
+                : isUploadingDocument
+                  ? "Uploading documents..."
+                  : isSaving
                   ? "Saving..."
                   : "Continue"}
             </button>

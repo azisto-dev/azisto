@@ -94,12 +94,38 @@ export async function POST(request: NextRequest) {
         : await ensureUniqueReadableId("customers", "customerId", "C");
     const customerDocument = adminDb.collection("customers").doc(customerId);
     const customerDocumentSnapshot = await customerDocument.get();
+    const existingPhoneVerified =
+      customerDocumentSnapshot.exists &&
+      customerDocumentSnapshot.get("phoneVerified") === true;
+    const existingRiskScore = customerDocumentSnapshot.get("riskScore");
+    const existingAccountStatus = customerDocumentSnapshot.get("accountStatus");
+    const existingOpenJobLimit = customerDocumentSnapshot.get("openJobLimit");
+    const existingCompletedJobsCount =
+      customerDocumentSnapshot.get("completedJobsCount");
+    const existingReportsCount = customerDocumentSnapshot.get("reportsCount");
 
     const customerProfile = {
       customerId,
       firebaseUid: decodedToken.uid,
       userId: customerId,
       authUid: decodedToken.uid,
+      emailVerified: decodedToken.email_verified === true,
+      // TODO: Replace this placeholder with Firebase Phone Auth before production.
+      phoneVerified: existingPhoneVerified,
+      riskScore:
+        typeof existingRiskScore === "number" ? existingRiskScore : 0,
+      accountStatus:
+        typeof existingAccountStatus === "string"
+          ? existingAccountStatus
+          : "active",
+      openJobLimit:
+        typeof existingOpenJobLimit === "number" ? existingOpenJobLimit : 2,
+      completedJobsCount:
+        typeof existingCompletedJobsCount === "number"
+          ? existingCompletedJobsCount
+          : 0,
+      reportsCount:
+        typeof existingReportsCount === "number" ? existingReportsCount : 0,
       fullName: readText(body.fullName),
       phoneNumber: readText(body.phoneNumber),
       address: readText(body.address),

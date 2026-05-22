@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { auth, authPersistenceReady } from "@/lib/firebase";
 
 const contactMethods = ["In-app message", "Phone call", "Text message"];
 
@@ -212,6 +212,7 @@ export default function CustomerOnboardingPage() {
     try {
       setIsSaving(true);
       setErrorMessage("");
+      await authPersistenceReady;
 
       console.log("Customer onboarding current user UID:", user.uid);
       console.log("Customer onboarding: before API save with UID:", user.uid);
@@ -229,6 +230,7 @@ export default function CustomerOnboardingPage() {
       await saveCustomerProfileWithApi(user, payload);
 
       console.log("Customer onboarding: customer profile saved");
+      console.log("Customer onboarding redirect reason: customer profile saved");
       router.push("/home");
     } catch (error) {
       const { code, message } = getFirebaseErrorDetails(error);

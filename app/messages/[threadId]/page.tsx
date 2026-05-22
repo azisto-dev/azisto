@@ -1,0 +1,313 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { ChevronLeft, Send } from "lucide-react";
+import { auth } from "@/lib/firebase";
+
+type MessageThread = {
+  threadId: string;
+  jobId: string;
+  customerId: string;
+  contractorId: string;
+  contractorName: string;
+  businessName: string;
+  currentUserRole: "customer" | "contractor" | string;
+  status: string;
+  jobStatus: string;
+};
+
+type MessageItem = {
+  messageId: string;
+  senderRole: "customer" | "contractor" | string;
+  text: string;
+  createdAt: string;
+  readBy: string[];
+};
+
+function StatusBar() {
+  return (
+    <div className="mb-5 flex items-center justify-between text-xs font-bold">
+      <span>9:41</span>
+      <div className="flex items-center gap-1">
+        <span className="h-2.5 w-3 rounded-sm bg-black" />
+        <span className="h-2.5 w-3 rounded-sm border border-black" />
+        <span className="h-2.5 w-5 rounded-sm bg-black" />
+      </div>
+    </div>
+  );
+}
+
+function createApiError(code: string, message: string) {
+  return new Error(`${message}\n\nCode: ${code}`);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unable to load this conversation.";
+}
+
+function formatMessageTime(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+async function fetchMessages(user: User, threadId: string) {
+  const token = await user.getIdToken();
+  const response = await fetch(
+    `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    code?: unknown;
+    message?: unknown;
+    thread?: unknown;
+    messages?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw createApiError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+
+  return {
+    thread: responseBody?.thread as MessageThread,
+    messages: Array.isArray(responseBody?.messages)
+      ? (responseBody.messages as MessageItem[])
+      : [],
+  };
+}
+
+async function sendMessage(user: User, threadId: string, text: string) {
+  const token = await user.getIdToken();
+  const response = await fetch(
+    `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    code?: unknown;
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw createApiError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+}
+
+export default function MessageThreadPage() {
+  const router = useRouter();
+  const params = useParams<{ threadId: string }>();
+  const threadId = params.threadId;
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [thread, setThread] = useState<MessageThread | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [draft, setDraft] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function loadMessages(user: User) {
+    const conversation = await fetchMessages(user, threadId);
+    setThread(conversation.thread);
+    setMessages(conversation.messages);
+  }
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      setCurrentUser(user);
+
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+        await loadMessages(user);
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error));
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, [router, threadId]);
+
+  async function handleSend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentUser || isSending || !draft.trim()) {
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      setErrorMessage("");
+      await sendMessage(currentUser, threadId, draft);
+      setDraft("");
+      await loadMessages(currentUser);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+        <div className="flex min-h-screen flex-1 flex-col px-5 pb-5 pt-5 md:min-h-[780px]">
+          <StatusBar />
+
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <Link
+              href="/messages"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Back to messages"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </Link>
+
+            <Link href="/home" className="flex justify-center">
+              <img
+                src="/azisto-logo-cropped.png"
+                alt="AZISTO - Your on-demand assistant"
+                className="w-full max-w-[150px] object-contain"
+              />
+            </Link>
+
+            <span aria-hidden="true" />
+          </header>
+
+          <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+              {thread?.jobId ?? "Conversation"}
+            </p>
+            <h1 className="mt-1 text-xl font-bold leading-tight text-black">
+              {thread?.businessName ||
+                thread?.contractorName ||
+                thread?.contractorId ||
+                "Messages"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              {thread?.status ? `Status: ${thread.status}` : "Open thread"}
+            </p>
+            {thread?.jobStatus ? (
+              <span className="mt-3 inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-bold capitalize text-slate-700">
+                Job: {thread.jobStatus.replaceAll("_", " ")}
+              </span>
+            ) : null}
+            <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-700">
+              Keep communication inside AZISTO until booking is confirmed.
+            </p>
+          </section>
+
+          {isLoading ? (
+            <p className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+              Loading conversation...
+            </p>
+          ) : null}
+
+          {errorMessage ? (
+            <p className="mt-5 whitespace-pre-line rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+              {errorMessage}
+            </p>
+          ) : null}
+
+          <section className="mt-5 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
+            {!isLoading && messages.length === 0 ? (
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm leading-6 text-slate-600">
+                No messages yet. Send the first note.
+              </p>
+            ) : null}
+
+            {messages.map((message) => {
+              const isOwnMessage =
+                Boolean(thread?.currentUserRole) &&
+                message.senderRole === thread?.currentUserRole;
+
+              return (
+                <div
+                  key={message.messageId}
+                  className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                      isOwnMessage
+                        ? "rounded-br-md bg-red-500 text-white"
+                        : "rounded-bl-md bg-slate-100 text-slate-900"
+                    }`}
+                  >
+                    <p>{message.text}</p>
+                    {message.createdAt ? (
+                      <p
+                        className={`mt-1 text-[11px] font-semibold ${
+                          isOwnMessage ? "text-red-100" : "text-slate-400"
+                        }`}
+                      >
+                        {formatMessageTime(message.createdAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+
+          <form onSubmit={handleSend} className="flex items-center gap-2">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Write a message..."
+              className="h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+            />
+            <button
+              type="submit"
+              disabled={isSending || !draft.trim()}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+              aria-label="Send message"
+            >
+              <Send aria-hidden="true" className="h-5 w-5" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+  );
+}

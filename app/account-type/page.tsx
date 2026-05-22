@@ -1,4 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import {
+  fetchSessionProfile,
+  getDefaultRouteForSession,
+} from "@/lib/sessionProfile";
 
 const accountTypes = [
   {
@@ -31,6 +41,39 @@ function StatusBar() {
 }
 
 export default function AccountTypePage() {
+  const router = useRouter();
+  const [authLoaded, setAuthLoaded] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Account type auth state loaded");
+      setAuthLoaded(true);
+
+      if (!user) {
+        console.log("Account type redirect reason: no signed-in user");
+        router.replace("/login");
+        return;
+      }
+
+      console.log("Account type current uid:", user.uid);
+
+      try {
+        const profile = await fetchSessionProfile(user);
+        console.log("Account type role API result:", profile);
+
+        if (profile.role !== "unknown") {
+          const nextRoute = getDefaultRouteForSession(profile);
+          console.log("Account type redirect reason:", `role:${profile.role}`);
+          router.replace(nextRoute);
+        }
+      } catch (error) {
+        console.error("Account type role lookup failed:", error);
+      }
+    });
+
+    return unsubscribe;
+  }, [router]);
+
   return (
     <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
@@ -53,7 +96,9 @@ export default function AccountTypePage() {
               How will you use AZISTO?
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Choose the experience that fits what you want to do next.
+              {authLoaded
+                ? "Choose the experience that fits what you want to do next."
+                : "Checking account..."}
             </p>
           </section>
 
