@@ -5,6 +5,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -135,10 +136,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       transaction.set(jobDocument.collection("statusHistory").doc(), {
         fromStatus: "open",
         toStatus: "hired",
-        changedByAuthUid: decodedToken.uid,
         changedByRole: "customer",
+        note: "Customer hired contractor",
         changedAt: FieldValue.serverTimestamp(),
       });
+    });
+    await createNotification({
+      recipientAuthUid: hiredContractorAuthUid,
+      recipientRole: "contractor",
+      type: "contractor_hired",
+      title: "You were hired",
+      message: `You were hired for job ${jobId}.`,
+      jobId,
     });
 
     return NextResponse.json({ ok: true });

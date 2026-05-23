@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ChevronLeft } from "lucide-react";
 
 function StatusBar() {
   return (
@@ -30,12 +30,24 @@ function SubmittedContent() {
         <div className="flex flex-1 flex-col px-5 pb-6 pt-5">
           <StatusBar />
 
-          <header className="mt-3 flex justify-center">
-            <img
-              src="/azisto-logo-cropped.png"
-              alt="AZISTO - Your on-demand assistant"
-              className="w-full max-w-[175px] object-contain"
-            />
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <Link
+              href="/customer/jobs"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Back to customer jobs"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </Link>
+
+            <Link href="/home" className="flex justify-center">
+              <img
+                src="/azisto-logo-cropped.png"
+                alt="AZISTO - Your on-demand assistant"
+                className="w-full max-w-[165px] object-contain"
+              />
+            </Link>
+
+            <span aria-hidden="true" />
           </header>
 
           <section className="flex flex-1 flex-col justify-center">
@@ -77,10 +89,10 @@ function SubmittedContent() {
           </section>
 
           <Link
-            href="/home"
+            href="/customer/jobs"
             className="mt-6 flex h-14 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-200 transition hover:bg-red-600"
           >
-            Back to Home
+            View My Jobs
           </Link>
         </div>
       </div>

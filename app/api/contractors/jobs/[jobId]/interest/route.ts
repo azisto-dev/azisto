@@ -5,6 +5,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -145,6 +146,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
       { merge: true },
     );
+    await createNotification({
+      recipientAuthUid: readText(jobSnapshot.get("customerAuthUid")),
+      recipientRole: "customer",
+      type: "contractor_interest",
+      title: "New contractor interest",
+      message: `${
+        readText(contractorProfile.get("businessName")) ||
+        readText(contractorProfile.get("contactName")) ||
+        "A contractor"
+      } is interested in your job.`,
+      jobId,
+    });
 
     return NextResponse.json({ ok: true, alreadySubmitted: false });
   } catch (error) {

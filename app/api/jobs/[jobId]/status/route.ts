@@ -5,6 +5,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -58,11 +59,19 @@ function isAllowedTransition(
     return true;
   }
 
-  if (fromStatus === "in_progress" && toStatus === "completed") {
+  if (
+    fromStatus === "in_progress" &&
+    toStatus === "completed" &&
+    changedByRole === "customer"
+  ) {
     return true;
   }
 
-  if (fromStatus === "hired" && toStatus === "cancelled") {
+  if (
+    fromStatus === "hired" &&
+    toStatus === "cancelled" &&
+    changedByRole === "customer"
+  ) {
     return true;
   }
 
@@ -110,6 +119,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const jobDocument = adminDb.collection("jobs").doc(jobId);
     let changedByRole: "customer" | "contractor" = "customer";
+    let notificationRecipientAuthUid = "";
+    let notificationRecipientRole: "customer" | "contractor" = "contractor";
+    let notificationTitle = "";
+    let notificationMessage = "";
 
     await adminDb.runTransaction(async (transaction) => {
       const jobSnapshot = await transaction.get(jobDocument);
@@ -153,6 +166,38 @@ export async function POST(request: NextRequest, context: RouteContext) {
       if (nextStatus === "completed") {
         statusUpdate.completedAt = FieldValue.serverTimestamp();
         statusUpdate.matchingStatus = "closed";
+        const customerId = readText(jobSnapshot.get("customerId"));
+
+        if (customerId) {
+          transaction.set(
+            adminDb.collection("customers").doc(customerId),
+            {
+              completedJobsCount: FieldValue.increment(1),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        const hiredContractorId = readText(jobSnapshot.get("hiredContractorId"));
+
+        if (hiredContractorId) {
+          transaction.set(
+            adminDb.collection("contractors").doc(hiredContractorId),
+            {
+              completedJobsCount: FieldValue.increment(1),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        notificationRecipientAuthUid = readText(
+          jobSnapshot.get("hiredContractorAuthUid"),
+        );
+        notificationRecipientRole = "contractor";
+        notificationTitle = "Job completed";
+        notificationMessage = `Job ${jobId} was marked completed.`;
       }
 
       if (nextStatus === "cancelled") {
@@ -164,11 +209,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       transaction.set(jobDocument.collection("statusHistory").doc(), {
         fromStatus: currentStatus,
         toStatus: nextStatus,
-        changedByAuthUid: decodedToken.uid,
         changedByRole,
+        note: `Status changed to ${nextStatus}`,
         changedAt: FieldValue.serverTimestamp(),
       });
     });
+
+    if (notificationRecipientAuthUid) {
+      await createNotification({
+        recipientAuthUid: notificationRecipientAuthUid,
+        recipientRole: notificationRecipientRole,
+        type: nextStatus === "completed" ? "job_completed" : "job_status",
+        title: notificationTitle,
+        message: notificationMessage,
+        jobId,
+      });
+    }
 
     return NextResponse.json({ ok: true, status: nextStatus, changedByRole });
   } catch (error) {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { MessageCircle } from "lucide-react";
+import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 
 type MessageThread = {
@@ -18,6 +18,8 @@ type MessageThread = {
   lastMessage: string;
   lastMessageAt: string;
   status: string;
+  jobStatus: string;
+  unreadCount: number;
 };
 
 function StatusBar() {
@@ -119,14 +121,24 @@ export default function MessagesPage() {
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
-          <header className="mt-3 flex justify-center">
-            <Link href="/home">
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <Link
+              href="/home"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Back to home"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </Link>
+
+            <Link href="/home" className="flex justify-center">
               <img
                 src="/azisto-logo-cropped.png"
                 alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[175px] object-contain"
+                className="w-full max-w-[165px] object-contain"
               />
             </Link>
+
+            <span aria-hidden="true" />
           </header>
 
           <section className="mt-8">
@@ -188,7 +200,10 @@ export default function MessagesPage() {
                     </h2>
                   </div>
                   <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold capitalize text-slate-600">
-                    {thread.status || "open"}
+                    {(thread.jobStatus || thread.status || "open").replaceAll(
+                      "_",
+                      " ",
+                    )}
                   </span>
                 </div>
 
@@ -196,11 +211,19 @@ export default function MessagesPage() {
                   {thread.lastMessage || "No messages yet."}
                 </p>
 
-                {thread.lastMessageAt ? (
-                  <p className="mt-2 text-xs font-semibold text-slate-400">
-                    {formatDateTime(thread.lastMessageAt)}
-                  </p>
-                ) : null}
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  {thread.lastMessageAt ? (
+                    <p className="text-xs font-semibold text-slate-400">
+                      {formatDateTime(thread.lastMessageAt)}
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
+                    {thread.unreadCount || 0} unread
+                  </span>
+                </div>
               </Link>
             ))}
           </section>

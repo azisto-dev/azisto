@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Send } from "lucide-react";
 import { auth } from "@/lib/firebase";
@@ -10,6 +10,7 @@ import { auth } from "@/lib/firebase";
 type MessageThread = {
   threadId: string;
   jobId: string;
+  displayName: string;
   customerId: string;
   contractorId: string;
   contractorName: string;
@@ -128,6 +129,33 @@ async function sendMessage(user: User, threadId: string, text: string) {
   }
 }
 
+async function updateJobStatus(user: User, jobId: string, status: string) {
+  const token = await user.getIdToken();
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+  const responseBody = (await response.json().catch(() => null)) as {
+    code?: unknown;
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw createApiError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+}
+
 export default function MessageThreadPage() {
   const router = useRouter();
   const params = useParams<{ threadId: string }>();
@@ -138,7 +166,10 @@ export default function MessageThreadPage() {
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const isLeavingForReviewRef = useRef(false);
 
   async function loadMessages(user: User) {
     const conversation = await fetchMessages(user, threadId);
@@ -169,6 +200,30 @@ export default function MessageThreadPage() {
     return unsubscribe;
   }, [router, threadId]);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!currentUser || isLeavingForReviewRef.current) {
+      return;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      if (isLeavingForReviewRef.current) {
+        return;
+      }
+
+      try {
+        await loadMessages(currentUser);
+      } catch (error) {
+        console.error("Message polling failed:", error);
+      }
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentUser, threadId]);
+
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -186,6 +241,25 @@ export default function MessageThreadPage() {
       setErrorMessage(getErrorMessage(error));
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function handleMarkCompleted() {
+    if (!currentUser || !thread?.jobId || isUpdatingStatus) {
+      return;
+    }
+
+    try {
+      setIsUpdatingStatus(true);
+      setErrorMessage("");
+      await updateJobStatus(currentUser, thread.jobId, "completed");
+      isLeavingForReviewRef.current = true;
+      router.replace(`/customer/jobs/${encodeURIComponent(thread.jobId)}/review`);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+      isLeavingForReviewRef.current = false;
+    } finally {
+      setIsUpdatingStatus(false);
     }
   }
 
@@ -220,10 +294,7 @@ export default function MessageThreadPage() {
               {thread?.jobId ?? "Conversation"}
             </p>
             <h1 className="mt-1 text-xl font-bold leading-tight text-black">
-              {thread?.businessName ||
-                thread?.contractorName ||
-                thread?.contractorId ||
-                "Messages"}
+              {thread?.displayName || "Messages"}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               {thread?.status ? `Status: ${thread.status}` : "Open thread"}
@@ -236,6 +307,17 @@ export default function MessageThreadPage() {
             <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-700">
               Keep communication inside AZISTO until booking is confirmed.
             </p>
+            {thread?.currentUserRole === "customer" &&
+            thread.jobStatus === "in_progress" ? (
+              <button
+                type="button"
+                onClick={handleMarkCompleted}
+                disabled={isUpdatingStatus}
+                className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+              >
+                {isUpdatingStatus ? "Completing..." : "Mark job completed"}
+              </button>
+            ) : null}
           </section>
 
           {isLoading ? (
@@ -288,6 +370,7 @@ export default function MessageThreadPage() {
                 </div>
               );
             })}
+            <div ref={bottomRef} />
           </section>
 
           <form onSubmit={handleSend} className="flex items-center gap-2">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Briefcase, ChevronRight, MapPin } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
 
 type ContractorJob = {
@@ -119,14 +119,25 @@ export default function ContractorDashboardPage() {
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
-          <header className="mt-3 flex justify-center">
-            <Link href="/home">
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Go back"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </button>
+
+            <Link href="/home" className="flex justify-center">
               <img
                 src="/azisto-logo-cropped.png"
                 alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[175px] object-contain"
+                className="w-full max-w-[165px] object-contain"
               />
             </Link>
+
+            <span aria-hidden="true" />
           </header>
 
           <section className="mt-8">
@@ -137,9 +148,15 @@ export default function ContractorDashboardPage() {
               Available jobs
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Review open customer requests. Matching, messaging, and job
-              acceptance will come next.
+              Review open customer requests, express interest, and message
+              customers once a conversation is started.
             </p>
+            <Link
+              href="/contractor/my-jobs"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-xl border border-red-100 bg-red-50 px-4 text-sm font-bold text-red-600"
+            >
+              My jobs
+            </Link>
           </section>
 
           {isLoading ? (

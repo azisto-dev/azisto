@@ -5,6 +5,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -131,17 +132,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const jobSnapshot = jobId
       ? await adminDb.collection("jobs").doc(jobId).get()
       : null;
+    const currentUserIsCustomer =
+      readText(threadData.customerAuthUid) === decodedToken.uid;
+    const contractorLabel =
+      readText(threadData.businessName) ||
+      readText(threadData.contractorName) ||
+      readText(threadData.contractorId);
+    const customerLabel = readText(threadData.customerId);
     const thread = {
       threadId,
       jobId,
+      displayName: currentUserIsCustomer
+        ? contractorLabel || "Contractor"
+        : customerLabel || "Customer",
       customerId: readText(threadData.customerId),
       contractorId: readText(threadData.contractorId),
       contractorName: readText(threadData.contractorName),
       businessName: readText(threadData.businessName),
-      currentUserRole:
-        readText(threadData.customerAuthUid) === decodedToken.uid
-          ? "customer"
-          : "contractor",
+      currentUserRole: currentUserIsCustomer ? "customer" : "contractor",
       status: readText(threadData.status),
       jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
     };
@@ -216,6 +224,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       threadSnapshot.get("customerAuthUid") === decodedToken.uid
         ? "customer"
         : "contractor";
+    const recipientAuthUid =
+      senderRole === "customer"
+        ? readText(threadSnapshot.get("contractorAuthUid"))
+        : readText(threadSnapshot.get("customerAuthUid"));
+    const recipientRole = senderRole === "customer" ? "contractor" : "customer";
     const messageDocument = threadSnapshot.ref.collection("items").doc();
     const messageId = messageDocument.id;
 
@@ -236,6 +249,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
       { merge: true },
     );
+    await createNotification({
+      recipientAuthUid,
+      recipientRole,
+      type: "new_message",
+      title: "New message",
+      message: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+      jobId: readText(threadSnapshot.get("jobId")),
+    });
 
     return NextResponse.json({ ok: true, messageId });
   } catch (error) {

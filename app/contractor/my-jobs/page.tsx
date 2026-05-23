@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Briefcase, MessageCircle } from "lucide-react";
+import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 
@@ -335,14 +335,25 @@ export default function ContractorMyJobsPage() {
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
-          <header className="mt-3 flex justify-center">
-            <Link href="/home">
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Go back"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </button>
+
+            <Link href="/home" className="flex justify-center">
               <img
                 src="/azisto-logo-cropped.png"
                 alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[175px] object-contain"
+                className="w-full max-w-[165px] object-contain"
               />
             </Link>
+
+            <span aria-hidden="true" />
           </header>
 
           <section className="mt-8">
@@ -355,6 +366,12 @@ export default function ContractorMyJobsPage() {
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Follow interested, hired, active, and completed AZISTO jobs.
             </p>
+            <Link
+              href="/contractor/active-jobs"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-xl border border-red-100 bg-red-50 px-4 text-sm font-bold text-red-600"
+            >
+              View active jobs
+            </Link>
           </section>
 
           {isLoading ? (

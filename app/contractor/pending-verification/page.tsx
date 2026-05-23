@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { ChevronLeft, ShieldCheck } from "lucide-react";
 
 function StatusBar() {
   return (
@@ -21,12 +21,24 @@ export default function ContractorPendingVerificationPage() {
         <div className="flex flex-1 flex-col px-5 pb-6 pt-5">
           <StatusBar />
 
-          <header className="mt-3 flex justify-center">
-            <img
-              src="/azisto-logo-cropped.png"
-              alt="AZISTO - Your on-demand assistant"
-              className="w-full max-w-[175px] object-contain"
-            />
+          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
+            <Link
+              href="/home"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              aria-label="Back to home"
+            >
+              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+            </Link>
+
+            <Link href="/home" className="flex justify-center">
+              <img
+                src="/azisto-logo-cropped.png"
+                alt="AZISTO - Your on-demand assistant"
+                className="w-full max-w-[165px] object-contain"
+              />
+            </Link>
+
+            <span aria-hidden="true" />
           </header>
 
           <section className="flex flex-1 flex-col justify-center">

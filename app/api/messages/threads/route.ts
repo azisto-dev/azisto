@@ -112,17 +112,24 @@ async function findContractorProfile(body: ThreadRequestBody, callerUid: string)
   return findContractorProfileByAuthUid(callerUid);
 }
 
-function serializeThread(data: Record<string, unknown>, currentUserUid: string) {
+async function serializeThread(
+  data: Record<string, unknown>,
+  currentUserUid: string,
+) {
   const currentUserIsCustomer = readText(data.customerAuthUid) === currentUserUid;
   const contractorLabel =
     readText(data.businessName) ||
     readText(data.contractorName) ||
     readText(data.contractorId);
   const customerLabel = readText(data.customerId);
+  const jobId = readText(data.jobId);
+  const jobSnapshot = jobId
+    ? await adminDb.collection("jobs").doc(jobId).get()
+    : null;
 
   return {
     threadId: readText(data.threadId),
-    jobId: readText(data.jobId),
+    jobId,
     displayName: currentUserIsCustomer
       ? contractorLabel || "Contractor"
       : customerLabel || "Customer",
@@ -133,6 +140,8 @@ function serializeThread(data: Record<string, unknown>, currentUserUid: string) 
     lastMessage: readText(data.lastMessage),
     lastMessageAt: serializeTimestamp(data.lastMessageAt),
     status: readText(data.status),
+    jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
+    unreadCount: 0,
     updatedAt: serializeTimestamp(data.updatedAt),
   };
 }
@@ -290,13 +299,15 @@ export async function GET(request: NextRequest) {
       .collection("messages")
       .where("participants", "array-contains", decodedToken.uid)
       .get();
-    const threads = threadsSnapshot.docs
-      .map((documentSnapshot) =>
-        serializeThread(documentSnapshot.data(), decodedToken.uid),
+    const threads = (
+      await Promise.all(
+        threadsSnapshot.docs.map((documentSnapshot) =>
+          serializeThread(documentSnapshot.data(), decodedToken.uid),
+        ),
       )
-      .sort((firstThread, secondThread) =>
-        secondThread.updatedAt.localeCompare(firstThread.updatedAt),
-      );
+    ).sort((firstThread, secondThread) =>
+      secondThread.updatedAt.localeCompare(firstThread.updatedAt),
+    );
 
     return NextResponse.json({ ok: true, threads });
   } catch (error) {

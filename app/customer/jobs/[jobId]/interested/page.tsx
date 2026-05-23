@@ -240,9 +240,9 @@ export default function CustomerInterestedContractorsPage() {
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
             <Link
-              href="/home"
+              href="/customer/jobs"
               className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to home"
+              aria-label="Back to customer jobs"
             >
               <ChevronLeft aria-hidden="true" className="h-5 w-5" />
             </Link>

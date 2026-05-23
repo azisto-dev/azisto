@@ -168,7 +168,7 @@ export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navItems = getNavItems(role);
-  const signedInHref = role === "unknown" ? "/login" : "/messages";
+  const notificationsHref = role === "unknown" ? "/login" : "/notifications";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -293,7 +293,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href={signedInHref}
+              href={notificationsHref}
               className="relative flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-black"
               aria-label="Notifications"
             >
