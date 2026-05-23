@@ -53,7 +53,7 @@ export async function fetchSessionProfile(user: User): Promise<SessionProfile> {
 
 export function getDefaultRouteForSession(profile: SessionProfile) {
   if (profile.role === "contractor") {
-    return "/contractor/my-jobs";
+    return "/home";
   }
 
   if (profile.role === "customer") {

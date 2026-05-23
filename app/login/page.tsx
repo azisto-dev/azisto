@@ -95,6 +95,27 @@ function LoginForm() {
     return "Password reset could not be completed. Please try again.";
   };
 
+  const confirmRegisteredResetEmail = async (registeredEmail: string) => {
+    const response = await fetch("/api/auth/password-reset", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: registeredEmail }),
+    });
+    const responseBody = (await response.json().catch(() => null)) as {
+      message?: unknown;
+    } | null;
+
+    if (!response.ok) {
+      throw new Error(
+        typeof responseBody?.message === "string"
+          ? responseBody.message
+          : "No AZISTO account was found with that email address.",
+      );
+    }
+  };
+
   const handleEmailReset = async () => {
     const trimmedEmail = (resetEmail || email).trim();
 
@@ -113,12 +134,18 @@ function LoginForm() {
       setMessage("");
       setSuccessMessage("");
       await authPersistenceReady;
+      await confirmRegisteredResetEmail(trimmedEmail);
       await sendPasswordResetEmail(auth, trimmedEmail);
       setSuccessMessage(
         "Password reset email sent. Please check your registered email inbox.",
       );
     } catch (error) {
-      setMessage(getResetErrorMessage(error));
+      setMessage(
+        error instanceof Error &&
+          !(typeof error === "object" && error !== null && "code" in error)
+          ? error.message
+          : getResetErrorMessage(error),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -278,7 +305,7 @@ function LoginForm() {
                   disabled={isLoading}
                   className="w-full rounded-md bg-red-500 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
-                  Send reset email
+                  {isLoading ? "Checking account..." : "Send reset email"}
                 </button>
               </div>
             </section>
