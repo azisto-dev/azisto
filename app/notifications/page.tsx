@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Bell } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { fetchSessionProfile } from "@/lib/sessionProfile";
+import BottomNav from "@/app/components/BottomNav";
 
 type NotificationItem = {
   notificationId: string;
@@ -61,9 +63,23 @@ async function fetchNotifications(user: User) {
     : [];
 }
 
+async function markNotificationsRead(user: User) {
+  const token = await user.getIdToken();
+
+  await fetch("/api/notifications", {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
+    "unknown",
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -77,7 +93,21 @@ export default function NotificationsPage() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        setNotifications(await fetchNotifications(user));
+        const profile = await fetchSessionProfile(user);
+        setRole(profile.role);
+        const userNotifications = await fetchNotifications(user);
+        setNotifications(userNotifications);
+        try {
+          await markNotificationsRead(user);
+          setNotifications(
+            userNotifications.map((notification) => ({
+              ...notification,
+              read: true,
+            })),
+          );
+        } catch (error) {
+          console.error("Mark notifications read failed:", error);
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load notifications.");
       } finally {
@@ -159,6 +189,7 @@ export default function NotificationsPage() {
             ))}
           </section>
         </div>
+        <BottomNav role={role} />
       </div>
     </main>
   );

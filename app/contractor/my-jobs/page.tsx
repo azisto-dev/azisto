@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import BottomNav from "@/app/components/BottomNav";
 
 type ContractorJob = {
   jobId: string;
@@ -421,6 +422,7 @@ export default function ContractorMyJobsPage() {
             )}
           </div>
         </div>
+        <BottomNav role="contractor" />
       </div>
     </main>
   );

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Flag, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import BottomNav from "@/app/components/BottomNav";
 
 const reportReasonOptions = [
   { value: "fake_job", label: "Fake job" },
@@ -20,6 +21,7 @@ const reportReasonOptions = [
 type ContractorJobDetail = {
   jobId: string;
   customerId: string;
+  customerFirstName: string;
   customerEmailVerified: boolean;
   customerPhoneVerified: boolean;
   customerCompletedJobsCount: number;
@@ -421,9 +423,9 @@ export default function ContractorJobDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-black">Customer ID</p>
+                  <p className="text-sm font-bold text-black">Customer</p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {job.customerId || "Not available"}
+                    {job.customerFirstName || "Customer"}
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3">
@@ -616,6 +618,7 @@ export default function ContractorJobDetailPage() {
             </>
           ) : null}
         </div>
+        <BottomNav role="contractor" />
       </div>
     </main>
   );

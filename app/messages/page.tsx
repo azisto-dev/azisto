@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { fetchSessionProfile } from "@/lib/sessionProfile";
+import BottomNav from "@/app/components/BottomNav";
 
 type MessageThread = {
   threadId: string;
@@ -90,6 +92,9 @@ async function fetchThreads(user: User) {
 export default function MessagesPage() {
   const router = useRouter();
   const [threads, setThreads] = useState<MessageThread[]>([]);
+  const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
+    "unknown",
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -103,6 +108,8 @@ export default function MessagesPage() {
       try {
         setIsLoading(true);
         setErrorMessage("");
+        const profile = await fetchSessionProfile(user);
+        setRole(profile.role);
         const messageThreads = await fetchThreads(user);
         setThreads(messageThreads);
       } catch (error) {
@@ -228,6 +235,7 @@ export default function MessagesPage() {
             ))}
           </section>
         </div>
+        <BottomNav role={role} />
       </div>
     </main>
   );

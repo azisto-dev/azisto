@@ -72,6 +72,10 @@ function isPastDate(dateValue: string) {
   return Boolean(dateValue) && dateValue < getTodayDateString();
 }
 
+function getFirstName(name: string) {
+  return name.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
 function getErrorDetails(error: unknown) {
   const code =
     typeof error === "object" && error !== null && "code" in error
@@ -150,6 +154,8 @@ export async function POST(request: NextRequest) {
     }
 
     const customerId = readText(customerProfile.get("customerId")) || customerProfile.id;
+    const customerFirstName =
+      getFirstName(readText(customerProfile.get("fullName"))) || "Customer";
     const accountStatus =
       readText(customerProfile.get("accountStatus")) || "active";
     const emailVerified =
@@ -258,6 +264,7 @@ export async function POST(request: NextRequest) {
       jobId,
       customerAuthUid: decodedToken.uid,
       customerId,
+      customerFirstName,
       customerEmailVerified: emailVerified,
       customerPhoneVerified: phoneVerified,
       customerCompletedJobsCount: completedJobsCount,

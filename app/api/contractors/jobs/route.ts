@@ -34,6 +34,10 @@ function readNumber(value: unknown) {
   return typeof value === "number" ? value : 0;
 }
 
+function readText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -45,6 +49,32 @@ function serializeTimestamp(value: unknown) {
   }
 
   return "";
+}
+
+function getFirstName(name: string) {
+  return name.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
+async function getCustomerFirstName(data: Record<string, unknown>) {
+  const savedFirstName = getFirstName(readText(data.customerFirstName));
+
+  if (savedFirstName) {
+    return savedFirstName;
+  }
+
+  const customerId = readText(data.customerId);
+
+  if (!customerId) {
+    return "Customer";
+  }
+
+  const customerSnapshot = await adminDb.collection("customers").doc(customerId).get();
+
+  if (!customerSnapshot.exists) {
+    return "Customer";
+  }
+
+  return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
 }
 
 function getErrorDetails(error: unknown) {
@@ -84,10 +114,11 @@ async function hasContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists;
 }
 
-function serializeJob(data: Record<string, unknown>) {
+async function serializeJob(data: Record<string, unknown>) {
   return {
     jobId: typeof data.jobId === "string" ? data.jobId : "",
     customerId: typeof data.customerId === "string" ? data.customerId : "",
+    customerFirstName: await getCustomerFirstName(data),
     customerEmailVerified: readBoolean(data.customerEmailVerified),
     customerPhoneVerified: readBoolean(data.customerPhoneVerified),
     customerCompletedJobsCount: readNumber(data.customerCompletedJobsCount),
@@ -113,6 +144,7 @@ function serializeJob(data: Record<string, unknown>) {
     status: typeof data.status === "string" ? data.status : "",
     matchingStatus:
       typeof data.matchingStatus === "string" ? data.matchingStatus : "",
+    hiredContractorId: readText(data.hiredContractorId),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -151,11 +183,21 @@ export async function GET(request: NextRequest) {
       .collection("jobs")
       .where("status", "==", "open")
       .get();
-    const jobs = openJobsSnapshot.docs
-      .map((documentSnapshot) => serializeJob(documentSnapshot.data()))
-      .sort((firstJob, secondJob) =>
-        secondJob.createdAt.localeCompare(firstJob.createdAt),
-      );
+    const filteredJobDocs = openJobsSnapshot.docs.filter((documentSnapshot) => {
+        const data = documentSnapshot.data();
+
+        return (
+          readText(data.matchingStatus) !== "paused" &&
+          !readText(data.hiredContractorId)
+        );
+      });
+    const jobs = (await Promise.all(
+      filteredJobDocs.map((documentSnapshot) =>
+        serializeJob(documentSnapshot.data()),
+      ),
+    )).sort((firstJob, secondJob) =>
+      secondJob.createdAt.localeCompare(firstJob.createdAt),
+    );
 
     return NextResponse.json({ ok: true, jobs });
   } catch (error) {

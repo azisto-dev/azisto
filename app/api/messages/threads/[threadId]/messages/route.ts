@@ -154,6 +154,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
     };
 
+    await threadSnapshot.ref.set(
+      {
+        unreadBy: FieldValue.arrayRemove(decodedToken.uid),
+      },
+      { merge: true },
+    );
+
     return NextResponse.json({ ok: true, thread, messages });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
@@ -241,14 +248,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       readBy: [decodedToken.uid],
     });
 
-    await threadSnapshot.ref.set(
-      {
-        lastMessage: text,
-        lastMessageAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    const threadUpdate: Record<string, unknown> = {
+      lastMessage: text,
+      lastMessageAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (recipientAuthUid) {
+      threadUpdate.unreadBy = FieldValue.arrayUnion(recipientAuthUid);
+    }
+
+    await threadSnapshot.ref.set(threadUpdate, { merge: true });
     await createNotification({
       recipientAuthUid,
       recipientRole,

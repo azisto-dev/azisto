@@ -40,6 +40,10 @@ function readNumber(value: unknown) {
   return typeof value === "number" ? value : 0;
 }
 
+function readText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -51,6 +55,32 @@ function serializeTimestamp(value: unknown) {
   }
 
   return "";
+}
+
+function getFirstName(name: string) {
+  return name.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
+async function getCustomerFirstName(data: Record<string, unknown>) {
+  const savedFirstName = getFirstName(readText(data.customerFirstName));
+
+  if (savedFirstName) {
+    return savedFirstName;
+  }
+
+  const customerId = readText(data.customerId);
+
+  if (!customerId) {
+    return "Customer";
+  }
+
+  const customerSnapshot = await adminDb.collection("customers").doc(customerId).get();
+
+  if (!customerSnapshot.exists) {
+    return "Customer";
+  }
+
+  return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
 }
 
 function getErrorDetails(error: unknown) {
@@ -90,10 +120,11 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
-function serializeJob(data: Record<string, unknown>) {
+async function serializeJob(data: Record<string, unknown>) {
   return {
     jobId: typeof data.jobId === "string" ? data.jobId : "",
     customerId: typeof data.customerId === "string" ? data.customerId : "",
+    customerFirstName: await getCustomerFirstName(data),
     customerEmailVerified: readBoolean(data.customerEmailVerified),
     customerPhoneVerified: readBoolean(data.customerPhoneVerified),
     customerCompletedJobsCount: readNumber(data.customerCompletedJobsCount),
@@ -170,7 +201,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const job = serializeJob(jobSnapshot.data() ?? {});
+    const job = await serializeJob(jobSnapshot.data() ?? {});
     const contractorId =
       typeof contractorProfile.get("contractorId") === "string"
         ? contractorProfile.get("contractorId")

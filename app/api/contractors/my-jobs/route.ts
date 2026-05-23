@@ -43,6 +43,32 @@ function serializeTimestamp(value: unknown) {
   return "";
 }
 
+function getFirstName(name: string) {
+  return name.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
+async function getCustomerFirstName(data: Record<string, unknown>) {
+  const savedFirstName = getFirstName(readText(data.customerFirstName));
+
+  if (savedFirstName) {
+    return savedFirstName;
+  }
+
+  const customerId = readText(data.customerId);
+
+  if (!customerId) {
+    return "Customer";
+  }
+
+  const customerSnapshot = await adminDb.collection("customers").doc(customerId).get();
+
+  if (!customerSnapshot.exists) {
+    return "Customer";
+  }
+
+  return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
+}
+
 function getErrorDetails(error: unknown) {
   const code =
     typeof error === "object" && error !== null && "code" in error
@@ -78,10 +104,11 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
-function serializeJob(data: Record<string, unknown>, relationship: string) {
+async function serializeJob(data: Record<string, unknown>, relationship: string) {
   return {
     jobId: readText(data.jobId),
     customerId: readText(data.customerId),
+    customerFirstName: await getCustomerFirstName(data),
     selectedServiceCategory: readText(data.selectedServiceCategory),
     selectedSubcategories: readStringList(data.selectedSubcategories),
     city: readText(data.city),
@@ -94,6 +121,8 @@ function serializeJob(data: Record<string, unknown>, relationship: string) {
     hiredContractorId: readText(data.hiredContractorId),
     hiredBusinessName: readText(data.hiredBusinessName),
     relationship,
+    completedAt: serializeTimestamp(data.completedAt),
+    cancelledAt: serializeTimestamp(data.cancelledAt),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -138,31 +167,31 @@ export async function GET(request: NextRequest) {
       .collection("jobs")
       .where("interestedContractorIds", "array-contains", contractorId)
       .get();
-    const jobsById = new Map<string, ReturnType<typeof serializeJob>>();
+    const jobsById = new Map<string, Awaited<ReturnType<typeof serializeJob>>>();
 
-    hiredJobsSnapshot.docs.forEach((documentSnapshot) => {
+    for (const documentSnapshot of hiredJobsSnapshot.docs) {
       jobsById.set(
         documentSnapshot.id,
-        serializeJob(documentSnapshot.data(), "hired"),
+        await serializeJob(documentSnapshot.data(), "hired"),
       );
-    });
+    }
 
-    interestedSnapshot.docs.forEach((jobSnapshot) => {
+    for (const jobSnapshot of interestedSnapshot.docs) {
       if (jobsById.has(jobSnapshot.id)) {
-        return;
+        continue;
       }
 
       const jobStatus = readText(jobSnapshot.get("status"));
 
       if (jobStatus !== "open") {
-        return;
+        continue;
       }
 
       jobsById.set(
         jobSnapshot.id,
-        serializeJob(jobSnapshot.data() ?? {}, "interested"),
+        await serializeJob(jobSnapshot.data() ?? {}, "interested"),
       );
-    });
+    }
 
     // Older interest records without interestedContractorIds are intentionally not backfilled here.
     // New interest submissions write this array field and avoid Firestore collection-group indexes.

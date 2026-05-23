@@ -141,7 +141,11 @@ async function serializeThread(
     lastMessageAt: serializeTimestamp(data.lastMessageAt),
     status: readText(data.status),
     jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
-    unreadCount: 0,
+    unreadCount: Array.isArray(data.unreadBy)
+      ? data.unreadBy.includes(currentUserUid)
+        ? 1
+        : 0
+      : 0,
     updatedAt: serializeTimestamp(data.updatedAt),
   };
 }
@@ -251,6 +255,7 @@ export async function POST(request: NextRequest) {
       contractorName: readText(contractorProfile.get("contactName")),
       businessName: readText(contractorProfile.get("businessName")),
       participants: [customerAuthUid, contractorAuthUid],
+      unreadBy: [],
       lastMessage: "",
       lastMessageAt: null,
       createdAt: FieldValue.serverTimestamp(),

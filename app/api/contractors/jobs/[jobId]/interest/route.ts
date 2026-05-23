@@ -64,6 +64,17 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
+async function hasActiveContractorJob(contractorId: string) {
+  const jobsSnapshot = await adminDb
+    .collection("jobs")
+    .where("hiredContractorId", "==", contractorId)
+    .get();
+
+  return jobsSnapshot.docs.some((jobSnapshot) =>
+    ["hired", "in_progress"].includes(readText(jobSnapshot.get("status"))),
+  );
+}
+
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     assertFirebaseAdminConfig();
@@ -109,6 +120,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const contractorId =
       readText(contractorProfile.get("contractorId")) || contractorProfile.id;
+
+    if (await hasActiveContractorJob(contractorId)) {
+      return NextResponse.json(
+        {
+          code: "active-job-exists",
+          message:
+            "You already have an active job. Complete it before accepting a new job.",
+        },
+        { status: 409 },
+      );
+    }
+
     const interestDocument = jobDocument
       .collection("interestedContractors")
       .doc(contractorId);

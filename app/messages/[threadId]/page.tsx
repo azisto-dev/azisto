@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Send } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import BottomNav from "@/app/components/BottomNav";
 
 type MessageThread = {
   threadId: string;
@@ -390,6 +391,14 @@ export default function MessageThreadPage() {
             </button>
           </form>
         </div>
+        <BottomNav
+          role={
+            thread?.currentUserRole === "customer" ||
+            thread?.currentUserRole === "contractor"
+              ? thread.currentUserRole
+              : "unknown"
+          }
+        />
       </div>
     </main>
   );

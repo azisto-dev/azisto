@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { BriefcaseBusiness, ChevronLeft, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import BottomNav from "@/app/components/BottomNav";
 
 type InterestedContractor = {
   contractorId: string;
@@ -370,6 +371,7 @@ export default function CustomerInterestedContractorsPage() {
             ))}
           </section>
         </div>
+        <BottomNav role="customer" />
       </div>
     </main>
   );

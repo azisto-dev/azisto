@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   type AuthError,
   signInWithEmailAndPassword,
 } from "firebase/auth";
@@ -23,7 +24,10 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   const validateForm = () => {
     const trimmedEmail = email.trim();
@@ -73,6 +77,53 @@ function LoginForm() {
     return "Something went wrong. Please try again.";
   };
 
+  const getResetErrorMessage = (error: unknown) => {
+    const authError = error as Partial<AuthError>;
+
+    if (authError.code === "auth/user-not-found") {
+      return "No account was found with that email address.";
+    }
+
+    if (authError.code === "auth/invalid-email") {
+      return "Please enter a valid email address.";
+    }
+
+    if (authError.code === "auth/network-request-failed") {
+      return "Network error. Please check your connection and try again.";
+    }
+
+    return "Password reset could not be completed. Please try again.";
+  };
+
+  const handleEmailReset = async () => {
+    const trimmedEmail = (resetEmail || email).trim();
+
+    if (!trimmedEmail) {
+      setMessage("Please enter your registered email address.");
+      return;
+    }
+
+    if (!emailPattern.test(trimmedEmail)) {
+      setMessage("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setMessage("");
+      setSuccessMessage("");
+      await authPersistenceReady;
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setSuccessMessage(
+        "Password reset email sent. Please check your registered email inbox.",
+      );
+    } catch (error) {
+      setMessage(getResetErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     const validationMessage = validateForm();
 
@@ -84,6 +135,7 @@ function LoginForm() {
     try {
       setIsLoading(true);
       setMessage("");
+      setSuccessMessage("");
       await authPersistenceReady;
       await signInWithEmailAndPassword(auth, email.trim(), password);
       await auth.authStateReady();
@@ -116,6 +168,7 @@ function LoginForm() {
     try {
       setIsLoading(true);
       setMessage("");
+      setSuccessMessage("");
       await authPersistenceReady;
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -185,9 +238,61 @@ function LoginForm() {
             />
           </label>
 
+          <div className="-mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setIsResetOpen((currentValue) => !currentValue);
+                setMessage("");
+                setSuccessMessage("");
+                setResetEmail(email);
+              }}
+              className="text-sm font-semibold text-red-500 hover:text-red-600"
+            >
+              Forgot password?
+            </button>
+          </div>
+
+          {isResetOpen ? (
+            <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="space-y-3">
+                <p className="text-sm leading-6 text-slate-600">
+                  Enter your registered email and AZISTO will send a secure
+                  password reset link.
+                </p>
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-700">
+                    Registered email
+                  </span>
+                  <input
+                    className="mt-2 w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                    type="email"
+                    value={resetEmail}
+                    placeholder="you@example.com"
+                    onChange={(event) => setResetEmail(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleEmailReset}
+                  disabled={isLoading}
+                  className="w-full rounded-md bg-red-500 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  Send reset email
+                </button>
+              </div>
+            </section>
+          ) : null}
+
           {message && (
             <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
               {message}
+            </p>
+          )}
+
+          {successMessage && (
+            <p className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {successMessage}
             </p>
           )}
 

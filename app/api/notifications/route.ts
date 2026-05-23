@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -88,6 +89,68 @@ export async function GET(request: NextRequest) {
     const { code, message } = getErrorDetails(error);
 
     console.error("Notifications API failed:", {
+      code,
+      message,
+      error,
+    });
+
+    return NextResponse.json(
+      {
+        code,
+        message,
+      },
+      { status: code === "missing-token" ? 401 : 500 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    assertFirebaseAdminConfig();
+
+    const token = getBearerToken(request.headers.get("authorization"));
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          code: "missing-token",
+          message: "Please sign in again.",
+        },
+        { status: 401 },
+      );
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const notificationsSnapshot = await adminDb
+      .collection("notifications")
+      .where("recipientAuthUid", "==", decodedToken.uid)
+      .get();
+    const batch = adminDb.batch();
+    const unreadNotifications = notificationsSnapshot.docs.filter(
+      (notificationSnapshot) => notificationSnapshot.get("read") !== true,
+    );
+
+    unreadNotifications.forEach((notificationSnapshot) => {
+      batch.set(
+        notificationSnapshot.ref,
+        {
+          read: true,
+          readAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    });
+
+    await batch.commit();
+
+    return NextResponse.json({
+      ok: true,
+      updated: unreadNotifications.length,
+    });
+  } catch (error) {
+    const { code, message } = getErrorDetails(error);
+
+    console.error("Notifications mark-read API failed:", {
       code,
       message,
       error,

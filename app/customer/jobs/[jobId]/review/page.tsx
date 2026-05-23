@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Star } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import BottomNav from "@/app/components/BottomNav";
 
 function StatusBar() {
   return (
@@ -117,6 +118,7 @@ export default function CustomerJobReviewPage() {
             {isSubmitting ? "Submitting..." : "Submit review"}
           </button>
         </div>
+        <BottomNav role="customer" />
       </div>
     </main>
   );

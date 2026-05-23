@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { fetchBadgeCounts } from "@/lib/badgeCounts";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import BottomNav from "@/app/components/BottomNav";
 
 const services = [
   {
@@ -48,49 +50,6 @@ const services = [
     imageAlt: "Tow truck carrying a car icon",
   },
 ];
-
-function getNavItems(role: "customer" | "contractor" | "unknown") {
-  const jobsHref =
-    role === "contractor"
-      ? "/contractor/my-jobs"
-      : role === "customer"
-        ? "/customer/jobs"
-        : "/login";
-  const messagesHref = role === "unknown" ? "/login" : "/messages";
-  const profileHref =
-    role === "contractor"
-      ? "/contractor/pending-verification"
-      : role === "customer"
-        ? "/customer/jobs"
-        : "/login";
-
-  return [
-    {
-      label: "Home",
-      href: "/home",
-      active: true,
-      path: "M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z",
-    },
-    {
-      label: "Bookings",
-      href: jobsHref,
-      active: false,
-      path: "M7 3v3M17 3v3M4 8h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
-    },
-    {
-      label: "Messages",
-      href: messagesHref,
-      active: false,
-      path: "M4 5h16v11H8l-4 4V5ZM8 9h8M8 13h5",
-    },
-    {
-      label: "Profile",
-      href: profileHref,
-      active: false,
-      path: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
-    },
-  ];
-}
 
 function MenuIcon() {
   return (
@@ -145,19 +104,47 @@ function SearchIcon() {
   );
 }
 
-function NavIcon({ path }: { path: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className="mx-auto h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-    </svg>
-  );
+function getFirstName(name: string) {
+  return name.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
+async function fetchHomeProfile(user: User) {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/profile", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const responseBody = (await response.json().catch(() => null)) as {
+    role?: unknown;
+    profile?: unknown;
+  } | null;
+
+  if (!response.ok || typeof responseBody?.profile !== "object") {
+    return {
+      role: "unknown" as const,
+      displayName: "",
+    };
+  }
+
+  const profile = responseBody.profile as Record<string, unknown>;
+  const role: "customer" | "contractor" | "unknown" =
+    responseBody.role === "customer" || responseBody.role === "contractor"
+      ? responseBody.role
+      : "unknown";
+  const displayName =
+    typeof profile.fullName === "string"
+      ? profile.fullName
+      : typeof profile.contactName === "string" && profile.contactName
+        ? profile.contactName
+        : typeof profile.businessName === "string"
+          ? profile.businessName
+          : "";
+
+  return {
+    role,
+    displayName,
+  };
 }
 
 export default function HomePage() {
@@ -165,9 +152,10 @@ export default function HomePage() {
   const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
     "unknown",
   );
+  const [greetingName, setGreetingName] = useState("");
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const navItems = getNavItems(role);
   const notificationsHref = role === "unknown" ? "/login" : "/notifications";
 
   useEffect(() => {
@@ -178,6 +166,8 @@ export default function HomePage() {
         console.log("Home current uid: none");
         console.log("Home redirect reason: none, public home");
         setRole("unknown");
+        setGreetingName("");
+        setNotificationBadgeCount(0);
         return;
       }
 
@@ -187,13 +177,59 @@ export default function HomePage() {
         const profile = await fetchSessionProfile(user);
         console.log("Home role API result:", profile);
         setRole(profile.role);
+        const homeProfile = await fetchHomeProfile(user);
+        setGreetingName(getFirstName(homeProfile.displayName));
+        if (homeProfile.role !== "unknown") {
+          setRole(homeProfile.role);
+        }
       } catch (error) {
         console.error("Home role lookup failed:", error);
         setRole("unknown");
+        setGreetingName("");
+        setNotificationBadgeCount(0);
       }
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    let currentUser: User | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    async function loadNotificationBadge(user: User) {
+      try {
+        const counts = await fetchBadgeCounts(user);
+        setNotificationBadgeCount(counts.notifications);
+      } catch (error) {
+        console.error("Home notification badge lookup failed:", error);
+      }
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+
+      if (!user) {
+        setNotificationBadgeCount(0);
+        return;
+      }
+
+      void loadNotificationBadge(user);
+    });
+
+    intervalId = setInterval(() => {
+      if (currentUser) {
+        void loadNotificationBadge(currentUser);
+      }
+    }, 10000);
+
+    return () => {
+      unsubscribe();
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   async function handleLogout() {
@@ -206,6 +242,8 @@ export default function HomePage() {
       console.log("Home logout: user clicked logout");
       await signOut(auth);
       setRole("unknown");
+      setGreetingName("");
+      setNotificationBadgeCount(0);
       setIsMenuOpen(false);
       router.push("/login");
     } catch (error) {
@@ -262,6 +300,13 @@ export default function HomePage() {
                   >
                     Messages
                   </Link>
+                  <Link
+                    href={role === "unknown" ? "/login" : "/profile"}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50"
+                  >
+                    Profile
+                  </Link>
                   {role === "unknown" ? (
                     <Link
                       href="/login"
@@ -298,13 +343,17 @@ export default function HomePage() {
               aria-label="Notifications"
             >
               <BellIcon />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+              {notificationBadgeCount > 0 ? (
+                <span className="absolute right-0 top-0 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
+                  {notificationBadgeCount > 9 ? "9+" : notificationBadgeCount}
+                </span>
+              ) : null}
             </Link>
           </header>
 
           <section className="mt-6">
             <h1 className="text-3xl font-bold leading-tight text-black">
-              Hello, Alex
+              {greetingName ? `Hello, ${greetingName}` : "Hello"}
             </h1>
           </section>
 
@@ -377,22 +426,7 @@ export default function HomePage() {
           </section>
         </div>
 
-        <nav className="border-t border-slate-200 bg-white px-3 py-2">
-          <div className="grid grid-cols-4">
-            {navItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
-                  item.active ? "text-red-500" : "text-slate-500"
-                }`}
-              >
-                <NavIcon path={item.path} />
-                <span className="mt-1 block">{item.label}</span>
-              </Link>
-            ))}
-          </div>
-        </nav>
+        <BottomNav role={role} />
       </div>
     </main>
   );
