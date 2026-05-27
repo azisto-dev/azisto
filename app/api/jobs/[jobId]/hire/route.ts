@@ -17,6 +17,7 @@ type RouteContext = {
 
 type HireRequestBody = {
   contractorId?: unknown;
+  taskIds?: unknown;
 };
 
 function getBearerToken(authorizationHeader: string | null) {
@@ -29,6 +30,17 @@ function getBearerToken(authorizationHeader: string | null) {
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readStringList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function getErrorDetails(error: unknown) {
@@ -61,6 +73,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { jobId } = await context.params;
     const body = (await request.json()) as HireRequestBody;
     const contractorId = readText(body.contractorId);
+    const requestedTaskIds = readStringList(body.taskIds);
 
     if (!contractorId) {
       return NextResponse.json(
@@ -93,6 +106,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const hiredContractorAuthUid =
       readText(interestedContractor.get("contractorUid")) ||
       interestedContractor.id;
+    const savedInterestedTaskIds = readStringList(
+      interestedContractor.get("selectedTaskIds"),
+    );
+    const taskIds =
+      requestedTaskIds.length > 0 ? requestedTaskIds : savedInterestedTaskIds;
 
     await adminDb.runTransaction(async (transaction) => {
       const jobSnapshot = await transaction.get(jobDocument);
@@ -110,16 +128,108 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
 
-      if (jobSnapshot.get("status") !== "open") {
+      if (
+        jobSnapshot.get("status") !== "open" &&
+        jobSnapshot.get("overallStatus") !== "partially_hired"
+      ) {
         throw Object.assign(new Error("Only open jobs can be hired."), {
           code: "job-not-open",
         });
+      }
+
+      const tasksSnapshot = await transaction.get(jobDocument.collection("tasks"));
+
+      if (!tasksSnapshot.empty && taskIds.length === 0) {
+        throw Object.assign(
+          new Error("Please select at least one task to hire for."),
+          { code: "missing-task-selection" },
+        );
+      }
+
+      if (!tasksSnapshot.empty) {
+        const selectedTaskSnapshots = tasksSnapshot.docs.filter((taskSnapshot) =>
+          taskIds.includes(readText(taskSnapshot.get("taskId")) || taskSnapshot.id),
+        );
+
+        if (selectedTaskSnapshots.length !== taskIds.length) {
+          throw Object.assign(new Error("One or more selected tasks were not found."), {
+            code: "task-not-found",
+          });
+        }
+
+        for (const taskSnapshot of selectedTaskSnapshots) {
+          if (taskSnapshot.get("status") !== "open") {
+            throw Object.assign(
+              new Error("One or more selected tasks are no longer open."),
+              { code: "task-not-open" },
+            );
+          }
+
+          const taskInterestSnapshot = await transaction.get(
+            taskSnapshot.ref.collection("interestedContractors").doc(contractorId),
+          );
+
+          if (!taskInterestSnapshot.exists) {
+            throw Object.assign(
+              new Error("This contractor has not expressed interest in every selected task."),
+              { code: "contractor-not-interested" },
+            );
+          }
+        }
+
+        selectedTaskSnapshots.forEach((taskSnapshot) => {
+          transaction.set(
+            taskSnapshot.ref,
+            {
+              status: "hired",
+              hiredContractorId: contractorId,
+              hiredContractorAuthUid,
+              hiredAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        });
+
+        const remainingOpenTaskCount = tasksSnapshot.docs.filter((taskSnapshot) => {
+          const taskId = readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
+
+          return taskSnapshot.get("status") === "open" && !taskIds.includes(taskId);
+        }).length;
+        const nextOverallStatus =
+          remainingOpenTaskCount > 0 ? "partially_hired" : "hired";
+
+        transaction.set(
+          jobDocument,
+          {
+            status: remainingOpenTaskCount > 0 ? "open" : "hired",
+            overallStatus: nextOverallStatus,
+            matchingStatus: remainingOpenTaskCount > 0 ? "pending" : "closed",
+            hiredContractorIds: FieldValue.arrayUnion(contractorId),
+            hiredContractorAuthUids: FieldValue.arrayUnion(hiredContractorAuthUid),
+            hiredAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        transaction.set(jobDocument.collection("statusHistory").doc(), {
+          fromStatus: readText(jobSnapshot.get("overallStatus")) || "open",
+          toStatus: nextOverallStatus,
+          changedByRole: "customer",
+          note: `Customer hired contractor for ${selectedTaskSnapshots.length} task(s)`,
+          selectedTaskIds: taskIds,
+          changedAt: FieldValue.serverTimestamp(),
+        });
+
+        return;
       }
 
       transaction.set(
         jobDocument,
         {
           status: "hired",
+          overallStatus: "hired",
           matchingStatus: "closed",
           hiredContractorId: contractorId,
           hiredContractorAuthUid,
@@ -150,7 +260,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       jobId,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, selectedTaskIds: taskIds });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 

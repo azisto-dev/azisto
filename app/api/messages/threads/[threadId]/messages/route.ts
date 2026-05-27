@@ -31,6 +31,10 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getFirstName(value: string) {
+  return value.trim().split(" ").filter(Boolean)[0] ?? "";
+}
+
 function readStringList(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -87,6 +91,57 @@ async function getThreadForParticipant(threadId: string, firebaseUid: string) {
   return participants.includes(firebaseUid) ? threadSnapshot : null;
 }
 
+async function getCustomerFirstName({
+  threadData,
+  jobData,
+}: {
+  threadData: Record<string, unknown>;
+  jobData: Record<string, unknown>;
+}) {
+  const savedName =
+    getFirstName(readText(threadData.customerFirstName)) ||
+    getFirstName(readText(jobData.customerFirstName)) ||
+    getFirstName(readText(threadData.customerName)) ||
+    getFirstName(readText(jobData.customerName));
+
+  if (savedName) {
+    return savedName;
+  }
+
+  const customerId = readText(threadData.customerId) || readText(jobData.customerId);
+
+  if (customerId) {
+    const customerSnapshot = await adminDb
+      .collection("customers")
+      .doc(customerId)
+      .get();
+
+    if (customerSnapshot.exists) {
+      return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
+    }
+  }
+
+  const customerAuthUid =
+    readText(threadData.customerAuthUid) || readText(jobData.customerAuthUid);
+
+  if (customerAuthUid) {
+    const customerSnapshot = await adminDb
+      .collection("customers")
+      .where("authUid", "==", customerAuthUid)
+      .limit(1)
+      .get();
+
+    if (!customerSnapshot.empty) {
+      return (
+        getFirstName(readText(customerSnapshot.docs[0].get("fullName"))) ||
+        "Customer"
+      );
+    }
+  }
+
+  return "Customer";
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     assertFirebaseAdminConfig();
@@ -132,13 +187,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const jobSnapshot = jobId
       ? await adminDb.collection("jobs").doc(jobId).get()
       : null;
+    const jobData = jobSnapshot?.exists ? (jobSnapshot.data() ?? {}) : {};
     const currentUserIsCustomer =
       readText(threadData.customerAuthUid) === decodedToken.uid;
     const contractorLabel =
       readText(threadData.businessName) ||
       readText(threadData.contractorName) ||
       readText(threadData.contractorId);
-    const customerLabel = readText(threadData.customerId);
+    const customerLabel = await getCustomerFirstName({
+      threadData,
+      jobData,
+    });
     const thread = {
       threadId,
       jobId,

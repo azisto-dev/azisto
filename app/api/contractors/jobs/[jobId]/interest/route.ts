@@ -15,6 +15,10 @@ type RouteContext = {
   }>;
 };
 
+type InterestRequestBody = {
+  taskIds?: unknown;
+};
+
 function getBearerToken(authorizationHeader: string | null) {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return "";
@@ -25,6 +29,17 @@ function getBearerToken(authorizationHeader: string | null) {
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readStringList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function getErrorDetails(error: unknown) {
@@ -64,15 +79,75 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
-async function hasActiveContractorJob(contractorId: string) {
+async function getActiveContractorParentJobIds(contractorId: string) {
+  const parentJobIds = new Set<string>();
   const jobsSnapshot = await adminDb
     .collection("jobs")
     .where("hiredContractorId", "==", contractorId)
     .get();
+  const taskParentJobsSnapshot = await adminDb
+    .collection("jobs")
+    .where("hiredContractorIds", "array-contains", contractorId)
+    .get();
 
-  return jobsSnapshot.docs.some((jobSnapshot) =>
-    ["hired", "in_progress"].includes(readText(jobSnapshot.get("status"))),
+  jobsSnapshot.docs.forEach((jobSnapshot) => {
+    if (["hired", "in_progress"].includes(readText(jobSnapshot.get("status")))) {
+      parentJobIds.add(readText(jobSnapshot.get("jobId")) || jobSnapshot.id);
+    }
+  });
+
+  await Promise.all(
+    taskParentJobsSnapshot.docs.map(async (jobSnapshot) => {
+      const tasksSnapshot = await jobSnapshot.ref.collection("tasks").get();
+
+      tasksSnapshot.docs.forEach((taskSnapshot) => {
+        if (
+          readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
+          ["hired", "in_progress"].includes(readText(taskSnapshot.get("status")))
+        ) {
+          parentJobIds.add(readText(taskSnapshot.get("parentJobId")) || jobSnapshot.id);
+        }
+      });
+    }),
   );
+
+  return parentJobIds;
+}
+
+function getContractorServiceSelections(contractorData: Record<string, unknown>) {
+  const selectedServices = new Set(readStringList(contractorData.selectedServices));
+  const selectedSubcategoriesByService =
+    typeof contractorData.selectedSubcategoriesByService === "object" &&
+    contractorData.selectedSubcategoriesByService !== null
+      ? (contractorData.selectedSubcategoriesByService as Record<string, unknown>)
+      : {};
+
+  return { selectedServices, selectedSubcategoriesByService };
+}
+
+function canPerformTask(
+  contractorData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+) {
+  const { selectedServices, selectedSubcategoriesByService } =
+    getContractorServiceSelections(contractorData);
+  const category = readText(taskData.category);
+  const subcategory = readText(taskData.subcategory);
+  const savedSubcategories = readStringList(selectedSubcategoriesByService[category]);
+
+  if (savedSubcategories.length > 0) {
+    return savedSubcategories.includes(subcategory);
+  }
+
+  if (selectedServices.size === 0) {
+    return true;
+  }
+
+  if (selectedServices.has(category)) {
+    return true;
+  }
+
+  return !(category in selectedSubcategoriesByService);
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -92,6 +167,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
+    const body = (await request.json().catch(() => ({}))) as InterestRequestBody;
     const contractorProfile = await findContractorProfile(decodedToken.uid);
 
     if (!contractorProfile) {
@@ -108,7 +184,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const jobDocument = adminDb.collection("jobs").doc(jobId);
     const jobSnapshot = await jobDocument.get();
 
-    if (!jobSnapshot.exists || jobSnapshot.get("status") !== "open") {
+    if (
+      !jobSnapshot.exists ||
+      (jobSnapshot.get("status") !== "open" &&
+        jobSnapshot.get("overallStatus") !== "partially_hired")
+    ) {
       return NextResponse.json(
         {
           code: "job-not-open",
@@ -120,8 +200,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const contractorId =
       readText(contractorProfile.get("contractorId")) || contractorProfile.id;
+    const activeParentJobIds = await getActiveContractorParentJobIds(contractorId);
 
-    if (await hasActiveContractorJob(contractorId)) {
+    if (
+      Array.from(activeParentJobIds).some(
+        (activeParentJobId) => activeParentJobId && activeParentJobId !== jobId,
+      )
+    ) {
       return NextResponse.json(
         {
           code: "active-job-exists",
@@ -132,25 +217,159 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const requestedTaskIds = readStringList(body.taskIds);
+    let tasksSnapshot = await jobDocument.collection("tasks").get();
+
+    if (tasksSnapshot.empty) {
+      const selectedSubcategories = readStringList(
+        jobSnapshot.get("selectedSubcategories"),
+      );
+      const selectedServiceCategory = readText(
+        jobSnapshot.get("selectedServiceCategory"),
+      );
+      const taskSubcategories =
+        selectedSubcategories.length > 0
+          ? selectedSubcategories
+          : [selectedServiceCategory || "General task"];
+      const batch = adminDb.batch();
+
+      taskSubcategories.forEach((subcategory, index) => {
+        const taskId = `${jobId}-${index + 1}`;
+
+        batch.set(jobDocument.collection("tasks").doc(taskId), {
+          taskId,
+          parentJobId: jobId,
+          category: selectedServiceCategory,
+          subcategory,
+          jobDescription: readText(jobSnapshot.get("jobDescription")),
+          city: readText(jobSnapshot.get("city")),
+          province: readText(jobSnapshot.get("province")),
+          postalCode: readText(jobSnapshot.get("postalCode")),
+          preferredDate: readText(jobSnapshot.get("preferredDate")),
+          preferredTime: readText(jobSnapshot.get("preferredTime")),
+          urgency: readText(jobSnapshot.get("urgency")) || "Flexible",
+          status: "open",
+          interestedContractorIds: [],
+          interestedContractorAuthUids: [],
+          hiredContractorId: null,
+          hiredContractorAuthUid: null,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      await batch.commit();
+      tasksSnapshot = await jobDocument.collection("tasks").get();
+    }
+
+    const openTasks = tasksSnapshot.docs.filter(
+      (taskSnapshot) => readText(taskSnapshot.get("status")) === "open",
+    );
+    const selectedTasks = openTasks.filter((taskSnapshot) => {
+      const taskId = readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
+
+      if (requestedTaskIds.length > 0 && !requestedTaskIds.includes(taskId)) {
+        return false;
+      }
+
+      return canPerformTask(contractorProfile.data() ?? {}, taskSnapshot.data());
+    });
+
+    if (!tasksSnapshot.empty && selectedTasks.length === 0) {
+      return NextResponse.json(
+        {
+          code: "no-open-matching-tasks",
+          message: "Please choose at least one open task that matches your services.",
+        },
+        { status: 400 },
+      );
+    }
+
     const interestDocument = jobDocument
       .collection("interestedContractors")
       .doc(contractorId);
     const interestSnapshot = await interestDocument.get();
+    const selectedTaskIds = selectedTasks.map(
+      (taskSnapshot) => readText(taskSnapshot.get("taskId")) || taskSnapshot.id,
+    );
+    const selectedTaskLabels = selectedTasks.map(
+      (taskSnapshot) =>
+        readText(taskSnapshot.get("subcategory")) ||
+        readText(taskSnapshot.get("category")) ||
+        readText(taskSnapshot.get("taskId")) ||
+        taskSnapshot.id,
+    );
 
     if (interestSnapshot.exists) {
+      await Promise.all(
+        selectedTasks.map((taskSnapshot) =>
+          taskSnapshot.ref.collection("interestedContractors").doc(contractorId).set(
+            {
+              contractorUid: decodedToken.uid,
+              contractorId,
+              contractorName: readText(contractorProfile.get("contactName")),
+              businessName: readText(contractorProfile.get("businessName")),
+              phoneNumber: readText(contractorProfile.get("phoneNumber")),
+              city: readText(contractorProfile.get("city")),
+              province: readText(contractorProfile.get("province")),
+              verificationStatus: readText(contractorProfile.get("verificationStatus")),
+              taskId: readText(taskSnapshot.get("taskId")) || taskSnapshot.id,
+              taskLabel:
+                readText(taskSnapshot.get("subcategory")) ||
+                readText(taskSnapshot.get("category")),
+              interestedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          ),
+        ),
+      );
+      await Promise.all(
+        selectedTasks.map((taskSnapshot) =>
+          taskSnapshot.ref.set(
+            {
+              interestedContractorIds: FieldValue.arrayUnion(contractorId),
+              interestedContractorAuthUids: FieldValue.arrayUnion(decodedToken.uid),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          ),
+        ),
+      );
       await jobDocument.set(
         {
           interestedContractorIds: FieldValue.arrayUnion(contractorId),
           interestedContractorAuthUids: FieldValue.arrayUnion(decodedToken.uid),
+          ...(selectedTaskIds.length > 0
+            ? {
+                [`selectedTaskIdsByContractor.${contractorId}`]:
+                  FieldValue.arrayUnion(...selectedTaskIds),
+              }
+            : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      await interestDocument.set(
+        {
+          ...(selectedTaskIds.length > 0
+            ? { selectedTaskIds: FieldValue.arrayUnion(...selectedTaskIds) }
+            : {}),
+          ...(selectedTaskLabels.length > 0
+            ? { selectedTaskLabels: FieldValue.arrayUnion(...selectedTaskLabels) }
+            : {}),
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },
       );
 
-      return NextResponse.json({ ok: true, alreadySubmitted: true });
+      return NextResponse.json({
+        ok: true,
+        alreadySubmitted: true,
+        selectedTaskIds,
+      });
     }
 
-    await interestDocument.set({
+    const contractorInterestData = {
       contractorUid: decodedToken.uid,
       contractorId,
       contractorName: readText(contractorProfile.get("contactName")),
@@ -159,12 +378,46 @@ export async function POST(request: NextRequest, context: RouteContext) {
       city: readText(contractorProfile.get("city")),
       province: readText(contractorProfile.get("province")),
       verificationStatus: readText(contractorProfile.get("verificationStatus")),
+      selectedTaskIds,
+      selectedTaskLabels,
       interestedAt: FieldValue.serverTimestamp(),
-    });
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    await interestDocument.set(contractorInterestData);
+    await Promise.all(
+      selectedTasks.map((taskSnapshot) =>
+        taskSnapshot.ref.collection("interestedContractors").doc(contractorId).set({
+          ...contractorInterestData,
+          taskId: readText(taskSnapshot.get("taskId")) || taskSnapshot.id,
+          taskLabel:
+            readText(taskSnapshot.get("subcategory")) ||
+            readText(taskSnapshot.get("category")),
+        }),
+      ),
+    );
+    await Promise.all(
+      selectedTasks.map((taskSnapshot) =>
+        taskSnapshot.ref.set(
+          {
+            interestedContractorIds: FieldValue.arrayUnion(contractorId),
+            interestedContractorAuthUids: FieldValue.arrayUnion(decodedToken.uid),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        ),
+      ),
+    );
     await jobDocument.set(
       {
         interestedContractorIds: FieldValue.arrayUnion(contractorId),
         interestedContractorAuthUids: FieldValue.arrayUnion(decodedToken.uid),
+        ...(selectedTaskIds.length > 0
+          ? {
+              [`selectedTaskIdsByContractor.${contractorId}`]:
+                FieldValue.arrayUnion(...selectedTaskIds),
+            }
+          : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -182,7 +435,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       jobId,
     });
 
-    return NextResponse.json({ ok: true, alreadySubmitted: false });
+    return NextResponse.json({
+      ok: true,
+      alreadySubmitted: false,
+      selectedTaskIds,
+    });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 

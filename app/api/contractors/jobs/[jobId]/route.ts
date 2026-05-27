@@ -159,6 +159,21 @@ async function serializeJob(data: Record<string, unknown>) {
   };
 }
 
+function serializeTask(data: Record<string, unknown>) {
+  return {
+    taskId: readText(data.taskId),
+    parentJobId: readText(data.parentJobId),
+    category: readText(data.category),
+    subcategory: readText(data.subcategory),
+    status: readText(data.status),
+    hiredContractorId: readText(data.hiredContractorId),
+    hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
+    interestedContractorIds: readStringList(data.interestedContractorIds),
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     assertFirebaseAdminConfig();
@@ -202,15 +217,42 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const job = await serializeJob(jobSnapshot.data() ?? {});
+    const tasksSnapshot = await jobSnapshot.ref.collection("tasks").get();
+    const savedTasks = tasksSnapshot.docs
+      .map((taskSnapshot) => serializeTask(taskSnapshot.data()))
+      .sort((firstTask, secondTask) =>
+        firstTask.taskId.localeCompare(secondTask.taskId),
+      );
+    const tasks =
+      savedTasks.length > 0
+        ? savedTasks
+        : job.selectedSubcategories.map((subcategory, index) => ({
+            taskId: `${job.jobId}-${index + 1}`,
+            parentJobId: job.jobId,
+            category: job.selectedServiceCategory,
+            subcategory,
+            status: job.status === "open" ? "open" : job.status,
+            hiredContractorId: "",
+            hiredContractorAuthUid: "",
+            interestedContractorIds: [],
+            createdAt: job.createdAt,
+            updatedAt: job.updatedAt,
+          }));
     const contractorId =
       typeof contractorProfile.get("contractorId") === "string"
         ? contractorProfile.get("contractorId")
         : contractorProfile.id;
     const callerIsHiredContractor =
       jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
-      jobSnapshot.get("hiredContractorId") === contractorId;
+      jobSnapshot.get("hiredContractorId") === contractorId ||
+      tasks.some(
+        (task) =>
+          task.hiredContractorAuthUid === decodedToken.uid ||
+          task.hiredContractorId === contractorId,
+      );
+    const hasOpenTask = tasks.some((task) => task.status === "open");
 
-    if (job.status !== "open" && !callerIsHiredContractor) {
+    if (job.status !== "open" && !hasOpenTask && !callerIsHiredContractor) {
       return NextResponse.json(
         {
           code: "job-not-open",
@@ -220,7 +262,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ ok: true, job });
+    return NextResponse.json({ ok: true, job: { ...job, tasks } });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 

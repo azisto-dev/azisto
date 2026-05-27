@@ -1,4 +1,8 @@
 import type { User } from "firebase/auth";
+import {
+  firebaseQuotaMessage,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
 
 export type SessionProfile = {
   role: "customer" | "contractor" | "unknown";
@@ -6,9 +10,26 @@ export type SessionProfile = {
   contractorId: string;
   verificationStatus: string;
   authUid: string;
+  displayName: string;
+  quotaExceeded?: boolean;
 };
 
+const sessionProfileCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    profile: SessionProfile;
+  }
+>();
+const sessionProfileCacheTtlMs = 60_000;
+
 export async function fetchSessionProfile(user: User): Promise<SessionProfile> {
+  const cachedProfile = sessionProfileCache.get(user.uid);
+
+  if (cachedProfile && cachedProfile.expiresAt > Date.now()) {
+    return cachedProfile.profile;
+  }
+
   const token = await user.getIdToken();
   const response = await fetch("/api/me", {
     headers: {
@@ -22,14 +43,36 @@ export async function fetchSessionProfile(user: User): Promise<SessionProfile> {
     | null;
 
   if (!response.ok) {
-    throw new Error(
+    const message =
       typeof responseBody?.message === "string"
         ? responseBody.message
-        : "Unable to load your account profile.",
+        : "Unable to load your account profile.";
+
+    if (isQuotaExceededMessage(message)) {
+      const fallbackProfile: SessionProfile = {
+        role: "unknown",
+        customerId: "",
+        contractorId: "",
+        verificationStatus: "",
+        authUid: user.uid,
+        displayName: "",
+        quotaExceeded: true,
+      };
+
+      sessionProfileCache.set(user.uid, {
+        expiresAt: Date.now() + sessionProfileCacheTtlMs,
+        profile: fallbackProfile,
+      });
+
+      return fallbackProfile;
+    }
+
+    throw new Error(
+      isQuotaExceededMessage(message) ? firebaseQuotaMessage : message,
     );
   }
 
-  return {
+  const profile: SessionProfile = {
     role:
       responseBody?.role === "customer" || responseBody?.role === "contractor"
         ? responseBody.role
@@ -48,7 +91,18 @@ export async function fetchSessionProfile(user: User): Promise<SessionProfile> {
         : "",
     authUid:
       typeof responseBody?.authUid === "string" ? responseBody.authUid : "",
+    displayName:
+      typeof responseBody?.displayName === "string"
+        ? responseBody.displayName
+        : "",
   };
+
+  sessionProfileCache.set(user.uid, {
+    expiresAt: Date.now() + sessionProfileCacheTtlMs,
+    profile,
+  });
+
+  return profile;
 }
 
 export function getDefaultRouteForSession(profile: SessionProfile) {

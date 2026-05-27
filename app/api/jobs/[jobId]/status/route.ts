@@ -17,6 +17,7 @@ type RouteContext = {
 
 type StatusRequestBody = {
   status?: unknown;
+  taskId?: unknown;
 };
 
 const lifecycleStatuses = new Set([
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { jobId } = await context.params;
     const body = (await request.json()) as StatusRequestBody;
     const nextStatus = readText(body.status);
+    const taskId = readText(body.taskId);
 
     if (!lifecycleStatuses.has(nextStatus)) {
       return NextResponse.json(
@@ -135,8 +137,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       const currentStatus = readText(jobSnapshot.get("status"));
       const callerIsCustomer = jobSnapshot.get("customerAuthUid") === decodedToken.uid;
-      const callerIsHiredContractor =
-        jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid;
+      const taskDocument = taskId ? jobDocument.collection("tasks").doc(taskId) : null;
+      const taskSnapshot = taskDocument ? await transaction.get(taskDocument) : null;
+      const allTasksSnapshot = taskDocument
+        ? await transaction.get(jobDocument.collection("tasks"))
+        : null;
+      const currentTaskStatus = taskSnapshot?.exists
+        ? readText(taskSnapshot.get("status"))
+        : "";
+      const callerIsHiredContractor = taskSnapshot?.exists
+        ? taskSnapshot.get("hiredContractorAuthUid") === decodedToken.uid
+        : jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid;
 
       if (!callerIsCustomer && !callerIsHiredContractor) {
         throw Object.assign(
@@ -146,8 +157,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
 
       changedByRole = callerIsCustomer ? "customer" : "contractor";
+      const transitionFromStatus = currentTaskStatus || currentStatus;
 
-      if (!isAllowedTransition(currentStatus, nextStatus, changedByRole)) {
+      if (!isAllowedTransition(transitionFromStatus, nextStatus, changedByRole)) {
         throw Object.assign(
           new Error("That job status change is not allowed."),
           { code: "invalid-status-transition" },
@@ -205,12 +217,53 @@ export async function POST(request: NextRequest, context: RouteContext) {
         statusUpdate.matchingStatus = "closed";
       }
 
-      transaction.set(jobDocument, statusUpdate, { merge: true });
+      if (taskDocument && taskSnapshot?.exists) {
+        transaction.set(taskDocument, statusUpdate, { merge: true });
+
+        const taskStatuses = (allTasksSnapshot?.docs ?? []).map((snapshot) => {
+          const snapshotTaskId = readText(snapshot.get("taskId")) || snapshot.id;
+
+          return snapshotTaskId === taskId
+            ? nextStatus
+            : readText(snapshot.get("status"));
+        });
+        const hasOpenTasks = taskStatuses.some((status) => status === "open");
+        const allCompleted = taskStatuses.every((status) => status === "completed");
+        const anyInProgress = taskStatuses.some((status) => status === "in_progress");
+        const parentStatus = allCompleted
+          ? "completed"
+          : anyInProgress
+            ? "in_progress"
+            : hasOpenTasks
+              ? "open"
+              : "hired";
+        const parentOverallStatus = hasOpenTasks
+          ? "partially_hired"
+          : parentStatus;
+
+        transaction.set(
+          jobDocument,
+          {
+            status: parentStatus,
+            overallStatus: parentOverallStatus,
+            ...(allCompleted || nextStatus === "cancelled"
+              ? { matchingStatus: "closed" }
+              : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } else {
+        transaction.set(jobDocument, statusUpdate, { merge: true });
+      }
       transaction.set(jobDocument.collection("statusHistory").doc(), {
-        fromStatus: currentStatus,
+        fromStatus: transitionFromStatus,
         toStatus: nextStatus,
         changedByRole,
-        note: `Status changed to ${nextStatus}`,
+        note: taskId
+          ? `Task ${taskId} status changed to ${nextStatus}`
+          : `Status changed to ${nextStatus}`,
+        ...(taskId ? { taskId } : {}),
         changedAt: FieldValue.serverTimestamp(),
       });
     });

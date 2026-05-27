@@ -1,4 +1,5 @@
 import type { User } from "firebase/auth";
+import { isQuotaExceededMessage } from "@/lib/apiErrors";
 
 export type BadgeCounts = {
   messages: number;
@@ -23,11 +24,19 @@ export async function fetchBadgeCounts(user: User): Promise<BadgeCounts> {
   } | null;
 
   if (!response.ok) {
-    throw new Error(
+    const message =
       typeof responseBody?.message === "string"
         ? responseBody.message
-        : "Unable to load badge counts.",
-    );
+        : "Unable to load badge counts.";
+
+    if (isQuotaExceededMessage(message)) {
+      return {
+        messages: 0,
+        notifications: 0,
+      };
+    }
+
+    throw new Error(message);
   }
 
   return {

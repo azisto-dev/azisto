@@ -220,7 +220,7 @@ function TextInput({
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+        className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
       />
     </div>
   );
@@ -250,13 +250,13 @@ function UploadCard({
     <label
       className={`block rounded-xl border border-dashed px-4 py-3 transition ${
         isUploading
-          ? "cursor-wait border-red-200 bg-red-50"
-          : "cursor-pointer border-slate-300 bg-slate-50 hover:border-red-200 hover:bg-red-50/50"
+          ? "cursor-wait border-azisto-gold bg-white"
+          : "cursor-pointer border-slate-300 bg-slate-50 hover:border-azisto-gold hover:bg-azisto-gold/10"
       }`}
     >
       <span className="flex min-h-16 items-center justify-between">
         <span className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-red-500 shadow-sm">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-azisto-text shadow-sm">
             <FileText aria-hidden="true" className="h-5 w-5" />
           </span>
           <span className="min-w-0">
@@ -272,7 +272,7 @@ function UploadCard({
           </span>
         </span>
 
-        <span className="ml-3 flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-red-500 shadow-sm">
+        <span className="ml-3 flex shrink-0 items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-azisto-text shadow-sm">
           <Upload aria-hidden="true" className="h-4 w-4" />
           {isUploading ? "Uploading..." : uploadedFileName ? "Replace" : "Upload"}
         </span>
@@ -308,12 +308,12 @@ function CheckboxRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 accent-red-500"
+        className="mt-1 h-4 w-4 accent-azisto-accent"
       />
       <span>{children}</span>
     </label>
@@ -858,8 +858,8 @@ export default function ContractorOnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -884,7 +884,7 @@ export default function ContractorOnboardingPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Contractor verification
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -896,16 +896,16 @@ export default function ContractorOnboardingPage() {
             </p>
           </section>
 
-          <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="mt-6 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-azisto-text">
                 <ShieldCheck aria-hidden="true" className="h-5 w-5" />
               </span>
               <div>
                 <p className="text-sm font-bold text-black">
                   Verification status
                 </p>
-                <p className="mt-1 text-sm font-semibold text-red-500">
+                <p className="mt-1 text-sm font-semibold text-azisto-text">
                   {verificationStatus}
                 </p>
               </div>
@@ -913,7 +913,7 @@ export default function ContractorOnboardingPage() {
           </section>
 
           <form className="mt-6 space-y-5">
-            <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
                   Contractor profile
@@ -930,7 +930,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("displayName", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -942,7 +942,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("phoneNumber", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -953,7 +953,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("address", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -965,7 +965,7 @@ export default function ContractorOnboardingPage() {
                     onChange={(event) =>
                       updateField("city", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                   />
                 </div>
 
@@ -976,7 +976,7 @@ export default function ContractorOnboardingPage() {
                     onChange={(event) =>
                       updateField("province", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                   />
                 </div>
               </div>
@@ -988,7 +988,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("postalCode", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1000,7 +1000,7 @@ export default function ContractorOnboardingPage() {
                     updateField("serviceRadius", event.target.value)
                   }
                   placeholder="25 km"
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
                 />
               </div>
 
@@ -1012,7 +1012,7 @@ export default function ContractorOnboardingPage() {
                     updateField("servicesOffered", event.target.value)
                   }
                   placeholder="Handyman, plumbing, moving..."
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
                 />
               </div>
 
@@ -1025,7 +1025,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("yearsExperience", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1035,12 +1035,12 @@ export default function ContractorOnboardingPage() {
                   value={form.bio}
                   onChange={(event) => updateField("bio", event.target.value)}
                   placeholder="A short summary of your experience..."
-                  className="min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="min-h-28 w-full resize-none rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400 az-focus-field"
                 />
               </div>
             </section>
 
-            <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
                   Business verification
@@ -1058,7 +1058,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("legalBusinessName", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1069,7 +1069,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("businessNumber", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1080,7 +1080,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("businessLicenceNumber", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1095,7 +1095,7 @@ export default function ContractorOnboardingPage() {
                       event.target.value,
                     )
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1106,7 +1106,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("insuranceProviderName", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1117,7 +1117,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("insurancePolicyNumber", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1129,7 +1129,7 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("insuranceExpiryDate", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -1142,12 +1142,12 @@ export default function ContractorOnboardingPage() {
                     updateField("coverageAmount", event.target.value)
                   }
                   placeholder="$2,000,000"
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
                 />
               </div>
             </section>
 
-            <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
                   Documents & Verification
@@ -1169,8 +1169,8 @@ export default function ContractorOnboardingPage() {
                       onClick={() => setActiveDocumentTab(tab.id)}
                       className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold transition ${
                         isActive
-                          ? "border-red-500 bg-red-50 text-red-500"
-                          : "border-slate-200 bg-white text-slate-600"
+                          ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
+                          : "border-azisto-gold bg-white text-slate-600"
                       }`}
                     >
                       {tab.label}
@@ -1271,7 +1271,7 @@ export default function ContractorOnboardingPage() {
                       updateField("insuranceExpiryDate", value)
                     }
                   />
-                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                  <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     Higher-risk services may require higher insurance coverage.
                   </p>
                 </div>
@@ -1322,7 +1322,7 @@ export default function ContractorOnboardingPage() {
                   {visibleTradeLicenceOptions.map((option) => (
                     <div
                       key={option.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                      className="rounded-xl border border-azisto-border bg-slate-50 p-3"
                     >
                       <p className="text-sm font-bold text-black">
                         {option.title}
@@ -1345,7 +1345,7 @@ export default function ContractorOnboardingPage() {
 
               {activeDocumentTab === "vehicle" ? (
                 <div className="space-y-4">
-                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                  <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     {vehicleDocumentsRequired
                       ? "Vehicle documents are expected for the services listed."
                       : "Vehicle documents are not required for the current services, but you can add details if needed."}
@@ -1419,7 +1419,7 @@ export default function ContractorOnboardingPage() {
 
               {activeDocumentTab === "driving" ? (
                 <div className="space-y-4">
-                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                  <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     {drivingAbstractRequired
                       ? "A driving abstract is expected for this service mix."
                       : "A driving abstract is not required for the current services, but you can add it if needed."}
@@ -1468,7 +1468,7 @@ export default function ContractorOnboardingPage() {
             </section>
 
             {authLoading ? (
-              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                 Checking account...
               </p>
             ) : null}
@@ -1483,7 +1483,7 @@ export default function ContractorOnboardingPage() {
               type="button"
               onClick={handleContinue}
               disabled={isSaving || authLoading || isUploadingDocument}
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+              className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
             >
               {authLoading
                 ? "Checking account..."

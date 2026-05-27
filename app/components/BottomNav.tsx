@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { fetchBadgeCounts } from "@/lib/badgeCounts";
+import { azistoUi } from "@/lib/theme";
+import { isQuotaExceededError } from "@/lib/apiErrors";
 
 type UserRole = "customer" | "contractor" | "unknown";
 
@@ -88,7 +90,9 @@ export default function BottomNav({ role }: { role: UserRole }) {
           setMessageBadgeCount(counts.messages);
         }
       } catch (error) {
-        console.error("Bottom nav badge lookup failed:", error);
+        if (!isQuotaExceededError(error)) {
+          console.error("Bottom nav badge lookup failed:", error);
+        }
 
         if (isMounted) {
           setMessageBadgeCount(0);
@@ -108,10 +112,14 @@ export default function BottomNav({ role }: { role: UserRole }) {
     });
 
     intervalId = setInterval(() => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
       if (currentUser && role !== "unknown") {
         void loadMessageBadge(currentUser);
       }
-    }, 10000);
+    }, 60000);
 
     return () => {
       isMounted = false;
@@ -124,7 +132,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
   }, [role]);
 
   return (
-    <nav className="border-t border-slate-200 bg-white px-3 py-2">
+    <nav className="border-t border-azisto-border bg-white px-3 py-2">
       <div className="grid grid-cols-4">
         {navItems.map((item) => {
           const isActive = item.matchPaths.some((matchPath) =>
@@ -136,16 +144,18 @@ export default function BottomNav({ role }: { role: UserRole }) {
               key={item.label}
               href={item.href}
               className={`relative rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
-                isActive ? "text-red-500" : "text-slate-500"
+                isActive ? "text-azisto-accent" : "text-azisto-muted"
               }`}
             >
               {item.label === "Messages" && messageBadgeCount > 0 ? (
-                <span className="absolute right-5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
+                <span className="absolute right-5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
                   {messageBadgeCount > 9 ? "9+" : messageBadgeCount}
                 </span>
               ) : null}
               <NavIcon path={item.path} />
-              <span className="mt-1 block">{item.label}</span>
+              <span className={`mt-1 block ${isActive ? azistoUi.kicker : ""}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

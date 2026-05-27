@@ -78,6 +78,19 @@ function readStringList(value: unknown) {
     .filter(Boolean);
 }
 
+function readRecord(value: unknown) {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function readStringListMap(value: unknown) {
+  const data = readRecord(value);
+  return Object.fromEntries(
+    Object.entries(data).map(([key, list]) => [key, readStringList(list)]),
+  );
+}
+
 function getErrorDetails(error: unknown) {
   const code =
     typeof error === "object" && error !== null && "code" in error
@@ -170,6 +183,14 @@ function serializeContractorProfile(
     postalCode: readText(data.postalCode),
     serviceRadiusKm: readNumber(data.serviceRadiusKm),
     selectedServices: readStringList(data.selectedServices),
+    selectedSubcategoriesByService: readStringListMap(
+      data.selectedSubcategoriesByService,
+    ),
+    insuranceProvider: readText(data.insuranceProvider),
+    insurancePolicyNumber: readText(data.insurancePolicyNumber),
+    businessLicenceNumber: readText(data.businessLicenceNumber),
+    documentsVerificationStatus: readText(data.documentsVerificationStatus),
+    documents: readRecord(data.documents),
     verificationStatus: readText(data.verificationStatus),
     profilePhotoUrl: readText(data.profilePhotoUrl),
     profilePhotoStoragePath: readText(data.profilePhotoStoragePath),
@@ -210,6 +231,33 @@ function getSafeUpdate(role: ProfileRole, body: EditableProfileBody) {
         update[fieldName] = readText(body[fieldName]);
       }
     });
+
+    if ("selectedServices" in body) {
+      update.selectedServices = readStringList(body.selectedServices);
+    }
+
+    if ("selectedSubcategoriesByService" in body) {
+      update.selectedSubcategoriesByService = readStringListMap(
+        body.selectedSubcategoriesByService,
+      );
+    }
+
+    if ("insuranceProvider" in body) {
+      update.insuranceProvider = readText(body.insuranceProvider);
+    }
+
+    if ("insurancePolicyNumber" in body) {
+      update.insurancePolicyNumber = readText(body.insurancePolicyNumber);
+    }
+
+    if ("businessLicenceNumber" in body) {
+      update.businessLicenceNumber = readText(body.businessLicenceNumber);
+    }
+
+    if ("documents" in body) {
+      update.documents = readRecord(body.documents);
+      update.documentsVerificationStatus = "pending";
+    }
   }
 
   profilePhotoFields.forEach((fieldName) => {
@@ -222,6 +270,10 @@ function getSafeUpdate(role: ProfileRole, body: EditableProfileBody) {
         ? readNumber(body[fieldName])
         : readText(body[fieldName]);
   });
+
+  if (role === "contractor" && Object.keys(update).length > 0) {
+    update.verificationStatus = "pending";
+  }
 
   return update;
 }

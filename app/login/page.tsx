@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -28,6 +29,7 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const validateForm = () => {
     const trimmedEmail = email.trim();
@@ -221,8 +223,8 @@ function LoginForm() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
-      <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <main className="flex min-h-screen items-center justify-center bg-azisto-background px-5 py-10">
+      <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-sm ring-1 ring-azisto-border">
         <div className="mb-8 pt-4 text-center">
           <img
             src="/azisto-logo-cropped.png"
@@ -236,7 +238,7 @@ function LoginForm() {
 
         <div className="space-y-4">
           {showSubmitRequestNotice ? (
-            <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+            <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
               Please sign in or create an account to submit your request.
             </div>
           ) : null}
@@ -244,7 +246,7 @@ function LoginForm() {
           <label className="block">
             <span className="text-sm font-medium text-slate-700">Email</span>
             <input
-              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-3 text-base outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-3 text-base outline-none focus:border-azisto-gold focus:ring-2 focus:ring-azisto-gold/20"
               type="email"
               value={email}
               placeholder="you@example.com"
@@ -256,13 +258,30 @@ function LoginForm() {
             <span className="text-sm font-medium text-slate-700">
               Password
             </span>
-            <input
-              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-3 text-base outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
-              type="password"
-              value={password}
-              placeholder="At least 6 characters"
-              onChange={(event) => setPassword(event.target.value)}
-            />
+            <span className="relative mt-2 block">
+              <input
+                className="w-full rounded-md border border-slate-300 px-4 py-3 pr-12 text-base outline-none focus:border-azisto-gold focus:ring-2 focus:ring-azisto-gold/20"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                placeholder="At least 6 characters"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setShowPassword((currentValue) => !currentValue)
+                }
+                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-azisto-text"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? (
+                  <EyeOff aria-hidden="true" className="h-4 w-4" />
+                ) : (
+                  <Eye aria-hidden="true" className="h-4 w-4" />
+                )}
+              </button>
+            </span>
           </label>
 
           <div className="-mt-2 flex justify-end">
@@ -274,14 +293,14 @@ function LoginForm() {
                 setSuccessMessage("");
                 setResetEmail(email);
               }}
-              className="text-sm font-semibold text-red-500 hover:text-red-600"
+              className="text-sm font-semibold text-azisto-text hover:text-azisto-text"
             >
               Forgot password?
             </button>
           </div>
 
           {isResetOpen ? (
-            <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <section className="rounded-lg border border-azisto-border bg-slate-50 p-4">
               <div className="space-y-3">
                 <p className="text-sm leading-6 text-slate-600">
                   Enter your registered email and AZISTO will send a secure
@@ -292,7 +311,7 @@ function LoginForm() {
                     Registered email
                   </span>
                   <input
-                    className="mt-2 w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                    className="mt-2 w-full rounded-md border border-slate-300 bg-white px-4 py-3 text-base outline-none focus:border-azisto-gold focus:ring-2 focus:ring-azisto-gold/20"
                     type="email"
                     value={resetEmail}
                     placeholder="you@example.com"
@@ -303,7 +322,7 @@ function LoginForm() {
                   type="button"
                   onClick={handleEmailReset}
                   disabled={isLoading}
-                  className="w-full rounded-md bg-red-500 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                  className="az-btn-primary w-full rounded-md px-4 py-3 font-semibold"
                 >
                   {isLoading ? "Checking account..." : "Send reset email"}
                 </button>
@@ -325,7 +344,7 @@ function LoginForm() {
 
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
-              className="rounded-md bg-slate-950 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="az-btn-primary rounded-md px-4 py-3 font-semibold"
               type="button"
               disabled={isLoading}
               onClick={handleLogin}
@@ -333,7 +352,7 @@ function LoginForm() {
               Login
             </button>
             <button
-              className="rounded-md border border-slate-300 px-4 py-3 font-semibold text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="az-btn-secondary rounded-md px-4 py-3 font-semibold"
               type="button"
               disabled={isLoading}
               onClick={handleSignup}

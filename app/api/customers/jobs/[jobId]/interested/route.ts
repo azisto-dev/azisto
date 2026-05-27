@@ -25,6 +25,17 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readStringList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -90,6 +101,8 @@ function serializeInterestedContractor(data: Record<string, unknown>) {
     city: readText(data.city),
     province: readText(data.province),
     verificationStatus: readText(data.verificationStatus),
+    taskIds: readStringList(data.selectedTaskIds),
+    taskLabels: readStringList(data.selectedTaskLabels),
     interestedAt: serializeTimestamp(data.interestedAt),
   };
 }
@@ -154,10 +167,62 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const interestedSnapshot = await jobDocument
       .collection("interestedContractors")
       .get();
-    const interestedContractors = interestedSnapshot.docs
-      .map((documentSnapshot) =>
-        serializeInterestedContractor(documentSnapshot.data()),
-      )
+    const groupedContractors = new Map<
+      string,
+      ReturnType<typeof serializeInterestedContractor>
+    >();
+
+    interestedSnapshot.docs.forEach((documentSnapshot) => {
+      const contractor = serializeInterestedContractor(documentSnapshot.data());
+
+      if (contractor.contractorId) {
+        groupedContractors.set(contractor.contractorId, contractor);
+      }
+    });
+
+    const tasksSnapshot = await jobDocument.collection("tasks").get();
+
+    await Promise.all(
+      tasksSnapshot.docs.map(async (taskSnapshot) => {
+        const taskData = taskSnapshot.data();
+        const taskId = readText(taskData.taskId) || taskSnapshot.id;
+        const taskLabel =
+          readText(taskData.subcategory) ||
+          readText(taskData.category) ||
+          taskId;
+        const taskInterestedSnapshot = await taskSnapshot.ref
+          .collection("interestedContractors")
+          .get();
+
+        taskInterestedSnapshot.docs.forEach((documentSnapshot) => {
+          const contractor = serializeInterestedContractor(
+            documentSnapshot.data(),
+          );
+
+          if (!contractor.contractorId) {
+            return;
+          }
+
+          const existingContractor =
+            groupedContractors.get(contractor.contractorId) ?? contractor;
+          const taskIds = new Set(existingContractor.taskIds);
+          const taskLabels = new Set(existingContractor.taskLabels);
+
+          taskIds.add(taskId);
+          taskLabels.add(taskLabel);
+
+          groupedContractors.set(contractor.contractorId, {
+            ...existingContractor,
+            taskIds: Array.from(taskIds),
+            taskLabels: Array.from(taskLabels),
+            interestedAt:
+              existingContractor.interestedAt || contractor.interestedAt,
+          });
+        });
+      }),
+    );
+
+    const interestedContractors = Array.from(groupedContractors.values())
       .sort((firstContractor, secondContractor) =>
         secondContractor.interestedAt.localeCompare(
           firstContractor.interestedAt,

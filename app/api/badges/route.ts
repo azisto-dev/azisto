@@ -4,6 +4,10 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import {
+  firebaseQuotaMessage,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
 
 export const runtime = "nodejs";
 
@@ -13,17 +17,6 @@ function getBearerToken(authorizationHeader: string | null) {
   }
 
   return authorizationHeader.slice("Bearer ".length).trim();
-}
-
-function readStringList(value: unknown) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function getErrorDetails(error: unknown) {
@@ -56,19 +49,16 @@ export async function GET(request: NextRequest) {
     const [threadsSnapshot, notificationsSnapshot] = await Promise.all([
       adminDb
         .collection("messages")
-        .where("participants", "array-contains", decodedToken.uid)
+        .where("unreadBy", "array-contains", decodedToken.uid)
         .get(),
       adminDb
         .collection("notifications")
         .where("recipientAuthUid", "==", decodedToken.uid)
+        .where("read", "==", false)
         .get(),
     ]);
-    const unreadMessagesCount = threadsSnapshot.docs.filter((threadSnapshot) =>
-      readStringList(threadSnapshot.get("unreadBy")).includes(decodedToken.uid),
-    ).length;
-    const unreadNotificationsCount = notificationsSnapshot.docs.filter(
-      (notificationSnapshot) => notificationSnapshot.get("read") !== true,
-    ).length;
+    const unreadMessagesCount = threadsSnapshot.size;
+    const unreadNotificationsCount = notificationsSnapshot.size;
 
     return NextResponse.json({
       ok: true,
@@ -83,6 +73,16 @@ export async function GET(request: NextRequest) {
       message,
       error,
     });
+
+    if (isQuotaExceededMessage(`${code} ${message}`)) {
+      return NextResponse.json(
+        {
+          code: "resource-exhausted",
+          message: firebaseQuotaMessage,
+        },
+        { status: 429 },
+      );
+    }
 
     return NextResponse.json(
       {

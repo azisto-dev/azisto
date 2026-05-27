@@ -161,7 +161,7 @@ const iconBadgeStyles = {
   amber:
     "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-100 shadow-amber-100/80",
   blue:
-    "border-sky-100 bg-gradient-to-br from-sky-50 via-white to-blue-100 shadow-sky-100/80",
+    "border-azisto-gold/30 bg-white shadow-azisto-gold/10",
   cyan:
     "border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-100 shadow-cyan-100/80",
   emerald:
@@ -173,13 +173,13 @@ const iconBadgeStyles = {
   orange:
     "border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-100 shadow-orange-100/80",
   pink:
-    "border-pink-100 bg-gradient-to-br from-pink-50 via-white to-rose-100 shadow-pink-100/80",
+    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-stone-100 shadow-amber-100/80",
   purple:
     "border-purple-100 bg-gradient-to-br from-purple-50 via-white to-fuchsia-100 shadow-purple-100/80",
   rose:
-    "border-rose-100 bg-gradient-to-br from-rose-50 via-white to-red-100 shadow-rose-100/80",
+    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-stone-100 shadow-amber-100/80",
   slate:
-    "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-slate-100/80",
+    "border-azisto-border bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-slate-100/80",
   yellow:
     "border-yellow-100 bg-gradient-to-br from-yellow-50 via-white to-amber-100 shadow-yellow-100/80",
 };
@@ -360,7 +360,7 @@ function SubcategoryIcon({
     <span
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${
         isSelected
-          ? "border-red-300 bg-gradient-to-br from-red-500 to-red-600 shadow-red-100"
+          ? "border-azisto-gold bg-white shadow-azisto-gold/10"
           : badgeClass
       }`}
     >
@@ -392,11 +392,11 @@ export default function ServiceDetailPage() {
 
   if (!service) {
     return (
-      <main className="min-h-screen bg-white text-black">
+      <main className="min-h-screen bg-azisto-background text-black">
         <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 py-5">
           <Link
             href="/home"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-black"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-black"
             aria-label="Back to home"
           >
             <ChevronLeft aria-hidden="true" className="h-5 w-5" />
@@ -411,7 +411,7 @@ export default function ServiceDetailPage() {
             </p>
             <Link
               href="/home"
-              className="mt-6 inline-flex h-12 items-center justify-center rounded-lg bg-red-500 px-6 text-sm font-bold text-white shadow-sm"
+              className="az-btn-primary mt-6 inline-flex h-12 items-center justify-center rounded-lg px-6 text-sm font-bold"
             >
               Back to Home
             </Link>
@@ -442,8 +442,8 @@ export default function ServiceDetailPage() {
   });
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-28 pt-5">
           <div className="mb-5 flex items-center justify-between text-xs font-bold">
             <span>9:41</span>
@@ -484,7 +484,7 @@ export default function ServiceDetailPage() {
                 }`}
               />
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
                   Select services
                 </p>
                 <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -509,8 +509,8 @@ export default function ServiceDetailPage() {
                   onClick={() => toggleSubcategory(subcategory)}
                   className={`flex min-h-[60px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left shadow-sm transition ${
                     isSelected
-                      ? "border-red-300 bg-red-50 text-black shadow-red-100"
-                      : "border-slate-200 bg-white text-black"
+                      ? "border-azisto-gold bg-white text-black shadow-azisto-gold/10"
+                      : "border-azisto-gold bg-white text-black"
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-3">
@@ -526,8 +526,8 @@ export default function ServiceDetailPage() {
                   <span
                     className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
                       isSelected
-                        ? "border-red-500 bg-red-500 text-white"
-                        : "border-slate-300 bg-white text-transparent"
+                        ? "border-azisto-gold bg-azisto-gold text-white"
+                        : "border-azisto-gold bg-white text-transparent"
                     }`}
                   >
                     <Check aria-hidden="true" className="h-4 w-4" />
@@ -538,10 +538,10 @@ export default function ServiceDetailPage() {
           </section>
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
+        <div className="sticky bottom-0 border-t border-azisto-border bg-white/95 px-5 py-4 backdrop-blur">
           <Link
             href={`/request?${requestParams.toString()}`}
-            className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100"
+            className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
           >
             {continueLabel}
           </Link>

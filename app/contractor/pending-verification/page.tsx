@@ -16,8 +16,8 @@ function StatusBar() {
 
 export default function ContractorPendingVerificationPage() {
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex flex-1 flex-col px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -42,15 +42,15 @@ export default function ContractorPendingVerificationPage() {
           </header>
 
           <section className="flex flex-1 flex-col justify-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-red-100 bg-red-50 shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 shadow-sm">
               <ShieldCheck
                 aria-hidden="true"
-                className="h-8 w-8 text-red-500"
+                className="h-8 w-8 text-amber-700"
               />
             </div>
 
             <div className="mt-6 text-center">
-              <span className="inline-flex items-center justify-center rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-bold text-red-500">
+              <span className="inline-flex items-center justify-center rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
                 Verification pending
               </span>
 
@@ -72,7 +72,7 @@ export default function ContractorPendingVerificationPage() {
 
           <Link
             href="/home"
-            className="mt-6 flex h-14 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-200 transition hover:bg-red-600"
+            className="az-btn-primary mt-6 flex h-14 items-center justify-center rounded-xl text-sm font-bold"
           >
             Back to Home
           </Link>

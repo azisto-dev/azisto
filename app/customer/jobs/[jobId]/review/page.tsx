@@ -83,8 +83,8 @@ export default function CustomerJobReviewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -97,24 +97,24 @@ export default function CustomerJobReviewPage() {
             <span aria-hidden="true" />
           </header>
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">{jobId}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">{jobId}</p>
             <h1 className="mt-1 text-3xl font-bold leading-tight">Review contractor</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">Your feedback helps keep AZISTO trustworthy.</p>
           </section>
-          <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="mt-6 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
             <p className="text-sm font-bold">Rating</p>
             <div className="mt-3 flex gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
                 <button key={value} type="button" onClick={() => setRating(value)} className="rounded-full p-1">
-                  <Star className={`h-8 w-8 ${value <= rating ? "fill-yellow-400 text-yellow-400" : "text-slate-300"}`} />
+                  <Star className={`h-8 w-8 ${value <= rating ? "fill-[#FFD700] text-[#FFD700]" : "text-slate-300"}`} />
                 </button>
               ))}
             </div>
             <label className="mt-5 block text-sm font-bold">Review</label>
-            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} className="mt-2 min-h-32 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50" placeholder="Share what went well..." />
+            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} className="mt-2 min-h-32 w-full resize-none rounded-xl border border-azisto-border px-4 py-3 text-sm outline-none az-focus-field" placeholder="Share what went well..." />
           </section>
           {errorMessage ? <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
-          <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:bg-slate-400">
+          <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="az-btn-primary mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold">
             {isSubmitting ? "Submitting..." : "Submit review"}
           </button>
         </div>

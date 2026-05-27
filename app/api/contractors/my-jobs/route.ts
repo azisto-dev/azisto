@@ -107,6 +107,8 @@ async function findContractorProfile(firebaseUid: string) {
 async function serializeJob(data: Record<string, unknown>, relationship: string) {
   return {
     jobId: readText(data.jobId),
+    parentJobId: readText(data.parentJobId),
+    taskId: readText(data.taskId),
     customerId: readText(data.customerId),
     customerFirstName: await getCustomerFirstName(data),
     selectedServiceCategory: readText(data.selectedServiceCategory),
@@ -126,6 +128,41 @@ async function serializeJob(data: Record<string, unknown>, relationship: string)
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
+}
+
+async function serializeTaskJob(
+  parentData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+  relationship: string,
+) {
+  const parentJobId = readText(taskData.parentJobId) || readText(parentData.jobId);
+  const taskId = readText(taskData.taskId);
+  const subcategory = readText(taskData.subcategory);
+  const category =
+    readText(taskData.category) || readText(parentData.selectedServiceCategory);
+
+  return serializeJob(
+    {
+      ...parentData,
+      jobId: taskId || parentJobId,
+      parentJobId,
+      taskId,
+      selectedServiceCategory: category,
+      selectedSubcategories: subcategory ? [subcategory] : [],
+      city: readText(taskData.city) || readText(parentData.city),
+      province: readText(taskData.province) || readText(parentData.province),
+      preferredDate:
+        readText(taskData.preferredDate) || readText(parentData.preferredDate),
+      preferredTime:
+        readText(taskData.preferredTime) || readText(parentData.preferredTime),
+      urgency: readText(taskData.urgency) || readText(parentData.urgency),
+      status: readText(taskData.status) || readText(parentData.status),
+      hiredContractorId: readText(taskData.hiredContractorId),
+      createdAt: taskData.createdAt ?? parentData.createdAt,
+      updatedAt: taskData.updatedAt ?? parentData.updatedAt,
+    },
+    relationship,
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -167,6 +204,10 @@ export async function GET(request: NextRequest) {
       .collection("jobs")
       .where("interestedContractorIds", "array-contains", contractorId)
       .get();
+    const hiredTaskParentsSnapshot = await adminDb
+      .collection("jobs")
+      .where("hiredContractorIds", "array-contains", contractorId)
+      .get();
     const jobsById = new Map<string, Awaited<ReturnType<typeof serializeJob>>>();
 
     for (const documentSnapshot of hiredJobsSnapshot.docs) {
@@ -174,6 +215,29 @@ export async function GET(request: NextRequest) {
         documentSnapshot.id,
         await serializeJob(documentSnapshot.data(), "hired"),
       );
+    }
+
+    for (const parentSnapshot of hiredTaskParentsSnapshot.docs) {
+      const tasksSnapshot = await parentSnapshot.ref.collection("tasks").get();
+
+      for (const taskSnapshot of tasksSnapshot.docs) {
+        if (readText(taskSnapshot.get("hiredContractorId")) !== contractorId) {
+          continue;
+        }
+
+        if (jobsById.has(taskSnapshot.id)) {
+          continue;
+        }
+
+        jobsById.set(
+          taskSnapshot.id,
+          await serializeTaskJob(
+            parentSnapshot.data() ?? {},
+            taskSnapshot.data() ?? {},
+            "hired",
+          ),
+        );
+      }
     }
 
     for (const jobSnapshot of interestedSnapshot.docs) {

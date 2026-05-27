@@ -75,8 +75,8 @@ export default function AccountTypePage() {
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -89,7 +89,7 @@ export default function AccountTypePage() {
           </header>
 
           <section className="mt-10">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Account type
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -106,7 +106,7 @@ export default function AccountTypePage() {
             {accountTypes.map((accountType) => (
               <article
                 key={accountType.title}
-                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="rounded-xl border border-azisto-border bg-white p-5 shadow-sm"
               >
                 <h2 className="text-xl font-bold text-black">
                   {accountType.title}
@@ -118,8 +118,8 @@ export default function AccountTypePage() {
                   href={accountType.href}
                   className={`mt-5 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold ${
                     accountType.title === "Customer"
-                      ? "bg-red-500 text-white shadow-lg shadow-red-100"
-                      : "border border-slate-300 bg-white text-slate-900"
+                      ? "az-btn-primary"
+                      : "az-btn-secondary"
                   }`}
                 >
                   {accountType.buttonText}

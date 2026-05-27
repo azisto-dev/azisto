@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type ActiveJob = {
@@ -150,8 +151,8 @@ export default function ContractorActiveJobsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -164,29 +165,29 @@ export default function ContractorActiveJobsPage() {
             <span aria-hidden="true" />
           </header>
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">Contractor jobs</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">Contractor jobs</p>
             <h1 className="mt-1 text-3xl font-bold leading-tight">Active jobs</h1>
           </section>
           {isLoading ? <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Loading active jobs...</p> : null}
           {errorMessage ? <p className="mt-6 whitespace-pre-line rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
           <section className="mt-6 space-y-4">
             {jobs.map((job) => (
-              <article key={job.jobId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <article key={job.jobId} className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">{job.jobId}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">{job.jobId}</p>
                     <h2 className="mt-1 text-lg font-bold">{job.selectedServiceCategory || "Service request"}</h2>
                   </div>
-                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold capitalize text-slate-700">{job.status}</span>
+                  <span className={getStatusChipClass(job.status)}>{job.status}</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">Customer: {job.customerId}</p>
                 <p className="mt-1 text-sm text-slate-600">{[job.city, job.province].filter(Boolean).join(", ")}</p>
                 <div className="mt-4 grid gap-2">
-                  <button type="button" onClick={() => handleMessage(job.jobId)} disabled={activeJobId === job.jobId} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-bold">
+                  <button type="button" onClick={() => handleMessage(job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold">
                     <MessageCircle className="h-4 w-4" /> Message customer
                   </button>
                   {job.status === "hired" ? (
-                    <button type="button" onClick={() => handleInProgress(job.jobId)} disabled={activeJobId === job.jobId} className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white">Mark in progress</button>
+                    <button type="button" onClick={() => handleInProgress(job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold">Mark in progress</button>
                   ) : null}
                 </div>
               </article>

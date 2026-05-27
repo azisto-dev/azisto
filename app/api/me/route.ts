@@ -4,6 +4,10 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import {
+  firebaseQuotaMessage,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
 
 export const runtime = "nodejs";
 
@@ -99,6 +103,8 @@ export async function GET(request: NextRequest) {
     const contractorProfile = await findContractorProfile(decodedToken.uid);
 
     if (contractorProfile) {
+      const contractorData = contractorProfile.data() ?? {};
+
       return NextResponse.json({
         ok: true,
         role: "contractor",
@@ -109,12 +115,17 @@ export async function GET(request: NextRequest) {
           contractorProfile.get("verificationStatus"),
         ),
         authUid: decodedToken.uid,
+        displayName:
+          readText(contractorData.contactName) ||
+          readText(contractorData.businessName),
       });
     }
 
     const customerProfile = await findCustomerProfile(decodedToken.uid);
 
     if (customerProfile) {
+      const customerData = customerProfile.data() ?? {};
+
       return NextResponse.json({
         ok: true,
         role: "customer",
@@ -122,6 +133,7 @@ export async function GET(request: NextRequest) {
           readText(customerProfile.get("customerId")) || customerProfile.id,
         verificationStatus: "",
         authUid: decodedToken.uid,
+        displayName: readText(customerData.fullName),
       });
     }
 
@@ -132,6 +144,7 @@ export async function GET(request: NextRequest) {
       contractorId: "",
       verificationStatus: "",
       authUid: decodedToken.uid,
+      displayName: "",
     });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
@@ -141,6 +154,16 @@ export async function GET(request: NextRequest) {
       message,
       error,
     });
+
+    if (isQuotaExceededMessage(`${code} ${message}`)) {
+      return NextResponse.json(
+        {
+          code: "resource-exhausted",
+          message: firebaseQuotaMessage,
+        },
+        { status: 429 },
+      );
+    }
 
     return NextResponse.json(
       {

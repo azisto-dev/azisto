@@ -3,27 +3,192 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FAFAF8;
+  --foreground: #111111;
+  --azisto-primary: #1E3A8A;
+  --azisto-primary-hover: #273F7A;
+  --azisto-accent: #2563EB;
+  --azisto-gold: #C8A96B;
+  --azisto-border: #E5E7EB;
+  --azisto-muted: #6B7280;
+  --azisto-success: #10B981;
+  --azisto-warning: #F59E0B;
+  --azisto-danger: #EF4444;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  scrollbar-color: #D1D5DB transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: 2px;
+  width: 2px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 22px;
+  margin-inline: 22px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #D1D5DB;
+  background-clip: content-box;
+  border-block: 34px solid transparent;
+  border-radius: 999px;
 }
 
 @keyframes azisto-ai-glow {
   0%,
   100% {
-    box-shadow: 0 8px 20px rgb(239 68 68 / 0.12);
+    box-shadow: 0 8px 20px rgb(200 169 107 / 0.16);
   }
 
   50% {
-    box-shadow: 0 8px 24px rgb(239 68 68 / 0.22);
+    box-shadow: 0 8px 24px rgb(200 169 107 / 0.28);
+  }
+}
+
+@keyframes azisto-live-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes azisto-soft-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes azisto-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
   }
 }
 
 .azisto-ai-glow {
   animation: azisto-ai-glow 3.8s ease-in-out infinite;
+}
+
+@layer components {
+  .az-btn-primary {
+    @apply border border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10 transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+  }
+
+  .az-btn-secondary {
+    @apply border border-azisto-gold bg-white text-azisto-text shadow-sm transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400;
+  }
+
+  .az-btn-royal-blue {
+    @apply border border-[#4169E1] bg-[#4169E1] text-white shadow-sm shadow-[#4169E1]/20 transition hover:border-[#3154C9] hover:bg-[#3154C9] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+  }
+
+  .az-btn-danger-soft {
+    @apply border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400;
+  }
+
+  .az-focus-field {
+    @apply focus:border-azisto-gold focus:ring-4 focus:ring-azisto-gold/20;
+  }
+
+  .az-kicker {
+    @apply text-azisto-accent;
+  }
+
+  .az-job-id {
+    @apply text-[#4169E1];
+  }
+
+  .az-ai-pill {
+    @apply border border-azisto-gold/30 bg-white/85 text-azisto-gold shadow-lg shadow-azisto-gold/20 backdrop-blur;
+  }
+
+  .az-status-chip {
+    @apply rounded-full border px-3 py-1 text-xs font-bold capitalize;
+  }
+
+  .az-status-success {
+    @apply border-emerald-100 bg-emerald-50 text-emerald-700;
+  }
+
+  .az-status-warning {
+    @apply border-amber-100 bg-amber-50 text-amber-700;
+  }
+
+  .az-status-info {
+    @apply border-azisto-gold/30 bg-white text-azisto-text;
+  }
+
+  .az-status-danger {
+    @apply border-red-100 bg-red-50 text-red-600;
+  }
+
+  .az-status-neutral {
+    @apply border-azisto-border bg-white text-slate-700;
+  }
+
+  .az-live-dot {
+    @apply h-2 w-2 rounded-full bg-emerald-500;
+    animation: azisto-live-pulse 1.6s ease-in-out infinite;
+  }
+
+  .az-feed-card {
+    @apply border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/70 shadow-sm shadow-sky-100/70 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[#4169E1]/35 hover:shadow-lg hover:shadow-sky-100 active:scale-[0.99];
+    animation: azisto-soft-fade-in 260ms ease-out both;
+  }
+
+  .az-new-job-glow {
+    @apply ring-1 ring-[#4169E1]/20;
+    box-shadow: 0 12px 28px rgb(65 105 225 / 0.12);
+  }
+
+  .az-task-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-[#0F172A] transition hover:border-[#4169E1]/40 hover:bg-sky-100;
+  }
+
+  .az-task-select {
+    @apply flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .az-task-select-active {
+    @apply border-[#4169E1] bg-sky-50 text-[#0F172A] shadow-sm shadow-sky-100;
+  }
+
+  .az-task-select-idle {
+    @apply border-slate-200 bg-white text-slate-700;
+  }
+
+  .az-shimmer {
+    @apply relative overflow-hidden bg-slate-100;
+  }
+
+  .az-shimmer::after {
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/70 to-transparent content-[""];
+    animation: azisto-shimmer 1.4s ease-in-out infinite;
+  }
 }

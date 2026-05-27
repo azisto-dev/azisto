@@ -260,6 +260,14 @@ export async function POST(request: NextRequest) {
     const jobId = await ensureUniqueReadableId("jobs", "jobId", "J");
     const jobDocument = adminDb.collection("jobs").doc(jobId);
 
+    const selectedServiceCategory = readText(body.selectedServiceCategory);
+    const selectedSubcategories = readStringList(body.selectedSubcategories);
+    const taskSubcategories =
+      selectedSubcategories.length > 0
+        ? selectedSubcategories
+        : [selectedServiceCategory || "General task"];
+    const preferredTime = readText(body.preferredTime);
+    const urgency = readText(body.urgency) || "Flexible";
     const jobRequest = {
       jobId,
       customerAuthUid: decodedToken.uid,
@@ -269,8 +277,8 @@ export async function POST(request: NextRequest) {
       customerPhoneVerified: phoneVerified,
       customerCompletedJobsCount: completedJobsCount,
       customerReportsCount,
-      selectedServiceCategory: readText(body.selectedServiceCategory),
-      selectedSubcategories: readStringList(body.selectedSubcategories),
+      selectedServiceCategory,
+      selectedSubcategories,
       jobDescription,
       photos: readPhotoList(body.photos),
       photoPlaceholders: readStringList(body.photoPlaceholders),
@@ -279,18 +287,49 @@ export async function POST(request: NextRequest) {
       province,
       postalCode,
       preferredDate,
-      preferredTime: readText(body.preferredTime),
-      urgency: readText(body.urgency) || "Flexible",
+      preferredTime,
+      urgency,
       riskScore,
       riskReasons,
       reportsCount: 0,
+      overallStatus: "open",
+      requiresMultipleContractors: taskSubcategories.length > 1,
+      taskCount: taskSubcategories.length,
       status: needsReview ? "review_required" : "open",
       matchingStatus: needsReview ? "paused" : "pending",
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    await jobDocument.set(jobRequest);
+    const batch = adminDb.batch();
+
+    batch.set(jobDocument, jobRequest);
+    taskSubcategories.forEach((subcategory, index) => {
+      const taskId = `${jobId}-${index + 1}`;
+
+      batch.set(jobDocument.collection("tasks").doc(taskId), {
+        taskId,
+        parentJobId: jobId,
+        category: selectedServiceCategory,
+        subcategory,
+        jobDescription,
+        city,
+        province,
+        postalCode,
+        preferredDate,
+        preferredTime,
+        urgency,
+        status: "open",
+        interestedContractorIds: [],
+        interestedContractorAuthUids: [],
+        hiredContractorId: null,
+        hiredContractorAuthUid: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    await batch.commit();
     await customerProfile.ref.set(
       {
         emailVerified,

@@ -7,10 +7,14 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type CustomerJob = {
   jobId: string;
+  overallStatus?: string;
+  requiresMultipleContractors?: boolean;
+  taskCount?: number;
   selectedServiceCategory: string;
   selectedSubcategories: string[];
   city: string;
@@ -19,6 +23,18 @@ type CustomerJob = {
   hiredContractorId: string;
   hiredContractorName: string;
   hiredBusinessName: string;
+  createdAt: string;
+  tasks?: CustomerJobTask[];
+};
+
+type CustomerJobTask = {
+  taskId: string;
+  parentJobId: string;
+  category: string;
+  subcategory: string;
+  status: string;
+  hiredContractorId: string;
+  hiredContractorAuthUid: string;
   createdAt: string;
 };
 
@@ -232,8 +248,8 @@ export default function CustomerJobsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -259,7 +275,7 @@ export default function CustomerJobsPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Customer jobs
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -270,14 +286,14 @@ export default function CustomerJobsPage() {
             </p>
             <Link
               href="/customer/active-jobs"
-              className="mt-4 inline-flex h-11 items-center justify-center rounded-xl border border-red-100 bg-red-50 px-4 text-sm font-bold text-red-600"
+              className="az-btn-secondary mt-4 inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
             >
               View active jobs
             </Link>
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
               Loading your jobs...
             </p>
           ) : null}
@@ -289,8 +305,8 @@ export default function CustomerJobsPage() {
           ) : null}
 
           {!isLoading && !errorMessage && jobs.length === 0 ? (
-            <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+            <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
                 <Briefcase aria-hidden="true" className="h-6 w-6" />
               </div>
               <p className="mt-4 text-sm font-bold text-black">No jobs yet</p>
@@ -304,23 +320,44 @@ export default function CustomerJobsPage() {
             {jobs.map((job) => (
               <article
                 key={job.jobId}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
                       {job.jobId}
                     </p>
                     <h2 className="mt-1 text-lg font-bold text-black">
                       {job.selectedServiceCategory || "Service request"}
                     </h2>
                   </div>
-                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold capitalize text-slate-700">
-                    {job.status || "open"}
+                  <span className={getStatusChipClass(job.status || "open")}>
+                    {job.overallStatus || job.status || "open"}
                   </span>
                 </div>
 
-                {job.selectedSubcategories.length > 0 ? (
+                {job.tasks && job.tasks.length > 0 ? (
+                  <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                    {job.tasks.map((task) => (
+                      <div
+                        key={task.taskId}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.1em] az-job-id">
+                            {task.taskId}
+                          </p>
+                          <p className="font-bold text-slate-800">
+                            {task.subcategory || task.category || "Task"}
+                          </p>
+                        </div>
+                        <span className={getStatusChipClass(task.status || "open")}>
+                          {task.status || "open"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : job.selectedSubcategories.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {job.selectedSubcategories.slice(0, 3).map((item) => (
                       <span
@@ -352,12 +389,13 @@ export default function CustomerJobsPage() {
                 </div>
 
                 <div className="mt-4 grid gap-2">
-                  {job.status === "open" ? (
+                  {(job.status === "open" ||
+                    job.overallStatus === "partially_hired") ? (
                     <Link
                       href={`/customer/jobs/${encodeURIComponent(
                         job.jobId,
                       )}/interested`}
-                      className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100"
+                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       View interested contractors
                     </Link>
@@ -367,18 +405,20 @@ export default function CustomerJobsPage() {
                     type="button"
                     onClick={() => handleOpenMessages(job)}
                     disabled={activeJobId === job.jobId}
-                    className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    className="az-btn-secondary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
                   >
                     <MessageCircle aria-hidden="true" className="h-4 w-4" />
                     View messages
                   </button>
 
-                  {(job.status === "open" || job.status === "hired") ? (
+                  {(job.status === "open" ||
+                    job.status === "hired" ||
+                    job.overallStatus === "partially_hired") ? (
                     <button
                       type="button"
                       onClick={() => handleStatusChange(job.jobId, "cancelled")}
                       disabled={activeJobId === job.jobId}
-                      className="flex h-12 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-sm font-bold text-red-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       Cancel job
                     </button>
@@ -389,7 +429,7 @@ export default function CustomerJobsPage() {
                       type="button"
                       onClick={() => handleStatusChange(job.jobId, "completed")}
                       disabled={activeJobId === job.jobId}
-                      className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       Mark completed
                     </button>
@@ -400,7 +440,7 @@ export default function CustomerJobsPage() {
                       href={`/customer/jobs/${encodeURIComponent(
                         job.jobId,
                       )}/review`}
-                      className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100"
+                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       Review contractor
                     </Link>

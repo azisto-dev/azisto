@@ -15,6 +15,8 @@ type InterestedContractor = {
   city: string;
   province: string;
   verificationStatus: string;
+  taskIds: string[];
+  taskLabels: string[];
   interestedAt: string;
 };
 
@@ -90,6 +92,8 @@ async function createMessageThread(
   user: User,
   jobId: string,
   contractorId: string,
+  selectedTaskIds: string[],
+  selectedTaskLabels: string[],
 ) {
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
@@ -101,6 +105,8 @@ async function createMessageThread(
     body: JSON.stringify({
       jobId,
       contractorId,
+      selectedTaskIds,
+      selectedTaskLabels,
     }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
@@ -125,7 +131,12 @@ async function createMessageThread(
     : "";
 }
 
-async function hireContractor(user: User, jobId: string, contractorId: string) {
+async function hireContractor(
+  user: User,
+  jobId: string,
+  contractorId: string,
+  taskIds: string[],
+) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/hire`, {
     method: "POST",
@@ -135,6 +146,7 @@ async function hireContractor(user: User, jobId: string, contractorId: string) {
     },
     body: JSON.stringify({
       contractorId,
+      taskIds,
     }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
@@ -193,18 +205,20 @@ export default function CustomerInterestedContractorsPage() {
     return unsubscribe;
   }, [jobId, router]);
 
-  async function handleMessageContractor(contractorId: string) {
+  async function handleMessageContractor(contractor: InterestedContractor) {
     if (!currentUser || openingContractorId) {
       return;
     }
 
     try {
-      setOpeningContractorId(contractorId);
+      setOpeningContractorId(contractor.contractorId);
       setErrorMessage("");
       const threadId = await createMessageThread(
         currentUser,
         jobId,
-        contractorId,
+        contractor.contractorId,
+        contractor.taskIds,
+        contractor.taskLabels,
       );
       router.push(`/messages/${encodeURIComponent(threadId)}`);
     } catch (error) {
@@ -214,16 +228,21 @@ export default function CustomerInterestedContractorsPage() {
     }
   }
 
-  async function handleHireContractor(contractorId: string) {
+  async function handleHireContractor(contractor: InterestedContractor) {
     if (!currentUser || hiringContractorId) {
       return;
     }
 
     try {
-      setHiringContractorId(contractorId);
+      setHiringContractorId(contractor.contractorId);
       setErrorMessage("");
       setSuccessMessage("");
-      await hireContractor(currentUser, jobId, contractorId);
+      await hireContractor(
+        currentUser,
+        jobId,
+        contractor.contractorId,
+        contractor.taskIds,
+      );
       setSuccessMessage("Contractor hired successfully");
       router.push("/customer/jobs");
     } catch (error) {
@@ -234,8 +253,8 @@ export default function CustomerInterestedContractorsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -260,7 +279,7 @@ export default function CustomerInterestedContractorsPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">
               {jobId}
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -273,7 +292,7 @@ export default function CustomerInterestedContractorsPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
               Loading interested contractors...
             </p>
           ) : null}
@@ -291,8 +310,8 @@ export default function CustomerInterestedContractorsPage() {
           ) : null}
 
           {!isLoading && !errorMessage && contractors.length === 0 ? (
-            <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+            <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
                 <BriefcaseBusiness aria-hidden="true" className="h-6 w-6" />
               </div>
               <p className="mt-4 text-sm font-bold text-black">
@@ -308,11 +327,11 @@ export default function CustomerInterestedContractorsPage() {
             {contractors.map((contractor) => (
               <article
                 key={contractor.contractorId}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
                       {contractor.contractorId}
                     </p>
                     <h2 className="mt-1 text-lg font-bold text-black">
@@ -326,7 +345,7 @@ export default function CustomerInterestedContractorsPage() {
                       </p>
                     ) : null}
                   </div>
-                  <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-bold capitalize text-red-500">
+                  <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold capitalize text-amber-700">
                     {contractor.verificationStatus || "pending"}
                   </span>
                 </div>
@@ -344,13 +363,28 @@ export default function CustomerInterestedContractorsPage() {
                     </span>{" "}
                     {formatInterestedAt(contractor.interestedAt)}
                   </p>
+                  {contractor.taskLabels.length > 0 ? (
+                    <div>
+                      <p className="font-bold text-slate-800">Can do:</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {contractor.taskLabels.map((taskLabel) => (
+                          <span
+                            key={taskLabel}
+                            className="rounded-full border border-azisto-gold bg-amber-50 px-3 py-1 text-xs font-bold text-slate-800"
+                          >
+                            ✓ {taskLabel}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => handleMessageContractor(contractor.contractorId)}
+                  onClick={() => handleMessageContractor(contractor)}
                   disabled={Boolean(openingContractorId)}
-                  className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                  className="az-btn-primary mt-4 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {openingContractorId === contractor.contractorId
                     ? "Opening conversation..."
@@ -359,9 +393,9 @@ export default function CustomerInterestedContractorsPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleHireContractor(contractor.contractorId)}
+                  onClick={() => handleHireContractor(contractor)}
                   disabled={Boolean(hiringContractorId)}
-                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-red-100 bg-red-50 text-sm font-bold text-red-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-azisto-gold bg-white text-sm font-bold text-azisto-text shadow-sm shadow-azisto-gold/10 transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                 >
                   {hiringContractorId === contractor.contractorId
                     ? "Hiring..."

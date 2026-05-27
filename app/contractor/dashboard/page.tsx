@@ -12,12 +12,15 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type DashboardTab = "active" | "available" | "past";
 
 type AvailableJob = {
   jobId: string;
+  parentJobId?: string;
+  taskId?: string;
   customerFirstName: string;
   customerEmailVerified: boolean;
   customerPhoneVerified: boolean;
@@ -34,8 +37,22 @@ type AvailableJob = {
   matchingStatus: string;
 };
 
+type AvailableJobTask = {
+  taskId: string;
+  label: string;
+};
+
+type AvailableJobCard = AvailableJob & {
+  jobId: string;
+  taskIds: string[];
+  taskLabels: string[];
+  tasks: AvailableJobTask[];
+};
+
 type ContractorJob = {
   jobId: string;
+  parentJobId?: string;
+  taskId?: string;
   customerFirstName: string;
   customerId: string;
   selectedServiceCategory: string;
@@ -54,6 +71,50 @@ type ContractorJob = {
   cancelledAt: string;
   updatedAt: string;
 };
+
+function groupAvailableJobs(jobs: AvailableJob[]) {
+  const groupedJobs = new Map<string, AvailableJobCard>();
+
+  jobs.forEach((job) => {
+    const parentJobId = job.parentJobId || job.jobId;
+    const taskLabel =
+      job.selectedSubcategories[0] ||
+      job.selectedServiceCategory ||
+      job.taskId ||
+      "Task";
+    const existingJob = groupedJobs.get(parentJobId);
+
+    if (!existingJob) {
+      groupedJobs.set(parentJobId, {
+        ...job,
+        jobId: parentJobId,
+        parentJobId: undefined,
+        taskIds: job.taskId ? [job.taskId] : [],
+        taskLabels: [taskLabel],
+        tasks: job.taskId
+          ? [{ taskId: job.taskId, label: taskLabel }]
+          : job.selectedSubcategories.map((subcategory) => ({
+              taskId: "",
+              label: subcategory,
+            })),
+        selectedSubcategories: [taskLabel],
+      });
+      return;
+    }
+
+    if (job.taskId && !existingJob.taskIds.includes(job.taskId)) {
+      existingJob.taskIds.push(job.taskId);
+      existingJob.tasks.push({ taskId: job.taskId, label: taskLabel });
+    }
+
+    if (!existingJob.taskLabels.includes(taskLabel)) {
+      existingJob.taskLabels.push(taskLabel);
+      existingJob.selectedSubcategories.push(taskLabel);
+    }
+  });
+
+  return Array.from(groupedJobs.values());
+}
 
 function StatusBar() {
   return (
@@ -152,7 +213,7 @@ async function fetchContractorJobs(user: User) {
     : [];
 }
 
-async function submitInterest(user: User, jobId: string) {
+async function submitInterest(user: User, jobId: string, taskIds: string[]) {
   const token = await user.getIdToken();
   const response = await fetch(
     `/api/contractors/jobs/${encodeURIComponent(jobId)}/interest`,
@@ -160,7 +221,11 @@ async function submitInterest(user: User, jobId: string) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        taskIds,
+      }),
     },
   );
   const responseBody = (await response.json().catch(() => null)) as {
@@ -180,7 +245,12 @@ async function submitInterest(user: User, jobId: string) {
   }
 }
 
-async function updateJobStatus(user: User, jobId: string, status: string) {
+async function updateJobStatus(
+  user: User,
+  jobId: string,
+  status: string,
+  taskId?: string,
+) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
     method: "POST",
@@ -188,7 +258,7 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, taskId }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
@@ -207,7 +277,8 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
   }
 }
 
-async function createMessageThread(user: User, jobId: string) {
+async function createMessageThread(user: User, job: ContractorJob) {
+  const parentJobId = job.parentJobId || job.jobId;
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
     method: "POST",
@@ -215,7 +286,13 @@ async function createMessageThread(user: User, jobId: string) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ jobId }),
+    body: JSON.stringify({
+      jobId: parentJobId,
+      selectedTaskIds: job.taskId ? [job.taskId] : [],
+      selectedTaskLabels: job.taskId
+        ? [job.selectedSubcategories[0] || job.selectedServiceCategory || job.taskId]
+        : [],
+    }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
@@ -260,8 +337,8 @@ function SubcategoryList({ items }: { items: string[] }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+    <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
         <Briefcase aria-hidden="true" className="h-6 w-6" />
       </div>
       <p className="mt-4 text-sm font-bold text-black">{message}</p>
@@ -298,6 +375,10 @@ export default function ContractorDashboardPage() {
       ),
     [contractorJobs],
   );
+  const availableJobCards = useMemo(
+    () => groupAvailableJobs(availableJobs),
+    [availableJobs],
+  );
   const hasActiveJob = activeJobs.length > 0;
 
   async function loadDashboard(user: User) {
@@ -332,16 +413,16 @@ export default function ContractorDashboardPage() {
     return unsubscribe;
   }, [router]);
 
-  async function handleInterest(jobId: string) {
+  async function handleInterest(job: AvailableJobCard) {
     if (!currentUser || activeJobId || hasActiveJob) {
       return;
     }
 
     try {
-      setActiveJobId(jobId);
+      setActiveJobId(job.jobId);
       setErrorMessage("");
       setSuccessMessage("");
-      await submitInterest(currentUser, jobId);
+      await submitInterest(currentUser, job.jobId, job.taskIds);
       await loadDashboard(currentUser);
       setSuccessMessage("Interest submitted successfully.");
     } catch (error) {
@@ -351,15 +432,15 @@ export default function ContractorDashboardPage() {
     }
   }
 
-  async function handleMessage(jobId: string) {
+  async function handleMessage(job: ContractorJob) {
     if (!currentUser || activeJobId) {
       return;
     }
 
     try {
-      setActiveJobId(jobId);
+      setActiveJobId(job.jobId);
       setErrorMessage("");
-      const threadId = await createMessageThread(currentUser, jobId);
+      const threadId = await createMessageThread(currentUser, job);
       router.push(`/messages/${encodeURIComponent(threadId)}`);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -368,16 +449,18 @@ export default function ContractorDashboardPage() {
     }
   }
 
-  async function handleMarkInProgress(jobId: string) {
+  async function handleMarkInProgress(job: ContractorJob) {
     if (!currentUser || activeJobId) {
       return;
     }
 
+    const parentJobId = job.parentJobId || job.jobId;
+
     try {
-      setActiveJobId(jobId);
+      setActiveJobId(job.jobId);
       setErrorMessage("");
       setSuccessMessage("");
-      await updateJobStatus(currentUser, jobId, "in_progress");
+      await updateJobStatus(currentUser, parentJobId, "in_progress", job.taskId);
       await loadDashboard(currentUser);
       setSuccessMessage("Job marked in progress.");
     } catch (error) {
@@ -389,13 +472,13 @@ export default function ContractorDashboardPage() {
 
   const tabs: Array<{ id: DashboardTab; label: string; count: number }> = [
     { id: "active", label: "Active jobs", count: activeJobs.length },
-    { id: "available", label: "Available jobs", count: availableJobs.length },
+    { id: "available", label: "Available jobs", count: availableJobCards.length },
     { id: "past", label: "Past jobs", count: pastJobs.length },
   ];
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -421,7 +504,7 @@ export default function ContractorDashboardPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Contractor workspace
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -433,20 +516,22 @@ export default function ContractorDashboardPage() {
             </p>
           </section>
 
-          <div className="mt-5 grid grid-cols-3 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+          <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-azisto-border bg-white p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedTab(tab.id)}
-                className={`min-h-12 rounded-xl px-2 text-xs font-bold leading-tight ${
+                className={`min-h-12 rounded-xl border px-2 text-xs font-bold leading-tight transition ${
                   selectedTab === tab.id
-                    ? "bg-white text-red-500 shadow-sm"
-                    : "text-slate-500"
+                    ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
+                    : "border-azisto-gold bg-white text-slate-700"
                 }`}
               >
                 {tab.label}
-                <span className="ml-1 text-[10px]">({tab.count})</span>
+                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-azisto-gold px-1.5 py-0.5 text-[10px] text-[#111111]">
+                  {tab.count}
+                </span>
               </button>
             ))}
           </div>
@@ -458,7 +543,7 @@ export default function ContractorDashboardPage() {
           ) : null}
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
               Loading contractor dashboard...
             </p>
           ) : null}
@@ -484,18 +569,29 @@ export default function ContractorDashboardPage() {
               {activeJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">
-                        {job.jobId}
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+                        {job.taskId
+                          ? `${job.taskId} · ${
+                              job.selectedSubcategories[0] ||
+                              job.selectedServiceCategory ||
+                              "Task"
+                            }`
+                          : job.jobId}
                       </p>
                       <h2 className="mt-1 text-lg font-bold text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
+                      {job.parentJobId ? (
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Parent job: {job.parentJobId}
+                        </p>
+                      ) : null}
                     </div>
-                    <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-bold capitalize text-red-500">
+                    <span className={getStatusChipClass(job.status)}>
                       {job.status.replaceAll("_", " ")}
                     </span>
                   </div>
@@ -518,9 +614,9 @@ export default function ContractorDashboardPage() {
                   <div className="mt-4 grid gap-2">
                     <button
                       type="button"
-                      onClick={() => handleMessage(job.jobId)}
+                      onClick={() => handleMessage(job)}
                       disabled={activeJobId === job.jobId}
-                      className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
                     >
                       <MessageCircle aria-hidden="true" className="h-4 w-4" />
                       Message customer
@@ -528,16 +624,18 @@ export default function ContractorDashboardPage() {
                     {job.status === "hired" ? (
                       <button
                         type="button"
-                        onClick={() => handleMarkInProgress(job.jobId)}
+                        onClick={() => handleMarkInProgress(job)}
                         disabled={activeJobId === job.jobId}
-                        className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                       >
                         Mark in progress
                       </button>
                     ) : null}
                     <Link
-                      href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="flex h-12 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-sm font-bold text-red-600"
+                      href={`/contractor/jobs/${encodeURIComponent(
+                        job.parentJobId || job.jobId,
+                      )}${job.taskId ? `?taskId=${encodeURIComponent(job.taskId)}` : ""}`}
+                      className="az-btn-secondary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       View details
                     </Link>
@@ -549,30 +647,48 @@ export default function ContractorDashboardPage() {
 
           {selectedTab === "available" && !isLoading ? (
             <section className="mt-6 space-y-4">
-              {availableJobs.length === 0 ? (
+              {availableJobCards.length === 0 ? (
                 <EmptyState message="No available jobs right now" />
               ) : null}
 
-              {availableJobs.map((job) => (
+              {availableJobCards.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
                         {job.jobId}
                       </p>
                       <h2 className="mt-1 text-lg font-bold text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
                     </div>
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold capitalize text-emerald-700">
+                    <span className={getStatusChipClass(job.status || "open")}>
                       {job.status || "open"}
                     </span>
                   </div>
 
-                  <SubcategoryList items={job.selectedSubcategories} />
+                  {job.tasks.length > 0 ? (
+                    <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                      {job.tasks.map((task, index) => (
+                        <div
+                          key={task.taskId || `${job.jobId}-${task.label}`}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                        >
+                          <span className="text-xs font-bold uppercase tracking-[0.1em] az-job-id">
+                            {task.taskId || `Task ${index + 1}`}
+                          </span>
+                          <span className="text-sm font-bold text-slate-800">
+                            {task.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <SubcategoryList items={job.selectedSubcategories} />
+                  )}
 
                   <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
                     <p>Customer: {job.customerFirstName || "Customer"}</p>
@@ -621,16 +737,16 @@ export default function ContractorDashboardPage() {
                   <div className="mt-4 grid gap-2">
                     <Link
                       href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-900"
+                      className="az-btn-royal-blue flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
                     >
                       View job
                       <ChevronRight aria-hidden="true" className="h-4 w-4" />
                     </Link>
                     <button
                       type="button"
-                      onClick={() => handleInterest(job.jobId)}
+                      onClick={() => handleInterest(job)}
                       disabled={hasActiveJob || activeJobId === job.jobId}
-                      className="flex h-12 items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none"
+                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold disabled:bg-slate-300 disabled:text-slate-600"
                     >
                       {hasActiveJob
                         ? "Complete active job first"
@@ -653,18 +769,18 @@ export default function ContractorDashboardPage() {
               {pastJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-red-500">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
                         {job.jobId}
                       </p>
                       <h2 className="mt-1 text-lg font-bold text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
                     </div>
-                    <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold capitalize text-slate-700">
+                    <span className={getStatusChipClass(job.status)}>
                       {job.status.replaceAll("_", " ")}
                     </span>
                   </div>
@@ -682,7 +798,7 @@ export default function ContractorDashboardPage() {
 
                   <Link
                     href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                    className="mt-4 flex h-12 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-sm font-bold text-red-600"
+                    className="az-btn-secondary mt-4 flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                   >
                     View details
                   </Link>

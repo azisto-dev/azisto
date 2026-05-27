@@ -222,8 +222,8 @@ function RequestForm() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -248,7 +248,7 @@ function RequestForm() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Request details
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -261,7 +261,7 @@ function RequestForm() {
           </section>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <p className="text-sm font-bold text-black">
                 Selected service summary
               </p>
@@ -277,7 +277,7 @@ function RequestForm() {
                     <ul className="space-y-2 text-sm leading-6 text-slate-600">
                       {selectedItems.map((item) => (
                         <li key={item} className="flex gap-2">
-                          <span className="text-red-500">•</span>
+                          <span className="text-azisto-text">•</span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -296,7 +296,7 @@ function RequestForm() {
             </section>
 
             {/* TODO: Replace this placeholder with Firebase Phone Auth before production. */}
-            <section className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+            <section className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
               <p className="font-bold">Phone verification required soon</p>
               <p className="mt-1">
                 You can post now, but AZISTO will require phone verification
@@ -311,7 +311,7 @@ function RequestForm() {
                 onChange={(event) =>
                   updateField("jobDescription", event.target.value)
                 }
-                className="min-h-32 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-black outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                className="min-h-32 w-full resize-none rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm leading-6 text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                 placeholder="Describe what you need help with..."
               />
             </div>
@@ -333,7 +333,7 @@ function RequestForm() {
                 type="text"
                 value={form.address}
                 onChange={(event) => updateField("address", event.target.value)}
-                className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                 placeholder="Enter service address"
               />
             </div>
@@ -345,7 +345,7 @@ function RequestForm() {
                   type="text"
                   value={form.city}
                   onChange={(event) => updateField("city", event.target.value)}
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                   placeholder="City"
                 />
               </div>
@@ -358,7 +358,7 @@ function RequestForm() {
                   onChange={(event) =>
                     updateField("province", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                   placeholder="BC"
                 />
               </div>
@@ -372,7 +372,7 @@ function RequestForm() {
                 onChange={(event) =>
                   updateField("postalCode", event.target.value)
                 }
-                className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                 placeholder="Postal code"
               />
             </div>
@@ -388,7 +388,7 @@ function RequestForm() {
                     onChange={(event) =>
                       updateField("preferredDate", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-black outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-3 text-sm text-black outline-none transition az-focus-field"
                   />
                   <Calendar
                     aria-hidden="true"
@@ -406,7 +406,7 @@ function RequestForm() {
                     onChange={(event) =>
                       updateField("preferredTime", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-black outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-3 text-sm text-black outline-none transition az-focus-field"
                   />
                   <Clock
                     aria-hidden="true"
@@ -429,8 +429,8 @@ function RequestForm() {
                       onClick={() => setUrgency(option)}
                       className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-bold leading-5 transition ${
                         isSelected
-                          ? "border-red-500 bg-red-50 text-red-600"
-                          : "border-slate-200 bg-white text-slate-700"
+                          ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
+                          : "border-azisto-gold bg-white text-slate-700"
                       }`}
                     >
                       {option}
@@ -441,7 +441,7 @@ function RequestForm() {
             </div>
 
             {authLoading ? (
-              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                 Checking account...
               </p>
             ) : null}
@@ -455,7 +455,7 @@ function RequestForm() {
             <button
               type="submit"
               disabled={authLoading || isSubmitting}
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+              className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
             >
               {authLoading
                 ? "Checking account..."

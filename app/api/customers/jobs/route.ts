@@ -105,6 +105,20 @@ function serializeJob(data: Record<string, unknown>) {
   };
 }
 
+function serializeTask(data: Record<string, unknown>) {
+  return {
+    taskId: readText(data.taskId),
+    parentJobId: readText(data.parentJobId),
+    category: readText(data.category),
+    subcategory: readText(data.subcategory),
+    status: readText(data.status),
+    hiredContractorId: readText(data.hiredContractorId),
+    hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     assertFirebaseAdminConfig();
@@ -138,8 +152,30 @@ export async function GET(request: NextRequest) {
       .collection("jobs")
       .where("customerAuthUid", "==", decodedToken.uid)
       .get();
-    const jobs = jobsSnapshot.docs
-      .map((documentSnapshot) => serializeJob(documentSnapshot.data()))
+    const jobs = (
+      await Promise.all(
+        jobsSnapshot.docs.map(async (documentSnapshot) => {
+          const tasksSnapshot = await documentSnapshot.ref.collection("tasks").get();
+          const tasks = tasksSnapshot.docs
+            .map((taskSnapshot) => serializeTask(taskSnapshot.data()))
+            .sort((firstTask, secondTask) =>
+              firstTask.taskId.localeCompare(secondTask.taskId),
+            );
+
+          return {
+            ...serializeJob(documentSnapshot.data()),
+            overallStatus: readText(documentSnapshot.get("overallStatus")),
+            requiresMultipleContractors:
+              documentSnapshot.get("requiresMultipleContractors") === true,
+            taskCount:
+              typeof documentSnapshot.get("taskCount") === "number"
+                ? documentSnapshot.get("taskCount")
+                : tasks.length,
+            tasks,
+          };
+        }),
+      )
+    )
       .sort((firstJob, secondJob) =>
         secondJob.createdAt.localeCompare(firstJob.createdAt),
       );

@@ -12,6 +12,8 @@ type ThreadRequestBody = {
   jobId?: unknown;
   contractorAuthUid?: unknown;
   contractorId?: unknown;
+  selectedTaskIds?: unknown;
+  selectedTaskLabels?: unknown;
 };
 
 function getBearerToken(authorizationHeader: string | null) {
@@ -24,6 +26,21 @@ function getBearerToken(authorizationHeader: string | null) {
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readStringList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getFirstName(value: string) {
+  return value.trim().split(" ").filter(Boolean)[0] ?? "";
 }
 
 function serializeTimestamp(value: unknown) {
@@ -112,6 +129,57 @@ async function findContractorProfile(body: ThreadRequestBody, callerUid: string)
   return findContractorProfileByAuthUid(callerUid);
 }
 
+async function getCustomerFirstName({
+  threadData,
+  jobData,
+}: {
+  threadData: Record<string, unknown>;
+  jobData: Record<string, unknown>;
+}) {
+  const savedName =
+    getFirstName(readText(threadData.customerFirstName)) ||
+    getFirstName(readText(jobData.customerFirstName)) ||
+    getFirstName(readText(threadData.customerName)) ||
+    getFirstName(readText(jobData.customerName));
+
+  if (savedName) {
+    return savedName;
+  }
+
+  const customerId = readText(threadData.customerId) || readText(jobData.customerId);
+
+  if (customerId) {
+    const customerSnapshot = await adminDb
+      .collection("customers")
+      .doc(customerId)
+      .get();
+
+    if (customerSnapshot.exists) {
+      return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
+    }
+  }
+
+  const customerAuthUid =
+    readText(threadData.customerAuthUid) || readText(jobData.customerAuthUid);
+
+  if (customerAuthUid) {
+    const customerSnapshot = await adminDb
+      .collection("customers")
+      .where("authUid", "==", customerAuthUid)
+      .limit(1)
+      .get();
+
+    if (!customerSnapshot.empty) {
+      return (
+        getFirstName(readText(customerSnapshot.docs[0].get("fullName"))) ||
+        "Customer"
+      );
+    }
+  }
+
+  return "Customer";
+}
+
 async function serializeThread(
   data: Record<string, unknown>,
   currentUserUid: string,
@@ -121,11 +189,15 @@ async function serializeThread(
     readText(data.businessName) ||
     readText(data.contractorName) ||
     readText(data.contractorId);
-  const customerLabel = readText(data.customerId);
   const jobId = readText(data.jobId);
   const jobSnapshot = jobId
     ? await adminDb.collection("jobs").doc(jobId).get()
     : null;
+  const jobData = jobSnapshot?.exists ? (jobSnapshot.data() ?? {}) : {};
+  const customerLabel = await getCustomerFirstName({
+    threadData: data,
+    jobData,
+  });
 
   return {
     threadId: readText(data.threadId),
@@ -137,6 +209,8 @@ async function serializeThread(
     contractorId: readText(data.contractorId),
     contractorName: readText(data.contractorName),
     businessName: readText(data.businessName),
+    selectedTaskIds: readStringList(data.selectedTaskIds),
+    selectedTaskLabels: readStringList(data.selectedTaskLabels),
     lastMessage: readText(data.lastMessage),
     lastMessageAt: serializeTimestamp(data.lastMessageAt),
     status: readText(data.status),
@@ -169,6 +243,8 @@ export async function POST(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(token);
     const body = (await request.json()) as ThreadRequestBody;
     const jobId = readText(body.jobId);
+    const selectedTaskIds = readStringList(body.selectedTaskIds);
+    const selectedTaskLabels = readStringList(body.selectedTaskLabels);
 
     if (!jobId) {
       return NextResponse.json(
@@ -242,6 +318,17 @@ export async function POST(request: NextRequest) {
     const threadSnapshot = await threadDocument.get();
 
     if (threadSnapshot.exists) {
+      if (selectedTaskIds.length > 0 || selectedTaskLabels.length > 0) {
+        await threadDocument.set(
+          {
+            ...(selectedTaskIds.length > 0 ? { selectedTaskIds } : {}),
+            ...(selectedTaskLabels.length > 0 ? { selectedTaskLabels } : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
       return NextResponse.json({ ok: true, threadId });
     }
 
@@ -254,6 +341,11 @@ export async function POST(request: NextRequest) {
       contractorId,
       contractorName: readText(contractorProfile.get("contactName")),
       businessName: readText(contractorProfile.get("businessName")),
+      customerFirstName: getFirstName(
+        readText(jobSnapshot.get("customerFirstName")),
+      ),
+      selectedTaskIds,
+      selectedTaskLabels,
       participants: [customerAuthUid, contractorAuthUid],
       unreadBy: [],
       lastMessage: "",

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Flag, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 const reportReasonOptions = [
@@ -40,6 +41,17 @@ type ContractorJobDetail = {
   matchingStatus: string;
   hiredContractorId: string;
   hiredBusinessName: string;
+  tasks?: JobTask[];
+};
+
+type JobTask = {
+  taskId: string;
+  parentJobId: string;
+  category: string;
+  subcategory: string;
+  status: string;
+  hiredContractorId: string;
+  interestedContractorIds: string[];
 };
 
 function StatusBar() {
@@ -97,7 +109,11 @@ async function fetchContractorJob(user: User, jobId: string) {
   return responseBody?.job as ContractorJobDetail;
 }
 
-async function submitContractorInterest(user: User, jobId: string) {
+async function submitContractorInterest(
+  user: User,
+  jobId: string,
+  taskIds: string[],
+) {
   const token = await user.getIdToken();
   const response = await fetch(
     `/api/contractors/jobs/${encodeURIComponent(jobId)}/interest`,
@@ -105,7 +121,9 @@ async function submitContractorInterest(user: User, jobId: string) {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({ taskIds }),
     },
   );
   const responseBody = (await response.json().catch(() => null)) as {
@@ -125,7 +143,12 @@ async function submitContractorInterest(user: User, jobId: string) {
   }
 }
 
-async function createMessageThread(user: User, jobId: string) {
+async function createMessageThread(
+  user: User,
+  jobId: string,
+  selectedTaskIds: string[],
+  selectedTaskLabels: string[],
+) {
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
     method: "POST",
@@ -135,6 +158,8 @@ async function createMessageThread(user: User, jobId: string) {
     },
     body: JSON.stringify({
       jobId,
+      selectedTaskIds,
+      selectedTaskLabels,
     }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
@@ -231,6 +256,7 @@ function formatWhen(date: string, time: string) {
 
 export default function ContractorJobDetailPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ jobId: string }>();
   const jobId = params.jobId;
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -248,10 +274,23 @@ export default function ContractorJobDetailPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [interestMessage, setInterestMessage] = useState("");
   const [lifecycleMessage, setLifecycleMessage] = useState("");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
   async function loadJob(user: User) {
     const jobDetails = await fetchContractorJob(user, jobId);
+    const openTasks =
+      jobDetails.tasks?.filter((task) => task.status === "open") ?? [];
+    const requestedTaskId = searchParams.get("taskId");
+    const initialTaskIds =
+      requestedTaskId &&
+      openTasks.some((task) => task.taskId === requestedTaskId)
+        ? [requestedTaskId]
+        : openTasks.length === 1
+          ? [openTasks[0].taskId]
+          : [];
+
     setJob(jobDetails);
+    setSelectedTaskIds(initialTaskIds);
   }
 
   useEffect(() => {
@@ -275,7 +314,7 @@ export default function ContractorJobDetailPage() {
     });
 
     return unsubscribe;
-  }, [jobId, router]);
+  }, [jobId, router, searchParams]);
 
   async function handleInterestSubmit() {
     if (!currentUser || isSubmittingInterest || hasSubmittedInterest) {
@@ -285,7 +324,7 @@ export default function ContractorJobDetailPage() {
     try {
       setIsSubmittingInterest(true);
       setInterestMessage("");
-      await submitContractorInterest(currentUser, jobId);
+      await submitContractorInterest(currentUser, jobId, selectedTaskIds);
       setHasSubmittedInterest(true);
       setInterestMessage("Interest submitted successfully");
     } catch (error) {
@@ -303,13 +342,30 @@ export default function ContractorJobDetailPage() {
     try {
       setIsOpeningThread(true);
       setInterestMessage("");
-      const threadId = await createMessageThread(currentUser, jobId);
+      const selectedTaskLabels =
+        job?.tasks
+          ?.filter((task) => selectedTaskIds.includes(task.taskId))
+          .map((task) => task.subcategory || task.category || task.taskId) ?? [];
+      const threadId = await createMessageThread(
+        currentUser,
+        jobId,
+        selectedTaskIds,
+        selectedTaskLabels,
+      );
       router.push(`/messages/${encodeURIComponent(threadId)}`);
     } catch (error) {
       setInterestMessage(getErrorMessage(error));
     } finally {
       setIsOpeningThread(false);
     }
+  }
+
+  function toggleSelectedTask(taskId: string) {
+    setSelectedTaskIds((currentTaskIds) =>
+      currentTaskIds.includes(taskId)
+        ? currentTaskIds.filter((currentTaskId) => currentTaskId !== taskId)
+        : [...currentTaskIds, taskId],
+    );
   }
 
   async function handleMarkInProgress() {
@@ -350,8 +406,8 @@ export default function ContractorJobDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -376,7 +432,7 @@ export default function ContractorJobDetailPage() {
           </header>
 
           {isLoading ? (
-            <p className="mt-8 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="mt-8 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
               Loading job details...
             </p>
           ) : null}
@@ -390,7 +446,7 @@ export default function ContractorJobDetailPage() {
           {job ? (
             <>
               <section className="mt-8">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">
                   {job.jobId}
                 </p>
                 <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -403,12 +459,12 @@ export default function ContractorJobDetailPage() {
                 </p>
               </section>
 
-              <section className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="mt-6 space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-bold text-black">Status</p>
-                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold capitalize text-emerald-700">
-                    {job.status || "open"}
-                  </span>
+                <span className={getStatusChipClass(job.status || "open")}>
+                  {job.status || "open"}
+                </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm leading-6">
                   <div>
@@ -463,9 +519,46 @@ export default function ContractorJobDetailPage() {
                 </div>
               </section>
 
-              <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-sm font-bold text-black">Subcategories</p>
-                {job.selectedSubcategories.length > 0 ? (
+              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
+                <p className="text-sm font-bold text-black">Tasks</p>
+                {job.tasks && job.tasks.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {job.tasks.map((task) => {
+                      const isOpen = task.status === "open";
+                      const isSelected = selectedTaskIds.includes(task.taskId);
+
+                      return (
+                        <button
+                          key={task.taskId}
+                          type="button"
+                          onClick={() => {
+                            if (isOpen) {
+                              toggleSelectedTask(task.taskId);
+                            }
+                          }}
+                          disabled={!isOpen}
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm transition ${
+                            isSelected
+                              ? "border-azisto-gold bg-amber-50 text-black"
+                              : "border-slate-200 bg-slate-50 text-slate-700"
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          <span>
+                            <span className="block text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+                              {task.taskId}
+                            </span>
+                            <span className="mt-1 block font-bold">
+                              {task.subcategory || task.category || "Task"}
+                            </span>
+                          </span>
+                          <span className={getStatusChipClass(task.status || "open")}>
+                            {task.status || "open"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : job.selectedSubcategories.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {job.selectedSubcategories.map((item) => (
                       <span
@@ -478,19 +571,19 @@ export default function ContractorJobDetailPage() {
                   </div>
                 ) : (
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    No subcategories listed.
+                    No tasks listed.
                   </p>
                 )}
               </section>
 
-              <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
                 <p className="text-sm font-bold text-black">Job details</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   {job.jobDescription || "No description provided."}
                 </p>
               </section>
 
-              <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
                 <p className="text-sm font-bold text-black">Service address</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   {[job.address, job.city, job.province, job.postalCode]
@@ -499,7 +592,7 @@ export default function ContractorJobDetailPage() {
                 </p>
               </section>
 
-              <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
                 <button
                   type="button"
                   onClick={() => {
@@ -526,7 +619,7 @@ export default function ContractorJobDetailPage() {
                       <select
                         value={reportReason}
                         onChange={(event) => setReportReason(event.target.value)}
-                        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                        className="h-12 w-full rounded-xl border border-azisto-border bg-white px-3 text-sm font-semibold text-slate-800 outline-none az-focus-field"
                       >
                         {reportReasonOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -544,7 +637,7 @@ export default function ContractorJobDetailPage() {
                         value={reportDetails}
                         onChange={(event) => setReportDetails(event.target.value)}
                         placeholder="Add any details that will help AZISTO review this job."
-                        className="min-h-24 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                        className="min-h-24 w-full resize-none rounded-xl border border-azisto-border bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 az-focus-field"
                       />
                     </div>
 
@@ -552,7 +645,7 @@ export default function ContractorJobDetailPage() {
                       type="button"
                       onClick={handleReportSubmit}
                       disabled={isSubmittingReport}
-                      className="flex h-12 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                      className="az-btn-danger-soft flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
                     >
                       {isSubmittingReport ? "Submitting..." : "Submit report"}
                     </button>
@@ -567,7 +660,13 @@ export default function ContractorJobDetailPage() {
               </section>
 
               {interestMessage ? (
-                <p className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                <p
+                  className={`mt-5 rounded-xl border px-4 py-3 text-sm leading-6 ${
+                    interestMessage === "Interest submitted successfully"
+                      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                      : "border-red-100 bg-red-50 text-red-700"
+                  }`}
+                >
                   {interestMessage}
                 </p>
               ) : null}
@@ -582,14 +681,21 @@ export default function ContractorJobDetailPage() {
                 <button
                   type="button"
                   onClick={handleInterestSubmit}
-                  disabled={isSubmittingInterest || hasSubmittedInterest}
-                  className="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                  disabled={
+                    isSubmittingInterest ||
+                    hasSubmittedInterest ||
+                    ((job.tasks?.some((task) => task.status === "open") ?? false) &&
+                      selectedTaskIds.length === 0)
+                  }
+                  className="az-btn-primary mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {isSubmittingInterest
                     ? "Submitting..."
                     : hasSubmittedInterest
                       ? "Interest submitted"
-                      : "I\u2019m interested"}
+                      : selectedTaskIds.length > 1
+                        ? "Submit interest for selected tasks"
+                        : "I\u2019m interested"}
                 </button>
               ) : null}
 
@@ -598,7 +704,7 @@ export default function ContractorJobDetailPage() {
                   type="button"
                   onClick={handleMarkInProgress}
                   disabled={isUpdatingStatus}
-                  className="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+                  className="az-btn-primary mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {isUpdatingStatus ? "Updating..." : "Mark in progress"}
                 </button>
@@ -610,7 +716,7 @@ export default function ContractorJobDetailPage() {
                   type="button"
                   onClick={handleMessageCustomer}
                   disabled={isOpeningThread}
-                  className="mt-3 flex h-14 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-900 shadow-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  className="az-btn-primary mt-3 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {isOpeningThread ? "Opening conversation..." : "Message customer"}
                 </button>

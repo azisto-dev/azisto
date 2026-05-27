@@ -247,8 +247,8 @@ export default function CustomerOnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-black md:bg-slate-50 md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-slate-200">
+    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -273,7 +273,7 @@ export default function CustomerOnboardingPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-500">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
               Customer profile
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
@@ -286,7 +286,7 @@ export default function CustomerOnboardingPage() {
           </section>
 
           <form className="mt-6 space-y-5">
-            <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div className="space-y-2">
                 <FieldLabel>Full name</FieldLabel>
                 <input
@@ -294,7 +294,7 @@ export default function CustomerOnboardingPage() {
                   onChange={(event) =>
                     updateField("fullName", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -306,7 +306,7 @@ export default function CustomerOnboardingPage() {
                   onChange={(event) =>
                     updateField("phoneNumber", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -317,7 +317,7 @@ export default function CustomerOnboardingPage() {
                   onChange={(event) =>
                     updateField("address", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
 
@@ -329,7 +329,7 @@ export default function CustomerOnboardingPage() {
                     onChange={(event) =>
                       updateField("city", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                   />
                 </div>
 
@@ -340,7 +340,7 @@ export default function CustomerOnboardingPage() {
                     onChange={(event) =>
                       updateField("province", event.target.value)
                     }
-                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                    className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                   />
                 </div>
               </div>
@@ -352,12 +352,12 @@ export default function CustomerOnboardingPage() {
                   onChange={(event) =>
                     updateField("postalCode", event.target.value)
                   }
-                  className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                  className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none az-focus-field"
                 />
               </div>
             </section>
 
-            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <section className="space-y-3 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <p className="text-base font-bold text-black">
                 Preferred contact method
               </p>
@@ -373,15 +373,15 @@ export default function CustomerOnboardingPage() {
                       onClick={() => setPreferredContactMethod(method)}
                       className={`flex h-12 items-center justify-between rounded-xl border px-4 text-sm font-bold transition ${
                         isSelected
-                          ? "border-red-500 bg-red-50 text-red-600"
-                          : "border-slate-200 bg-white text-slate-700"
+                          ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
+                          : "border-azisto-gold bg-white text-slate-700"
                       }`}
                     >
                       <span>{method}</span>
                       <span
                         className={`h-4 w-4 rounded-full border ${
                           isSelected
-                            ? "border-red-500 bg-red-500"
+                            ? "border-azisto-gold bg-azisto-gold"
                             : "border-slate-300 bg-white"
                         }`}
                       />
@@ -392,7 +392,7 @@ export default function CustomerOnboardingPage() {
             </section>
 
             {authLoading ? (
-              <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                 Checking account...
               </p>
             ) : null}
@@ -407,7 +407,7 @@ export default function CustomerOnboardingPage() {
               type="button"
               onClick={handleContinue}
               disabled={isSaving || authLoading}
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-red-500 text-sm font-bold text-white shadow-lg shadow-red-100 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none"
+              className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
             >
               {authLoading
                 ? "Checking account..."
