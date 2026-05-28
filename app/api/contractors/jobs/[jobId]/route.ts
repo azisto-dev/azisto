@@ -174,6 +174,38 @@ function serializeTask(data: Record<string, unknown>) {
   };
 }
 
+function getContractorServiceSelections(contractorData: Record<string, unknown>) {
+  const selectedServices = new Set(readStringList(contractorData.selectedServices));
+  const selectedSubcategoriesByService =
+    typeof contractorData.selectedSubcategoriesByService === "object" &&
+    contractorData.selectedSubcategoriesByService !== null
+      ? (contractorData.selectedSubcategoriesByService as Record<string, unknown>)
+      : {};
+
+  return { selectedServices, selectedSubcategoriesByService };
+}
+
+function canPerformTask(
+  contractorData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+) {
+  const { selectedServices, selectedSubcategoriesByService } =
+    getContractorServiceSelections(contractorData);
+  const category = readText(taskData.category);
+  const subcategory = readText(taskData.subcategory);
+  const savedSubcategories = readStringList(selectedSubcategoriesByService[category]);
+
+  if (selectedServices.size === 0 || !category || !selectedServices.has(category)) {
+    return false;
+  }
+
+  if (savedSubcategories.length > 0) {
+    return savedSubcategories.includes(subcategory);
+  }
+
+  return true;
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     assertFirebaseAdminConfig();
@@ -218,8 +250,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const job = await serializeJob(jobSnapshot.data() ?? {});
     const tasksSnapshot = await jobSnapshot.ref.collection("tasks").get();
+    const contractorData = contractorProfile.data() ?? {};
     const savedTasks = tasksSnapshot.docs
-      .map((taskSnapshot) => serializeTask(taskSnapshot.data()))
+      .map((taskSnapshot) => ({
+        ...serializeTask(taskSnapshot.data()),
+        contractorServiceMatch: canPerformTask(
+          contractorData,
+          taskSnapshot.data(),
+        ),
+      }))
       .sort((firstTask, secondTask) =>
         firstTask.taskId.localeCompare(secondTask.taskId),
       );
@@ -237,6 +276,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
             interestedContractorIds: [],
             createdAt: job.createdAt,
             updatedAt: job.updatedAt,
+            contractorServiceMatch: canPerformTask(contractorData, {
+              category: job.selectedServiceCategory,
+              subcategory,
+            }),
           }));
     const contractorId =
       typeof contractorProfile.get("contractorId") === "string"

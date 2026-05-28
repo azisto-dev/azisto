@@ -17,6 +17,16 @@ type RouteContext = {
 
 type MessageRequestBody = {
   text?: unknown;
+  attachments?: unknown;
+};
+
+type MessageAttachment = {
+  type: "image";
+  url: string;
+  fileName: string;
+  storagePath: string;
+  contentType: string;
+  size: number;
 };
 
 function getBearerToken(authorizationHeader: string | null) {
@@ -44,6 +54,40 @@ function readStringList(value: unknown) {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function readAttachments(value: unknown): MessageAttachment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      const data =
+        typeof item === "object" && item !== null
+          ? (item as Record<string, unknown>)
+          : {};
+      const type = readText(data.type);
+      const url = readText(data.url);
+      const fileName = readText(data.fileName);
+      const storagePath = readText(data.storagePath);
+      const contentType = readText(data.contentType);
+      const size = typeof data.size === "number" ? data.size : 0;
+
+      if (type !== "image" || !url || !storagePath) {
+        return null;
+      }
+
+      return {
+        type,
+        url,
+        fileName,
+        storagePath,
+        contentType,
+        size,
+      };
+    })
+    .filter((item): item is MessageAttachment => item !== null);
 }
 
 function serializeTimestamp(value: unknown) {
@@ -74,6 +118,7 @@ function serializeMessage(data: Record<string, unknown>) {
     messageId: readText(data.messageId),
     senderRole: readText(data.senderRole),
     text: readText(data.text),
+    attachments: readAttachments(data.attachments),
     createdAt: serializeTimestamp(data.createdAt),
     readBy: readStringList(data.readBy),
   };
@@ -208,6 +253,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       contractorId: readText(threadData.contractorId),
       contractorName: readText(threadData.contractorName),
       businessName: readText(threadData.businessName),
+      selectedTaskIds: readStringList(threadData.selectedTaskIds),
+      selectedTaskLabels: readStringList(threadData.selectedTaskLabels),
       currentUserRole: currentUserIsCustomer ? "customer" : "contractor",
       status: readText(threadData.status),
       jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
@@ -275,12 +322,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const body = (await request.json()) as MessageRequestBody;
     const text = readText(body.text);
+    const attachments = readAttachments(body.attachments);
 
-    if (!text) {
+    if (!text && attachments.length === 0) {
       return NextResponse.json(
         {
           code: "empty-message",
-          message: "Please enter a message before sending.",
+          message: "Please enter a message or attach a photo before sending.",
         },
         { status: 400 },
       );
@@ -303,12 +351,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       senderAuthUid: decodedToken.uid,
       senderRole,
       text,
+      attachments,
       createdAt: FieldValue.serverTimestamp(),
       readBy: [decodedToken.uid],
     });
 
+    const notificationMessage = text || "Photo attachment";
     const threadUpdate: Record<string, unknown> = {
-      lastMessage: text,
+      lastMessage: notificationMessage,
       lastMessageAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
@@ -323,7 +373,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       recipientRole,
       type: "new_message",
       title: "New message",
-      message: text.length > 80 ? `${text.slice(0, 77)}...` : text,
+      message:
+        notificationMessage.length > 80
+          ? `${notificationMessage.slice(0, 77)}...`
+          : notificationMessage,
       jobId: readText(threadSnapshot.get("jobId")),
     });
 

@@ -135,19 +135,15 @@ function canPerformTask(
   const subcategory = readText(taskData.subcategory);
   const savedSubcategories = readStringList(selectedSubcategoriesByService[category]);
 
+  if (selectedServices.size === 0 || !category || !selectedServices.has(category)) {
+    return false;
+  }
+
   if (savedSubcategories.length > 0) {
     return savedSubcategories.includes(subcategory);
   }
 
-  if (selectedServices.size === 0) {
-    return true;
-  }
-
-  if (selectedServices.has(category)) {
-    return true;
-  }
-
-  return !(category in selectedSubcategoriesByService);
+  return true;
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -217,7 +213,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const requestedTaskIds = readStringList(body.taskIds);
+    const requestedTaskIds = Array.from(new Set(readStringList(body.taskIds)));
     let tasksSnapshot = await jobDocument.collection("tasks").get();
 
     if (tasksSnapshot.empty) {
@@ -262,24 +258,35 @@ export async function POST(request: NextRequest, context: RouteContext) {
       tasksSnapshot = await jobDocument.collection("tasks").get();
     }
 
+    if (requestedTaskIds.length === 0) {
+      return NextResponse.json(
+        {
+          code: "task-selection-required",
+          message: "Please choose at least one task before submitting interest.",
+        },
+        { status: 400 },
+      );
+    }
+
     const openTasks = tasksSnapshot.docs.filter(
       (taskSnapshot) => readText(taskSnapshot.get("status")) === "open",
     );
     const selectedTasks = openTasks.filter((taskSnapshot) => {
       const taskId = readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
 
-      if (requestedTaskIds.length > 0 && !requestedTaskIds.includes(taskId)) {
+      if (!requestedTaskIds.includes(taskId)) {
         return false;
       }
 
       return canPerformTask(contractorProfile.data() ?? {}, taskSnapshot.data());
     });
 
-    if (!tasksSnapshot.empty && selectedTasks.length === 0) {
+    if (selectedTasks.length !== requestedTaskIds.length) {
       return NextResponse.json(
         {
           code: "no-open-matching-tasks",
-          message: "Please choose at least one open task that matches your services.",
+          message:
+            "Please choose only open tasks that match the services saved in your contractor profile.",
         },
         { status: 400 },
       );

@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { ChevronLeft, Send } from "lucide-react";
-import { auth } from "@/lib/firebase";
-import { getStatusChipClass } from "@/lib/theme";
+import {
+  Camera,
+  ChevronLeft,
+  Image as ImageIcon,
+  Paperclip,
+  Send,
+  X,
+} from "lucide-react";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { auth, storage } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
 
 type MessageThread = {
@@ -17,6 +24,8 @@ type MessageThread = {
   contractorId: string;
   contractorName: string;
   businessName: string;
+  selectedTaskIds: string[];
+  selectedTaskLabels: string[];
   currentUserRole: "customer" | "contractor" | string;
   status: string;
   jobStatus: string;
@@ -26,8 +35,18 @@ type MessageItem = {
   messageId: string;
   senderRole: "customer" | "contractor" | string;
   text: string;
+  attachments?: MessageAttachment[];
   createdAt: string;
   readBy: string[];
+};
+
+type MessageAttachment = {
+  type: "image";
+  url: string;
+  fileName: string;
+  storagePath: string;
+  contentType: string;
+  size: number;
 };
 
 function StatusBar() {
@@ -43,8 +62,8 @@ function StatusBar() {
   );
 }
 
-function createApiError(code: string, message: string) {
-  return new Error(`${message}\n\nCode: ${code}`);
+function createApiError(_code: string, message: string) {
+  return new Error(message);
 }
 
 function getErrorMessage(error: unknown) {
@@ -101,7 +120,42 @@ async function fetchMessages(user: User, threadId: string) {
   };
 }
 
-async function sendMessage(user: User, threadId: string, text: string) {
+function createSafeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+async function uploadMessagePhoto(
+  user: User,
+  threadId: string,
+  file: File,
+): Promise<MessageAttachment> {
+  const timestamp = Date.now();
+  const safeFileName = createSafeFileName(file.name || "message-photo.jpg");
+  const storagePath = `message-attachments/${threadId}/${user.uid}/${timestamp}-${safeFileName}`;
+  const storageReference = ref(storage, storagePath);
+
+  await uploadBytes(storageReference, file, {
+    contentType: file.type || "image/jpeg",
+  });
+
+  const url = await getDownloadURL(storageReference);
+
+  return {
+    type: "image",
+    url,
+    fileName: file.name || "Photo",
+    storagePath,
+    contentType: file.type || "image/jpeg",
+    size: file.size,
+  };
+}
+
+async function sendMessage(
+  user: User,
+  threadId: string,
+  text: string,
+  attachments: MessageAttachment[],
+) {
   const token = await user.getIdToken();
   const response = await fetch(
     `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
@@ -111,7 +165,7 @@ async function sendMessage(user: User, threadId: string, text: string) {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, attachments }),
     },
   );
   const responseBody = (await response.json().catch(() => null)) as {
@@ -158,6 +212,61 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
   }
 }
 
+async function fetchProfilePhoneNumber(user: User) {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/profile", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const responseBody = (await response.json().catch(() => null)) as {
+    profile?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    return "";
+  }
+
+  const profile =
+    typeof responseBody?.profile === "object" && responseBody.profile !== null
+      ? (responseBody.profile as Record<string, unknown>)
+      : {};
+
+  return typeof profile.phoneNumber === "string" ? profile.phoneNumber.trim() : "";
+}
+
+async function hireContractorForThread(
+  user: User,
+  jobId: string,
+  contractorId: string,
+  taskIds: string[],
+) {
+  const token = await user.getIdToken();
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/hire`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ contractorId, taskIds }),
+  });
+  const responseBody = (await response.json().catch(() => null)) as {
+    code?: unknown;
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw createApiError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+}
+
 export default function MessageThreadPage() {
   const router = useRouter();
   const params = useParams<{ threadId: string }>();
@@ -170,8 +279,26 @@ export default function MessageThreadPage() {
   const [isSending, setIsSending] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [selectedPhotoPreviewUrl, setSelectedPhotoPreviewUrl] = useState("");
+  const [customerPhoneNumber, setCustomerPhoneNumber] = useState("");
+  const [hirePhoneNumber, setHirePhoneNumber] = useState("");
+  const [isHirePromptOpen, setIsHirePromptOpen] = useState(false);
+  const [isUsingAlternatePhone, setIsUsingAlternatePhone] = useState(false);
+  const [isHiringContractor, setIsHiringContractor] = useState(false);
+  const [hireStatusMessage, setHireStatusMessage] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const takePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const isLeavingForReviewRef = useRef(false);
+  const hasComposerContent = Boolean(draft.trim() || selectedPhoto);
+  const canHireContractor =
+    thread?.currentUserRole === "customer" &&
+    Boolean(thread.jobId && thread.contractorId) &&
+    (thread.jobStatus === "open" ||
+      thread.jobStatus === "partially_hired" ||
+      !thread.jobStatus);
 
   async function loadMessages(user: User) {
     const conversation = await fetchMessages(user, threadId);
@@ -207,6 +334,47 @@ export default function MessageThreadPage() {
   }, [messages]);
 
   useEffect(() => {
+    if (!selectedPhoto) {
+      setSelectedPhotoPreviewUrl("");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedPhoto);
+    setSelectedPhotoPreviewUrl(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedPhoto]);
+
+  useEffect(() => {
+    if (
+      !currentUser ||
+      thread?.currentUserRole !== "customer" ||
+      customerPhoneNumber
+    ) {
+      return;
+    }
+
+    let isMounted = true;
+
+    fetchProfilePhoneNumber(currentUser)
+      .then((phoneNumber) => {
+        if (!isMounted || !phoneNumber) {
+          return;
+        }
+
+        setCustomerPhoneNumber(phoneNumber);
+        setHirePhoneNumber((currentValue) => currentValue || phoneNumber);
+      })
+      .catch((error) => {
+        console.error("Unable to load customer phone number:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser, thread?.currentUserRole, customerPhoneNumber]);
+
+  useEffect(() => {
     if (!currentUser || isLeavingForReviewRef.current) {
       return;
     }
@@ -229,21 +397,45 @@ export default function MessageThreadPage() {
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!currentUser || isSending || !draft.trim()) {
+    if (!currentUser || isSending || !hasComposerContent) {
       return;
     }
 
     try {
       setIsSending(true);
       setErrorMessage("");
-      await sendMessage(currentUser, threadId, draft);
+      const attachments = selectedPhoto
+        ? [await uploadMessagePhoto(currentUser, threadId, selectedPhoto)]
+        : [];
+
+      await sendMessage(currentUser, threadId, draft.trim(), attachments);
       setDraft("");
+      setSelectedPhoto(null);
+      setIsAttachMenuOpen(false);
       await loadMessages(currentUser);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("Please choose a photo file.");
+      return;
+    }
+
+    setSelectedPhoto(file);
+    setIsAttachMenuOpen(false);
+    setErrorMessage("");
   }
 
   async function handleMarkCompleted() {
@@ -262,6 +454,54 @@ export default function MessageThreadPage() {
       isLeavingForReviewRef.current = false;
     } finally {
       setIsUpdatingStatus(false);
+    }
+  }
+
+  function handleOpenHirePrompt() {
+    setHireStatusMessage("");
+    setErrorMessage("");
+    setIsUsingAlternatePhone(!customerPhoneNumber);
+    setHirePhoneNumber((currentValue) => currentValue || customerPhoneNumber);
+    setIsHirePromptOpen(true);
+  }
+
+  async function handleHireContractor() {
+    if (!currentUser || !thread?.jobId || !thread.contractorId) {
+      return;
+    }
+
+    const phoneNumber = hirePhoneNumber.trim();
+
+    if (!phoneNumber) {
+      setHireStatusMessage("Please enter a phone no. before sharing.");
+      return;
+    }
+
+    try {
+      setIsHiringContractor(true);
+      setHireStatusMessage("");
+      setErrorMessage("");
+      await hireContractorForThread(
+        currentUser,
+        thread.jobId,
+        thread.contractorId,
+        thread.selectedTaskIds ?? [],
+      );
+      await sendMessage(
+        currentUser,
+        threadId,
+        `My phone no. is ${phoneNumber}.`,
+        [],
+      );
+      setIsHirePromptOpen(false);
+      setHireStatusMessage(
+        "Contractor hired. Your phone no. was shared in this conversation.",
+      );
+      await loadMessages(currentUser);
+    } catch (error) {
+      setHireStatusMessage(getErrorMessage(error));
+    } finally {
+      setIsHiringContractor(false);
     }
   }
 
@@ -291,22 +531,41 @@ export default function MessageThreadPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">
-              {thread?.jobId ?? "Conversation"}
-            </p>
-            <h1 className="mt-1 text-xl font-bold leading-tight text-black">
-              {thread?.displayName || "Messages"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {thread?.status ? `Status: ${thread.status}` : "Open thread"}
-            </p>
-            {thread?.jobStatus ? (
-              <span className={`mt-3 inline-flex ${getStatusChipClass(thread.jobStatus)}`}>
-                Job: {thread.jobStatus.replaceAll("_", " ")}
+          <h1 className="mt-5 text-xl font-bold leading-tight text-[#1E3A8A]">
+            Messages
+          </h1>
+
+          <section className="mt-3 rounded-xl border border-[#1E3A8A] bg-white px-3 py-2.5 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="text-[13px] font-bold leading-5 text-black">
+                  {thread?.displayName || "Messages"}
+                </h1>
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                  {thread?.jobId ?? "Conversation"}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                {thread?.jobStatus
+                  ? thread.jobStatus.replaceAll("_", " ")
+                  : thread?.status || "Open"}
               </span>
-            ) : null}
-            <p className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800">
+            </div>
+            <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-2 py-1">
+                <p className="min-w-0 truncate">Conversation</p>
+                <p className="shrink-0 text-right capitalize">
+                  {thread?.status || "Open thread"}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-2 py-1">
+                <p className="min-w-0 truncate">Role</p>
+                <p className="shrink-0 text-right capitalize">
+                  {thread?.currentUserRole || "Member"}
+                </p>
+              </div>
+            </div>
+            <p className="mt-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-700">
               Keep communication inside AZISTO until booking is confirmed.
             </p>
             {thread?.currentUserRole === "customer" &&
@@ -315,7 +574,7 @@ export default function MessageThreadPage() {
                 type="button"
                 onClick={handleMarkCompleted}
                 disabled={isUpdatingStatus}
-                className="az-btn-primary mt-3 flex h-11 w-full items-center justify-center rounded-xl text-sm font-bold"
+                className="az-btn-primary mt-2 flex h-9 w-full items-center justify-center rounded-xl text-xs font-bold"
               >
                 {isUpdatingStatus ? "Completing..." : "Mark job completed"}
               </button>
@@ -354,15 +613,34 @@ export default function MessageThreadPage() {
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       isOwnMessage
-                        ? "rounded-br-md border border-azisto-gold bg-white text-azisto-text"
-                        : "rounded-bl-md bg-slate-100 text-slate-900"
+                        ? "rounded-br-md border border-[#1E3A8A] bg-[#4169E1] text-white"
+                        : "rounded-bl-md border border-slate-200 bg-slate-100 text-slate-900"
                     }`}
                   >
-                    <p>{message.text}</p>
+                    {message.text ? <p>{message.text}</p> : null}
+                    {message.attachments && message.attachments.length > 0 ? (
+                      <div className={message.text ? "mt-2 space-y-2" : "space-y-2"}>
+                        {message.attachments.map((attachment) => (
+                          <a
+                            key={attachment.storagePath || attachment.url}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block overflow-hidden rounded-xl border border-slate-200 bg-white"
+                          >
+                            <img
+                              src={attachment.url}
+                              alt={attachment.fileName || "Message photo"}
+                              className="max-h-56 w-full object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {message.createdAt ? (
                       <p
                         className={`mt-1 text-[11px] font-semibold ${
-                          isOwnMessage ? "text-azisto-muted" : "text-slate-400"
+                          isOwnMessage ? "text-white/75" : "text-slate-400"
                         }`}
                       >
                         {formatMessageTime(message.createdAt)}
@@ -375,22 +653,123 @@ export default function MessageThreadPage() {
             <div ref={bottomRef} />
           </section>
 
-          <form onSubmit={handleSend} className="flex items-center gap-2">
+          {selectedPhoto ? (
+            <div className="mb-2 flex items-center gap-3 rounded-xl border border-[#1E3A8A] bg-slate-50 p-2">
+              {selectedPhotoPreviewUrl ? (
+                <img
+                  src={selectedPhotoPreviewUrl}
+                  alt="Selected attachment preview"
+                  className="h-12 w-12 rounded-lg object-cover"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-slate-900">
+                  {selectedPhoto.name || "Photo selected"}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Ready to send
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPhoto(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                aria-label="Remove selected photo"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSend} className="relative flex items-center gap-2">
+            <input
+              ref={takePhotoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoSelected}
+              className="hidden"
+              aria-label="Take photo"
+            />
+            <input
+              ref={uploadPhotoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelected}
+              className="hidden"
+              aria-label="Upload photo"
+            />
+            <div className="relative">
+              {isAttachMenuOpen ? (
+                <div className="absolute bottom-14 left-0 z-20 w-44 rounded-2xl border border-[#1E3A8A] bg-white p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => takePhotoInputRef.current?.click()}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-800 hover:bg-slate-50"
+                  >
+                    <Camera aria-hidden="true" className="h-4 w-4 text-[#4169E1]" />
+                    Take photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => uploadPhotoInputRef.current?.click()}
+                    className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-800 hover:bg-slate-50"
+                  >
+                    <ImageIcon
+                      aria-hidden="true"
+                      className="h-4 w-4 text-[#4169E1]"
+                    />
+                    Upload photo
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() =>
+                  setIsAttachMenuOpen((currentValue) => !currentValue)
+                }
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#1E3A8A] bg-white text-[#1E3A8A]"
+                aria-label="Attach photo"
+                aria-expanded={isAttachMenuOpen}
+              >
+                <Paperclip aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Write a message..."
-              className="h-12 min-w-0 flex-1 rounded-xl border border-azisto-border bg-white px-4 text-sm outline-none placeholder:text-slate-400 az-focus-field"
+              className="h-12 min-w-0 flex-1 rounded-xl border border-[#1E3A8A] bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[#4169E1]/15"
             />
             <button
               type="submit"
-              disabled={isSending || !draft.trim()}
-              className="az-btn-primary flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+              disabled={isSending || !hasComposerContent}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition ${
+                hasComposerContent && !isSending
+                  ? "border-[#1E3A8A] bg-[#4169E1] text-white shadow-sm shadow-[#4169E1]/20"
+                  : "border-slate-200 bg-slate-100 text-slate-400"
+              }`}
               aria-label="Send message"
             >
               <Send aria-hidden="true" className="h-5 w-5" />
             </button>
           </form>
+
+          {canHireContractor ? (
+            <button
+              type="button"
+              onClick={handleOpenHirePrompt}
+              className="az-btn-royal-animated mt-2 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              Hire Contractor
+            </button>
+          ) : null}
+
+          {hireStatusMessage ? (
+            <p className="mt-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-700">
+              {hireStatusMessage}
+            </p>
+          ) : null}
         </div>
         <BottomNav
           role={
@@ -401,6 +780,82 @@ export default function MessageThreadPage() {
           }
         />
       </div>
+      {isHirePromptOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-5">
+          <div className="w-full max-w-[340px] rounded-2xl border border-[#1E3A8A] bg-white p-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-[#1E3A8A]">
+                  Share phone no.
+                </h2>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  Hire the contractor and share a phone no. in this message thread.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHirePromptOpen(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                aria-label="Close hire prompt"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </div>
+
+            {customerPhoneNumber && !isUsingAlternatePhone ? (
+              <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                  Profile phone no.
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-950">
+                  {customerPhoneNumber}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUsingAlternatePhone(true);
+                    setHirePhoneNumber("");
+                    setHireStatusMessage("");
+                  }}
+                  className="mt-2 text-xs font-bold text-[#4169E1]"
+                >
+                  Use another phone no.
+                </button>
+              </div>
+            ) : (
+              <label className="mt-4 block">
+                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                  Phone no.
+                </span>
+                <input
+                  value={hirePhoneNumber}
+                  onChange={(event) => {
+                    setHirePhoneNumber(event.target.value);
+                    setHireStatusMessage("");
+                  }}
+                  placeholder="Enter phone no."
+                  className="mt-2 h-12 w-full rounded-xl border border-[#1E3A8A] bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[#4169E1]/15"
+                />
+              </label>
+            )}
+
+            {hireStatusMessage ? (
+              <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-700">
+                {hireStatusMessage}
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleHireContractor}
+              disabled={isHiringContractor || !hirePhoneNumber.trim()}
+              className="az-btn-royal-animated mt-4 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              {isHiringContractor ? "Hiring..." : "Share phone no. & hire"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

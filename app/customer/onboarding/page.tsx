@@ -108,9 +108,7 @@ function getFirebaseErrorDetails(error: unknown) {
 }
 
 function formatCustomerSaveError(error: unknown) {
-  const { code, message } = getFirebaseErrorDetails(error);
-
-  return `${getCustomerSaveErrorMessage(error)}\n\nCode: ${code}\nMessage: ${message}`;
+  return getCustomerSaveErrorMessage(error);
 }
 
 function createCustomerSaveError(code: string, message: string) {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { ChevronLeft, Flag, MapPin } from "lucide-react";
+import { Check, ChevronLeft, Flag, MapPin, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
@@ -52,6 +52,7 @@ type JobTask = {
   status: string;
   hiredContractorId: string;
   interestedContractorIds: string[];
+  contractorServiceMatch?: boolean;
 };
 
 function StatusBar() {
@@ -67,8 +68,8 @@ function StatusBar() {
   );
 }
 
-function createApiError(code: string, message: string) {
-  return new Error(`${message}\n\nCode: ${code}`);
+function createApiError(_code: string, message: string) {
+  return new Error(message);
 }
 
 function getErrorMessage(error: unknown) {
@@ -275,6 +276,7 @@ export default function ContractorJobDetailPage() {
   const [interestMessage, setInterestMessage] = useState("");
   const [lifecycleMessage, setLifecycleMessage] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [isMessagePromptOpen, setIsMessagePromptOpen] = useState(false);
 
   async function loadJob(user: User) {
     const jobDetails = await fetchContractorJob(user, jobId);
@@ -285,9 +287,7 @@ export default function ContractorJobDetailPage() {
       requestedTaskId &&
       openTasks.some((task) => task.taskId === requestedTaskId)
         ? [requestedTaskId]
-        : openTasks.length === 1
-          ? [openTasks[0].taskId]
-          : [];
+        : [];
 
     setJob(jobDetails);
     setSelectedTaskIds(initialTaskIds);
@@ -321,12 +321,33 @@ export default function ContractorJobDetailPage() {
       return;
     }
 
+    if (selectedTaskIds.length === 0) {
+      setInterestMessage("Please choose at least one task before submitting interest.");
+      return;
+    }
+
+    const selectedTasks =
+      job?.tasks?.filter((task) => selectedTaskIds.includes(task.taskId)) ?? [];
+    const hasInvalidSelectedTask =
+      selectedTasks.length !== selectedTaskIds.length ||
+      selectedTasks.some(
+        (task) => task.status !== "open" || task.contractorServiceMatch === false,
+      );
+
+    if (hasInvalidSelectedTask) {
+      setInterestMessage(
+        "Please choose only open tasks that match the services saved in your contractor profile.",
+      );
+      return;
+    }
+
     try {
       setIsSubmittingInterest(true);
       setInterestMessage("");
       await submitContractorInterest(currentUser, jobId, selectedTaskIds);
       setHasSubmittedInterest(true);
       setInterestMessage("Interest submitted successfully");
+      setIsMessagePromptOpen(true);
     } catch (error) {
       setInterestMessage(getErrorMessage(error));
     } finally {
@@ -525,6 +546,7 @@ export default function ContractorJobDetailPage() {
                   <div className="mt-3 space-y-2">
                     {job.tasks.map((task) => {
                       const isOpen = task.status === "open";
+                      const canSelectTask = isOpen && task.contractorServiceMatch !== false;
                       const isSelected = selectedTaskIds.includes(task.taskId);
 
                       return (
@@ -532,27 +554,43 @@ export default function ContractorJobDetailPage() {
                           key={task.taskId}
                           type="button"
                           onClick={() => {
-                            if (isOpen) {
+                            if (canSelectTask) {
                               toggleSelectedTask(task.taskId);
                             }
                           }}
-                          disabled={!isOpen}
+                          disabled={!canSelectTask}
                           className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm transition ${
                             isSelected
-                              ? "border-azisto-gold bg-amber-50 text-black"
+                              ? "border-[#4169E1] bg-sky-50 text-black"
                               : "border-slate-200 bg-slate-50 text-slate-700"
                           } disabled:cursor-not-allowed disabled:opacity-60`}
                         >
-                          <span>
-                            <span className="block text-xs font-bold uppercase tracking-[0.12em] az-job-id">
-                              {task.taskId}
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                                isSelected
+                                  ? "border-[#4169E1] bg-[#4169E1] text-white"
+                                  : canSelectTask
+                                    ? "border-[#4169E1] bg-white text-transparent"
+                                    : "border-slate-300 bg-slate-100 text-transparent"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              <Check className="h-4 w-4" />
                             </span>
-                            <span className="mt-1 block font-bold">
-                              {task.subcategory || task.category || "Task"}
+                            <span className="min-w-0">
+                              <span className="block text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+                                {task.taskId}
+                              </span>
+                              <span className="mt-1 block truncate font-bold">
+                                {task.subcategory || task.category || "Task"}
+                              </span>
                             </span>
                           </span>
-                          <span className={getStatusChipClass(task.status || "open")}>
-                            {task.status || "open"}
+                          <span className={`${getStatusChipClass(task.status || "open")} shrink-0`}>
+                            {task.contractorServiceMatch === false
+                              ? "Not in profile"
+                              : task.status || "open"}
                           </span>
                         </button>
                       );
@@ -684,16 +722,17 @@ export default function ContractorJobDetailPage() {
                   disabled={
                     isSubmittingInterest ||
                     hasSubmittedInterest ||
-                    ((job.tasks?.some((task) => task.status === "open") ?? false) &&
-                      selectedTaskIds.length === 0)
+                    selectedTaskIds.length === 0
                   }
-                  className="az-btn-primary mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+                  className="az-btn-royal-blue mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {isSubmittingInterest
                     ? "Submitting..."
                     : hasSubmittedInterest
                       ? "Interest submitted"
-                      : selectedTaskIds.length > 1
+                      : selectedTaskIds.length === 0
+                        ? "Select at least one task"
+                        : selectedTaskIds.length > 1
                         ? "Submit interest for selected tasks"
                         : "I\u2019m interested"}
                 </button>
@@ -716,7 +755,7 @@ export default function ContractorJobDetailPage() {
                   type="button"
                   onClick={handleMessageCustomer}
                   disabled={isOpeningThread}
-                  className="az-btn-primary mt-3 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+                  className="az-btn-royal-blue mt-3 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
                 >
                   {isOpeningThread ? "Opening conversation..." : "Message customer"}
                 </button>
@@ -726,6 +765,46 @@ export default function ContractorJobDetailPage() {
         </div>
         <BottomNav role="contractor" />
       </div>
+
+      {isMessagePromptOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="message-customer-title"
+        >
+          <div className="relative w-full max-w-[340px] rounded-2xl border border-azisto-border bg-white p-5 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setIsMessagePromptOpen(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+              aria-label="Close message prompt"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+
+            <p
+              id="message-customer-title"
+              className="pr-10 text-lg font-bold leading-6 text-black"
+            >
+              Message customer?
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Your interest was submitted. You can now open the customer
+              conversation for this job.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleMessageCustomer}
+              disabled={isOpeningThread}
+              className="az-btn-royal-blue mt-5 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              {isOpeningThread ? "Opening conversation..." : "Message customer"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

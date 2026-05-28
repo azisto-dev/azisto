@@ -7,12 +7,9 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   Briefcase,
   ChevronLeft,
-  ChevronRight,
-  MapPin,
   MessageCircle,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type DashboardTab = "active" | "available" | "past";
@@ -129,8 +126,8 @@ function StatusBar() {
   );
 }
 
-function createApiError(code: string, message: string) {
-  return new Error(`${message}\n\nCode: ${code}`);
+function createApiError(_code: string, message: string) {
+  return new Error(message);
 }
 
 function getErrorMessage(error: unknown) {
@@ -213,38 +210,6 @@ async function fetchContractorJobs(user: User) {
     : [];
 }
 
-async function submitInterest(user: User, jobId: string, taskIds: string[]) {
-  const token = await user.getIdToken();
-  const response = await fetch(
-    `/api/contractors/jobs/${encodeURIComponent(jobId)}/interest`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        taskIds,
-      }),
-    },
-  );
-  const responseBody = (await response.json().catch(() => null)) as {
-    code?: unknown;
-    message?: unknown;
-  } | null;
-
-  if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
-      typeof responseBody?.message === "string"
-        ? responseBody.message
-        : response.statusText,
-    );
-  }
-}
-
 async function updateJobStatus(
   user: User,
   jobId: string,
@@ -322,11 +287,11 @@ function SubcategoryList({ items }: { items: string[] }) {
   }
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {items.slice(0, 4).map((item) => (
         <span
           key={item}
-          className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700"
+          className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700"
         >
           {item}
         </span>
@@ -412,25 +377,6 @@ export default function ContractorDashboardPage() {
 
     return unsubscribe;
   }, [router]);
-
-  async function handleInterest(job: AvailableJobCard) {
-    if (!currentUser || activeJobId || hasActiveJob) {
-      return;
-    }
-
-    try {
-      setActiveJobId(job.jobId);
-      setErrorMessage("");
-      setSuccessMessage("");
-      await submitInterest(currentUser, job.jobId, job.taskIds);
-      await loadDashboard(currentUser);
-      setSuccessMessage("Interest submitted successfully.");
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setActiveJobId("");
-    }
-  }
 
   async function handleMessage(job: ContractorJob) {
     if (!currentUser || activeJobId) {
@@ -524,8 +470,8 @@ export default function ContractorDashboardPage() {
                 onClick={() => setSelectedTab(tab.id)}
                 className={`min-h-12 rounded-xl border px-2 text-xs font-bold leading-tight transition ${
                   selectedTab === tab.id
-                    ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
-                    : "border-azisto-gold bg-white text-slate-700"
+                    ? "border-slate-300 bg-slate-100 text-azisto-text shadow-sm ring-1 ring-[#4169E1]/20"
+                    : "border-slate-200 bg-slate-100 text-slate-700"
                 }`}
               >
                 {tab.label}
@@ -569,56 +515,57 @@ export default function ContractorDashboardPage() {
               {activeJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
-                        {job.taskId
-                          ? `${job.taskId} · ${
-                              job.selectedSubcategories[0] ||
-                              job.selectedServiceCategory ||
-                              "Task"
-                            }`
-                          : job.jobId}
-                      </p>
-                      <h2 className="mt-1 text-lg font-bold text-black">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-[13px] font-bold leading-5 text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                        {job.taskId || job.jobId}
+                      </p>
                       {job.parentJobId ? (
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                        <p className="mt-0.5 text-[10px] font-semibold text-slate-500">
                           Parent job: {job.parentJobId}
                         </p>
                       ) : null}
                     </div>
-                    <span className={getStatusChipClass(job.status)}>
-                      {job.status.replaceAll("_", " ")}
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                      {[job.city, job.province].filter(Boolean).join(", ") ||
+                        "Location pending"}
                     </span>
                   </div>
 
                   <SubcategoryList items={job.selectedSubcategories} />
 
-                  <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
-                    <p>Customer: {job.customerFirstName || "Customer"}</p>
-                    <p className="flex items-center gap-2">
-                      <MapPin aria-hidden="true" className="h-4 w-4" />
-                      {[job.city, job.province].filter(Boolean).join(", ") ||
-                        "Location not provided"}
-                    </p>
-                    <p>
-                      <span className="font-bold text-slate-800">When:</span>{" "}
-                      {formatWhen(job.preferredDate, job.preferredTime)}
-                    </p>
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate">
+                        Customer: {job.customerFirstName || "Customer"}
+                      </p>
+                      <p className="shrink-0 text-right capitalize">
+                        {job.status.replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate">
+                        {job.urgency || "Flexible"}
+                      </p>
+                      <p className="shrink-0 text-right">
+                        {formatWhen(job.preferredDate, job.preferredTime)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="mt-4 grid gap-2">
+                  <div className="mt-2 grid gap-2">
                     <button
                       type="button"
                       onClick={() => handleMessage(job)}
                       disabled={activeJobId === job.jobId}
-                      className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
+                      className="az-btn-primary flex h-9 items-center justify-center gap-2 rounded-xl text-xs font-bold"
                     >
-                      <MessageCircle aria-hidden="true" className="h-4 w-4" />
+                      <MessageCircle aria-hidden="true" className="h-3.5 w-3.5" />
                       Message customer
                     </button>
                     {job.status === "hired" ? (
@@ -626,7 +573,7 @@ export default function ContractorDashboardPage() {
                         type="button"
                         onClick={() => handleMarkInProgress(job)}
                         disabled={activeJobId === job.jobId}
-                        className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                        className="az-btn-primary flex h-9 items-center justify-center rounded-xl text-xs font-bold"
                       >
                         Mark in progress
                       </button>
@@ -635,7 +582,7 @@ export default function ContractorDashboardPage() {
                       href={`/contractor/jobs/${encodeURIComponent(
                         job.parentJobId || job.jobId,
                       )}${job.taskId ? `?taskId=${encodeURIComponent(job.taskId)}` : ""}`}
-                      className="az-btn-secondary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                      className="az-btn-secondary flex h-9 items-center justify-center rounded-xl text-xs font-bold"
                     >
                       View details
                     </Link>
@@ -654,33 +601,34 @@ export default function ContractorDashboardPage() {
               {availableJobCards.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
-                        {job.jobId}
-                      </p>
-                      <h2 className="mt-1 text-lg font-bold text-black">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-[13px] font-bold leading-5 text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                        {job.jobId}
+                      </p>
                     </div>
-                    <span className={getStatusChipClass(job.status || "open")}>
-                      {job.status || "open"}
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                      {[job.city, job.province].filter(Boolean).join(", ") ||
+                        "Location pending"}
                     </span>
                   </div>
 
                   {job.tasks.length > 0 ? (
-                    <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                    <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-1.5">
                       {job.tasks.map((task, index) => (
                         <div
                           key={task.taskId || `${job.jobId}-${task.label}`}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                          className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2 py-1"
                         >
-                          <span className="text-xs font-bold uppercase tracking-[0.1em] az-job-id">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] az-job-id">
                             {task.taskId || `Task ${index + 1}`}
                           </span>
-                          <span className="text-sm font-bold text-slate-800">
+                          <span className="text-[11px] font-bold text-slate-800">
                             {task.label}
                           </span>
                         </div>
@@ -690,71 +638,31 @@ export default function ContractorDashboardPage() {
                     <SubcategoryList items={job.selectedSubcategories} />
                   )}
 
-                  <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
-                    <p>Customer: {job.customerFirstName || "Customer"}</p>
-                    <p className="flex items-center gap-2">
-                      <MapPin aria-hidden="true" className="h-4 w-4" />
-                      {[job.city, job.province].filter(Boolean).join(", ") ||
-                        "Location not provided"}
-                    </p>
-                    <p>
-                      <span className="font-bold text-slate-800">
-                        Urgency:
-                      </span>{" "}
-                      {job.urgency || "Flexible"}
-                    </p>
-                    <p>
-                      <span className="font-bold text-slate-800">When:</span>{" "}
-                      {formatWhen(job.preferredDate, job.preferredTime)}
-                    </p>
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate">
+                        Customer: {job.customerFirstName || "Customer"}
+                      </p>
+                      <p className="shrink-0 text-right capitalize">
+                        {job.urgency || "Flexible"}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate capitalize">
+                        {job.status || "open"}
+                      </p>
+                      <p className="shrink-0 text-right">
+                        {formatWhen(job.preferredDate, job.preferredTime)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        job.customerEmailVerified
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {job.customerEmailVerified
-                        ? "Email verified"
-                        : "Email unverified"}
-                    </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        job.customerPhoneVerified
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {job.customerPhoneVerified
-                        ? "Phone verified"
-                        : "Phone pending"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid gap-2">
-                    <Link
-                      href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="az-btn-royal-blue flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
-                    >
-                      View job
-                      <ChevronRight aria-hidden="true" className="h-4 w-4" />
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleInterest(job)}
-                      disabled={hasActiveJob || activeJobId === job.jobId}
-                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold disabled:bg-slate-300 disabled:text-slate-600"
-                    >
-                      {hasActiveJob
-                        ? "Complete active job first"
-                        : activeJobId === job.jobId
-                          ? "Submitting..."
-                          : "I’m interested"}
-                    </button>
-                  </div>
+                  <Link
+                    href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
+                    className="az-btn-royal-blue mt-2 flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                  >
+                    View job
+                  </Link>
                 </article>
               ))}
             </section>
@@ -769,36 +677,43 @@ export default function ContractorDashboardPage() {
               {pastJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
-                        {job.jobId}
-                      </p>
-                      <h2 className="mt-1 text-lg font-bold text-black">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h2 className="text-[13px] font-bold leading-5 text-black">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                        {job.jobId}
+                      </p>
                     </div>
-                    <span className={getStatusChipClass(job.status)}>
-                      {job.status.replaceAll("_", " ")}
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                      {[job.city, job.province].filter(Boolean).join(", ") ||
+                        "Location pending"}
                     </span>
                   </div>
 
-                  <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
-                    <p>Customer: {job.customerFirstName || "Customer"}</p>
-                    <p>
-                      <span className="font-bold text-slate-800">Updated:</span>{" "}
-                      {formatDate(job.completedAt || job.cancelledAt || job.updatedAt)}
-                    </p>
-                    <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                      Review summary coming soon.
-                    </p>
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate">
+                        Customer: {job.customerFirstName || "Customer"}
+                      </p>
+                      <p className="shrink-0 text-right capitalize">
+                        {job.status.replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate">Updated</p>
+                      <p className="shrink-0 text-right">
+                        {formatDate(job.completedAt || job.cancelledAt || job.updatedAt)}
+                      </p>
+                    </div>
                   </div>
 
                   <Link
                     href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                    className="az-btn-secondary mt-4 flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                    className="az-btn-royal-blue mt-2 flex h-9 items-center justify-center rounded-xl text-xs font-bold"
                   >
                     View details
                   </Link>

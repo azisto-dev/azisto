@@ -254,8 +254,8 @@ function StatusBar() {
   );
 }
 
-function createApiError(code: string, message: string) {
-  return new Error(`${message}\n\nCode: ${code}`);
+function createApiError(_code: string, message: string) {
+  return new Error(message);
 }
 
 function readProfile(value: unknown): ProfileData {

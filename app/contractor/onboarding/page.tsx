@@ -328,8 +328,8 @@ function getErrorMessage(error: unknown) {
   return "Unable to save your contractor profile.";
 }
 
-function createApiError(code: string, message: string) {
-  return new Error(`${message}\n\nCode: ${code}`);
+function createApiError(_code: string, message: string) {
+  return new Error(message);
 }
 
 function parseSelectedServices(servicesOffered: string) {
