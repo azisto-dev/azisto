@@ -506,8 +506,8 @@ export default function MessageThreadPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex min-h-screen flex-1 flex-col px-5 pb-5 pt-5 md:min-h-[780px]">
           <StatusBar />
 
@@ -531,41 +531,38 @@ export default function MessageThreadPage() {
             <span aria-hidden="true" />
           </header>
 
-          <h1 className="mt-5 text-xl font-bold leading-tight text-[#1E3A8A]">
-            Messages
-          </h1>
-
-          <section className="mt-3 rounded-xl border border-[#1E3A8A] bg-white px-3 py-2.5 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
+          <section className="az-contractor-hero-card mt-5 p-4">
+            <div className="relative z-10 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h1 className="text-[13px] font-bold leading-5 text-black">
+                <p className="text-sm font-semibold text-white/75">Messages</p>
+                <h1 className="mt-1 text-2xl font-normal leading-7 text-white">
                   {thread?.displayName || "Messages"}
                 </h1>
-                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.09em] text-white/80">
                   {thread?.jobId ?? "Conversation"}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+              <span className="shrink-0 rounded-full border border-white/20 bg-white/15 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-white">
                 {thread?.jobStatus
                   ? thread.jobStatus.replaceAll("_", " ")
                   : thread?.status || "Open"}
               </span>
             </div>
-            <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
-              <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-2 py-1">
+            <div className="relative z-10 mt-4 space-y-1 text-[11px] font-semibold text-white/85">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-2 py-1">
                 <p className="min-w-0 truncate">Conversation</p>
                 <p className="shrink-0 text-right capitalize">
                   {thread?.status || "Open thread"}
                 </p>
               </div>
-              <div className="flex items-center justify-between gap-3 rounded-lg bg-sky-50 px-2 py-1">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-2 py-1">
                 <p className="min-w-0 truncate">Role</p>
                 <p className="shrink-0 text-right capitalize">
                   {thread?.currentUserRole || "Member"}
                 </p>
               </div>
             </div>
-            <p className="mt-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-700">
+            <p className="relative z-10 mt-3 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold leading-5 text-white/85">
               Keep communication inside AZISTO until booking is confirmed.
             </p>
             {thread?.currentUserRole === "customer" &&
@@ -574,7 +571,7 @@ export default function MessageThreadPage() {
                 type="button"
                 onClick={handleMarkCompleted}
                 disabled={isUpdatingStatus}
-                className="az-btn-primary mt-2 flex h-9 w-full items-center justify-center rounded-xl text-xs font-bold"
+                className="relative z-10 mt-3 flex h-10 w-full items-center justify-center rounded-full border border-white/30 bg-white text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
               >
                 {isUpdatingStatus ? "Completing..." : "Mark job completed"}
               </button>
@@ -582,7 +579,7 @@ export default function MessageThreadPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-5 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="az-contractor-card-compact mt-5 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Loading conversation...
             </p>
           ) : null}
@@ -595,7 +592,7 @@ export default function MessageThreadPage() {
 
           <section className="mt-5 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
             {!isLoading && messages.length === 0 ? (
-              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-center text-sm leading-6 text-slate-600">
+              <p className="az-contractor-card-compact px-4 py-3 text-center text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 No messages yet. Send the first note.
               </p>
             ) : null}
@@ -613,8 +610,8 @@ export default function MessageThreadPage() {
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                       isOwnMessage
-                        ? "rounded-br-md border border-[#1E3A8A] bg-[#4169E1] text-white"
-                        : "rounded-bl-md border border-slate-200 bg-slate-100 text-slate-900"
+                        ? "rounded-br-md border border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
+                        : "rounded-bl-md border border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-text)]"
                     }`}
                   >
                     {message.text ? <p>{message.text}</p> : null}
@@ -654,7 +651,7 @@ export default function MessageThreadPage() {
           </section>
 
           {selectedPhoto ? (
-            <div className="mb-2 flex items-center gap-3 rounded-xl border border-[#1E3A8A] bg-slate-50 p-2">
+            <div className="mb-2 flex items-center gap-3 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-2">
               {selectedPhotoPreviewUrl ? (
                 <img
                   src={selectedPhotoPreviewUrl}
@@ -701,13 +698,13 @@ export default function MessageThreadPage() {
             />
             <div className="relative">
               {isAttachMenuOpen ? (
-                <div className="absolute bottom-14 left-0 z-20 w-44 rounded-2xl border border-[#1E3A8A] bg-white p-2 shadow-xl">
+                <div className="absolute bottom-14 left-0 z-20 w-44 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white p-2 shadow-xl">
                   <button
                     type="button"
                     onClick={() => takePhotoInputRef.current?.click()}
                     className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-800 hover:bg-slate-50"
                   >
-                    <Camera aria-hidden="true" className="h-4 w-4 text-[#4169E1]" />
+                    <Camera aria-hidden="true" className="h-4 w-4 text-[var(--azisto-contractor-burgundy)]" />
                     Take photo
                   </button>
                   <button
@@ -717,7 +714,7 @@ export default function MessageThreadPage() {
                   >
                     <ImageIcon
                       aria-hidden="true"
-                      className="h-4 w-4 text-[#4169E1]"
+                      className="h-4 w-4 text-[var(--azisto-contractor-burgundy)]"
                     />
                     Upload photo
                   </button>
@@ -728,7 +725,7 @@ export default function MessageThreadPage() {
                 onClick={() =>
                   setIsAttachMenuOpen((currentValue) => !currentValue)
                 }
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#1E3A8A] bg-white text-[#1E3A8A]"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-burgundy)]"
                 aria-label="Attach photo"
                 aria-expanded={isAttachMenuOpen}
               >
@@ -739,14 +736,14 @@ export default function MessageThreadPage() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Write a message..."
-              className="h-12 min-w-0 flex-1 rounded-xl border border-[#1E3A8A] bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[#4169E1]/15"
+              className="h-12 min-w-0 flex-1 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]"
             />
             <button
               type="submit"
               disabled={isSending || !hasComposerContent}
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition ${
                 hasComposerContent && !isSending
-                  ? "border-[#1E3A8A] bg-[#4169E1] text-white shadow-sm shadow-[#4169E1]/20"
+                  ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white shadow-sm shadow-[rgb(138_15_77_/_0.18)]"
                   : "border-slate-200 bg-slate-100 text-slate-400"
               }`}
               aria-label="Send message"
@@ -759,7 +756,7 @@ export default function MessageThreadPage() {
             <button
               type="button"
               onClick={handleOpenHirePrompt}
-              className="az-btn-royal-animated mt-2 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+              className="az-btn-contractor mt-2 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
             >
               Hire Contractor
             </button>
@@ -782,10 +779,10 @@ export default function MessageThreadPage() {
       </div>
       {isHirePromptOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-5">
-          <div className="w-full max-w-[340px] rounded-2xl border border-[#1E3A8A] bg-white p-4 shadow-2xl">
+          <div className="az-contractor-card w-full max-w-[340px] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-[#1E3A8A]">
+                <h2 className="text-base font-bold text-[var(--azisto-contractor-burgundy)]">
                   Share phone no.
                 </h2>
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
@@ -803,7 +800,7 @@ export default function MessageThreadPage() {
             </div>
 
             {customerPhoneNumber && !isUsingAlternatePhone ? (
-              <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3">
+              <div className="mt-4 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                   Profile phone no.
                 </p>
@@ -817,7 +814,7 @@ export default function MessageThreadPage() {
                     setHirePhoneNumber("");
                     setHireStatusMessage("");
                   }}
-                  className="mt-2 text-xs font-bold text-[#4169E1]"
+                  className="mt-2 text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
                 >
                   Use another phone no.
                 </button>
@@ -834,7 +831,7 @@ export default function MessageThreadPage() {
                     setHireStatusMessage("");
                   }}
                   placeholder="Enter phone no."
-                  className="mt-2 h-12 w-full rounded-xl border border-[#1E3A8A] bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[#4169E1]/15"
+                  className="mt-2 h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]"
                 />
               </label>
             )}
@@ -849,7 +846,7 @@ export default function MessageThreadPage() {
               type="button"
               onClick={handleHireContractor}
               disabled={isHiringContractor || !hirePhoneNumber.trim()}
-              className="az-btn-royal-animated mt-4 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+              className="az-btn-contractor mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
             >
               {isHiringContractor ? "Hiring..." : "Share phone no. & hire"}
             </button>

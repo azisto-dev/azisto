@@ -427,8 +427,8 @@ export default function ContractorJobDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -453,7 +453,7 @@ export default function ContractorJobDetailPage() {
           </header>
 
           {isLoading ? (
-            <p className="mt-8 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="az-contractor-card-compact mt-8 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Loading job details...
             </p>
           ) : null}
@@ -466,82 +466,46 @@ export default function ContractorJobDetailPage() {
 
           {job ? (
             <>
-              <section className="mt-8">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">
-                  {job.jobId}
-                </p>
-                <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
-                  {job.selectedServiceCategory || "Service request"}
-                </h1>
-                <p className="mt-3 flex items-center gap-2 text-sm leading-6 text-slate-600">
-                  <MapPin aria-hidden="true" className="h-4 w-4" />
-                  {[job.city, job.province].filter(Boolean).join(", ") ||
-                    "Location not provided"}
-                </p>
-              </section>
-
-              <section className="mt-6 space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-bold text-black">Status</p>
-                <span className={getStatusChipClass(job.status || "open")}>
-                  {job.status || "open"}
-                </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm leading-6">
-                  <div>
-                    <p className="font-bold text-black">Urgency</p>
-                    <p className="text-slate-600">{job.urgency || "Flexible"}</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-black">When</p>
-                    <p className="text-slate-600">
-                      {formatWhen(job.preferredDate, job.preferredTime)}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-black">Customer</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {job.customerFirstName || "Customer"}
+              <section className="az-contractor-hero-card mt-8 p-5">
+                <div className="relative z-10">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">
+                    {job.jobId}
                   </p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-sm font-bold text-black">
-                    Customer safety summary
+                  <h1 className="mt-2 text-3xl font-normal leading-tight text-white">
+                    {job.selectedServiceCategory || "Service request"}
+                  </h1>
+                  <p className="mt-8 flex items-center gap-2 text-sm font-semibold leading-6 text-white/80">
+                    <MapPin aria-hidden="true" className="h-4 w-4" />
+                    {[job.city, job.province].filter(Boolean).join(", ") ||
+                      "Location not provided"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        job.customerEmailVerified
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-white text-slate-600"
-                      }`}
-                    >
-                      {job.customerEmailVerified
-                        ? "Email verified"
-                        : "Email unverified"}
+                    <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold capitalize text-white">
+                      {job.status || "open"}
                     </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold ${
-                        job.customerPhoneVerified
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {job.customerPhoneVerified
-                        ? "Phone verified"
-                        : "Phone pending"}
+                    <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
+                      {job.urgency || "Flexible"}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {job.customerCompletedJobsCount} completed jobs ·{" "}
-                    {job.customerReportsCount} reports
-                  </p>
+                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm leading-5">
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/65">When</p>
+                      <p className="mt-1 font-semibold text-white">
+                        {formatWhen(job.preferredDate, job.preferredTime)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/65">Customer</p>
+                      <p className="mt-1 font-semibold text-white">
+                        {job.customerFirstName || "Customer"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </section>
 
-              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
-                <p className="text-sm font-bold text-black">Tasks</p>
+              <section className="az-contractor-card mt-5 p-4">
+                <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Tasks</p>
                 {job.tasks && job.tasks.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     {job.tasks.map((task) => {
@@ -559,19 +523,19 @@ export default function ContractorJobDetailPage() {
                             }
                           }}
                           disabled={!canSelectTask}
-                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm transition ${
+                          className={`flex w-full items-center justify-between gap-3 rounded-[22px] border px-3 py-3 text-left text-sm transition ${
                             isSelected
-                              ? "border-[#4169E1] bg-sky-50 text-black"
-                              : "border-slate-200 bg-slate-50 text-slate-700"
+                              ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-text)]"
+                              : "border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] text-[var(--azisto-contractor-muted)]"
                           } disabled:cursor-not-allowed disabled:opacity-60`}
                         >
                           <span className="flex min-w-0 items-center gap-3">
                             <span
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
                                 isSelected
-                                  ? "border-[#4169E1] bg-[#4169E1] text-white"
+                                  ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
                                   : canSelectTask
-                                    ? "border-[#4169E1] bg-white text-transparent"
+                                    ? "border-[var(--azisto-contractor-burgundy)] bg-white text-transparent"
                                     : "border-slate-300 bg-slate-100 text-transparent"
                               }`}
                               aria-hidden="true"
@@ -579,7 +543,7 @@ export default function ContractorJobDetailPage() {
                               <Check className="h-4 w-4" />
                             </span>
                             <span className="min-w-0">
-                              <span className="block text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+                              <span className="block text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">
                                 {task.taskId}
                               </span>
                               <span className="mt-1 block truncate font-bold">
@@ -601,36 +565,36 @@ export default function ContractorJobDetailPage() {
                     {job.selectedSubcategories.map((item) => (
                       <span
                         key={item}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700"
+                        className="az-contractor-chip rounded-full px-3 py-1 text-xs font-bold"
                       >
                         {item}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                     No tasks listed.
                   </p>
                 )}
               </section>
 
-              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
-                <p className="text-sm font-bold text-black">Job details</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+              <section className="az-contractor-card mt-5 p-4">
+                <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Job details</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   {job.jobDescription || "No description provided."}
                 </p>
               </section>
 
-              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
-                <p className="text-sm font-bold text-black">Service address</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+              <section className="az-contractor-card mt-5 p-4">
+                <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Service address</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   {[job.address, job.city, job.province, job.postalCode]
                     .filter(Boolean)
                     .join(", ") || "Address not provided."}
                 </p>
               </section>
 
-              <section className="mt-5 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
+              <section className="az-contractor-card mt-5 p-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -657,7 +621,7 @@ export default function ContractorJobDetailPage() {
                       <select
                         value={reportReason}
                         onChange={(event) => setReportReason(event.target.value)}
-                        className="h-12 w-full rounded-xl border border-azisto-border bg-white px-3 text-sm font-semibold text-slate-800 outline-none az-focus-field"
+                        className="h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 text-sm font-semibold text-slate-800 outline-none az-focus-field"
                       >
                         {reportReasonOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -675,7 +639,7 @@ export default function ContractorJobDetailPage() {
                         value={reportDetails}
                         onChange={(event) => setReportDetails(event.target.value)}
                         placeholder="Add any details that will help AZISTO review this job."
-                        className="min-h-24 w-full resize-none rounded-xl border border-azisto-border bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 az-focus-field"
+                        className="min-h-24 w-full resize-none rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 az-focus-field"
                       />
                     </div>
 
@@ -724,7 +688,7 @@ export default function ContractorJobDetailPage() {
                     hasSubmittedInterest ||
                     selectedTaskIds.length === 0
                   }
-                  className="az-btn-royal-blue mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+                  className="az-btn-contractor mt-6 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
                 >
                   {isSubmittingInterest
                     ? "Submitting..."
@@ -743,7 +707,7 @@ export default function ContractorJobDetailPage() {
                   type="button"
                   onClick={handleMarkInProgress}
                   disabled={isUpdatingStatus}
-                  className="az-btn-primary mt-6 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+                  className="az-btn-contractor mt-6 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
                 >
                   {isUpdatingStatus ? "Updating..." : "Mark in progress"}
                 </button>
@@ -755,7 +719,7 @@ export default function ContractorJobDetailPage() {
                   type="button"
                   onClick={handleMessageCustomer}
                   disabled={isOpeningThread}
-                  className="az-btn-royal-blue mt-3 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+                  className="az-btn-contractor mt-3 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
                 >
                   {isOpeningThread ? "Opening conversation..." : "Message customer"}
                 </button>
@@ -773,7 +737,7 @@ export default function ContractorJobDetailPage() {
           aria-modal="true"
           aria-labelledby="message-customer-title"
         >
-          <div className="relative w-full max-w-[340px] rounded-2xl border border-azisto-border bg-white p-5 shadow-2xl">
+          <div className="az-contractor-card relative w-full max-w-[340px] p-5">
             <button
               type="button"
               onClick={() => setIsMessagePromptOpen(false)}
@@ -798,7 +762,7 @@ export default function ContractorJobDetailPage() {
               type="button"
               onClick={handleMessageCustomer}
               disabled={isOpeningThread}
-              className="az-btn-royal-blue mt-5 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+              className="az-btn-contractor mt-5 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
             >
               {isOpeningThread ? "Opening conversation..." : "Message customer"}
             </button>

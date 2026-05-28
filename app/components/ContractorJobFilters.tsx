@@ -69,8 +69,8 @@ function FilterChip({
       onClick={onClick}
       className={`rounded-full border px-3 py-2 text-xs font-bold transition ${
         isSelected
-          ? "border-azisto-gold bg-azisto-gold/10 text-azisto-text"
-          : "border-azisto-gold bg-white text-slate-700"
+          ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+          : "border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-muted)]"
       }`}
     >
       {label}
@@ -123,13 +123,13 @@ export default function ContractorJobFilters({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/20 md:left-1/2 md:right-auto md:top-8 md:h-[min(780px,calc(100vh-4rem))] md:w-full md:max-w-[390px] md:-translate-x-1/2 md:items-end md:rounded-[28px]">
-      <section className="max-h-[82%] w-full overflow-y-auto rounded-t-3xl border border-azisto-gold bg-white p-5 shadow-2xl shadow-black/20">
+      <section className="az-contractor-shell max-h-[82%] w-full overflow-y-auto rounded-t-[28px] border border-[var(--azisto-contractor-border)] bg-white p-5 shadow-2xl shadow-black/20">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-azisto-muted">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--azisto-contractor-burgundy)]">
               Available jobs
             </p>
-            <h2 className="mt-1 text-xl font-bold text-azisto-text">Filters</h2>
+            <h2 className="mt-1 text-2xl font-normal text-[var(--azisto-contractor-text)]">Filters</h2>
           </div>
           <button
             type="button"
@@ -143,7 +143,7 @@ export default function ContractorJobFilters({
 
         <div className="mt-5 space-y-5">
           <section>
-            <p className="text-sm font-bold text-azisto-text">Service category</p>
+            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Service category</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {options.categories.length > 0 ? (
                 options.categories.map((category) => (
@@ -160,7 +160,7 @@ export default function ContractorJobFilters({
                   />
                 ))
               ) : (
-                <p className="text-xs font-semibold text-azisto-muted">
+                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
                   No categories available yet.
                 </p>
               )}
@@ -168,7 +168,7 @@ export default function ContractorJobFilters({
           </section>
 
           <section>
-            <p className="text-sm font-bold text-azisto-text">Subcategory</p>
+            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Subcategory</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {visibleSubcategories.length > 0 ? (
                 visibleSubcategories.map((subcategory) => (
@@ -188,7 +188,7 @@ export default function ContractorJobFilters({
                   />
                 ))
               ) : (
-                <p className="text-xs font-semibold text-azisto-muted">
+                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
                   Select a category to see matching subcategories.
                 </p>
               )}
@@ -196,7 +196,7 @@ export default function ContractorJobFilters({
           </section>
 
           <section>
-            <p className="text-sm font-bold text-azisto-text">City</p>
+            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">City</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {options.cities.length > 0 ? (
                 options.cities.map((city) => (
@@ -213,7 +213,7 @@ export default function ContractorJobFilters({
                   />
                 ))
               ) : (
-                <p className="text-xs font-semibold text-azisto-muted">
+                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
                   Cities appear here when open jobs are available.
                 </p>
               )}
@@ -221,7 +221,7 @@ export default function ContractorJobFilters({
           </section>
 
           <section>
-            <p className="text-sm font-bold text-azisto-text">Urgency</p>
+            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Urgency</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {urgencyOptions.map((option) => (
                 <button
@@ -233,10 +233,10 @@ export default function ContractorJobFilters({
                       urgency: option.value,
                     })
                   }
-                  className={`h-11 rounded-xl border text-xs font-bold transition ${
+                  className={`h-11 rounded-full border text-xs font-bold transition ${
                     draftFilters.urgency === option.value
-                      ? "border-azisto-gold bg-azisto-gold/10 text-azisto-text"
-                      : "border-azisto-gold bg-white text-slate-700"
+                      ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+                      : "border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-muted)]"
                   }`}
                 >
                   {option.label}
@@ -246,7 +246,7 @@ export default function ContractorJobFilters({
           </section>
 
           <section>
-            <p className="text-sm font-bold text-azisto-text">Sort</p>
+            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Sort</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {sortOptions.map((option) => (
                 <button
@@ -258,10 +258,10 @@ export default function ContractorJobFilters({
                       sort: option.value,
                     })
                   }
-                  className={`h-11 rounded-xl border text-xs font-bold transition ${
+                  className={`h-11 rounded-full border text-xs font-bold transition ${
                     draftFilters.sort === option.value
-                      ? "border-azisto-gold bg-azisto-gold/10 text-azisto-text"
-                      : "border-azisto-gold bg-white text-slate-700"
+                      ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+                      : "border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-muted)]"
                   }`}
                 >
                   {option.label}
@@ -275,7 +275,7 @@ export default function ContractorJobFilters({
           <button
             type="button"
             onClick={() => onApply(draftFilters)}
-            className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+            className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
           >
             Apply filters
           </button>
@@ -283,7 +283,7 @@ export default function ContractorJobFilters({
             type="button"
             onClick={() => onSave(draftFilters)}
             disabled={isSaving}
-            className="az-btn-secondary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+            className="az-btn-contractor-outline flex h-12 items-center justify-center rounded-full text-sm font-bold"
           >
             {isSaving ? "Saving..." : "Save preferences"}
           </button>
@@ -293,7 +293,7 @@ export default function ContractorJobFilters({
               setDraftFilters(emptyFilters);
               onClear();
             }}
-            className="flex h-12 items-center justify-center rounded-xl text-sm font-bold text-red-600"
+            className="flex h-12 items-center justify-center rounded-full text-sm font-bold text-red-600"
           >
             Clear filters
           </button>

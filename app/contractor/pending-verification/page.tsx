@@ -16,8 +16,8 @@ function StatusBar() {
 
 export default function ContractorPendingVerificationPage() {
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex flex-1 flex-col px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -54,15 +54,15 @@ export default function ContractorPendingVerificationPage() {
                 Verification pending
               </span>
 
-              <h1 className="mt-4 text-3xl font-bold leading-tight text-black">
+              <h1 className="mt-4 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
                 Profile submitted
               </h1>
 
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 Your contractor profile has been submitted for review.
               </p>
 
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 AZISTO will verify your business licence, insurance details,
                 and service information before your contractor account is
                 approved.
@@ -72,7 +72,7 @@ export default function ContractorPendingVerificationPage() {
 
           <Link
             href="/home"
-            className="az-btn-primary mt-6 flex h-14 items-center justify-center rounded-xl text-sm font-bold"
+            className="az-btn-contractor mt-6 flex h-14 items-center justify-center rounded-full text-sm font-bold"
           >
             Back to Home
           </Link>

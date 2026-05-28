@@ -758,8 +758,8 @@ export default function HomePage() {
       contractorFilters.sort !== "newest";
 
     return (
-      <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-        <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+      <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+        <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
           <div className="flex-1 px-5 pb-6 pt-5">
             <div className="mb-5 flex items-center justify-between text-xs font-bold">
               <span>9:41</span>
@@ -771,7 +771,9 @@ export default function HomePage() {
             </div>
 
             <header className="relative mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-              <AppMenu role={role} />
+              <div className="translate-y-3">
+                <AppMenu role={role} />
+              </div>
 
               <Link href="/home" className="flex justify-center">
                 <img
@@ -783,7 +785,7 @@ export default function HomePage() {
 
               <Link
                 href={notificationsHref}
-                className="relative flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-black"
+                className="relative flex h-10 w-10 translate-y-3 items-center justify-center justify-self-end rounded-full text-black"
                 aria-label="Notifications"
               >
                 <BellIcon />
@@ -796,18 +798,18 @@ export default function HomePage() {
             </header>
 
             <section className="mt-6">
-              <h1 className="text-xl font-normal leading-tight text-black">
+              <h1 className="text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
                 Hello
                 {contractorGreetingName ? (
                   <>
                     ,{" "}
-                    <span className="text-azisto-text">
+                    <span className="text-[var(--azisto-contractor-text)]">
                       {contractorGreetingName}
                     </span>
                   </>
                 ) : null}
               </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 New jobs near you are updating live.
               </p>
             </section>
@@ -829,35 +831,43 @@ export default function HomePage() {
                 {
                   label: "Available",
                   value: contractorHome?.availableJobsCount ?? 0,
-                  className: "border-emerald-100 bg-emerald-50",
+                  className: "border-[var(--azisto-contractor-border)] bg-white/75",
+                  labelClassName: "text-emerald-700",
+                  valueClassName: "text-emerald-700",
                 },
                 {
                   label: "New today",
                   value: contractorHome?.newTodayCount ?? 0,
-                  className: "border-sky-100 bg-sky-50",
+                  className: "border-[var(--azisto-contractor-border)] bg-white/75",
+                  labelClassName: "text-[#4169E1]",
+                  valueClassName: "text-[#4169E1]",
                 },
                 {
                   label: "Unread",
                   value: contractorHome?.unreadMessagesCount ?? 0,
-                  className: "border-violet-100 bg-violet-50",
+                  className: "border-[var(--azisto-contractor-border)] bg-white/75",
+                  labelClassName: "text-black",
+                  valueClassName: "text-black",
                 },
                 {
                   label: "Rating",
                   value: contractorHome?.averageRating ?? 0,
-                  className: "border-slate-200 bg-slate-100",
+                  className: "border-[var(--azisto-contractor-border)] bg-white/75",
+                  labelClassName: "text-black",
+                  valueClassName: "text-black",
                   isRating: true,
                 },
               ].map((stat) => (
                 <div
                   key={stat.label}
-                  className={`rounded-xl border px-3 py-3 shadow-sm ${stat.className}`}
+                  className={`rounded-[22px] border px-3 py-3 shadow-sm ${stat.className}`}
                 >
-                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-azisto-muted">
+                  <p className={`text-[11px] font-bold uppercase tracking-[0.12em] ${stat.labelClassName}`}>
                     {stat.label}
                   </p>
                   {stat.isRating ? (
                     <div className="mt-1 flex items-center gap-1">
-                      <span className="text-lg font-bold leading-none text-azisto-text">
+                      <span className={`text-lg font-bold leading-none ${stat.valueClassName}`}>
                         {stat.value > 0 ? stat.value.toFixed(1) : "New"}
                       </span>
                       <span
@@ -883,7 +893,7 @@ export default function HomePage() {
                       </span>
                     </div>
                   ) : (
-                    <p className="mt-1 truncate text-lg font-bold capitalize text-azisto-text">
+                    <p className={`mt-1 truncate text-lg font-bold capitalize ${stat.valueClassName}`}>
                       {stat.value}
                     </p>
                   )}
@@ -898,7 +908,7 @@ export default function HomePage() {
                   currentUser &&
                   void loadContractorWorkspace(currentUser, contractorFilters)
                 }
-                className="az-btn-secondary flex h-11 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold"
+                className="az-btn-contractor flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold"
               >
                 <RotateCw
                   aria-hidden="true"
@@ -915,14 +925,14 @@ export default function HomePage() {
                     <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                     Live
                   </span>
-                  <h2 className="mt-1 text-lg font-bold text-black">
+                  <h2 className="mt-2 text-2xl font-normal text-[var(--azisto-contractor-text)]">
                     Available jobs
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsFilterSheetOpen(true)}
-                  className="az-btn-secondary flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold"
+                  className="az-btn-contractor-outline flex h-10 items-center justify-center gap-2 rounded-full px-4 text-xs font-bold"
                 >
                   <Filter aria-hidden="true" className="h-4 w-4" />
                   Filter
@@ -933,12 +943,12 @@ export default function HomePage() {
                   Updated just now
                 </span>
                 {contractorHome && contractorHome.newTodayCount > 0 ? (
-                  <span className="rounded-full border border-azisto-gold/30 bg-azisto-gold/10 px-3 py-1 text-xs font-bold text-azisto-text">
+                  <span className="az-contractor-chip rounded-full px-3 py-1 text-xs font-bold">
                     New jobs added recently
                   </span>
                 ) : null}
                 {hasActiveFilters ? (
-                  <span className="rounded-full border border-azisto-border bg-white px-3 py-1 text-xs font-bold text-slate-600">
+                  <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-muted)]">
                     Filters active
                   </span>
                 ) : null}
@@ -951,7 +961,7 @@ export default function HomePage() {
               ) : null}
 
               {isContractorHomeLoading ? (
-                <p className="mt-4 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                <p className="az-contractor-card-compact mt-4 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   Loading live contractor workspace...
                 </p>
               ) : null}
@@ -959,52 +969,52 @@ export default function HomePage() {
               {!isContractorHomeLoading &&
               contractorHome &&
               contractorAvailableJobCards.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
+                <div className="az-contractor-card mt-4 p-5 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[var(--azisto-contractor-burgundy)]">
                     <Briefcase aria-hidden="true" className="h-6 w-6" />
                   </div>
-                  <p className="mt-3 text-sm font-bold text-black">
+                  <p className="mt-3 text-sm font-bold text-[var(--azisto-contractor-text)]">
                     No matching open jobs yet
                   </p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <p className="mt-1 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                     Adjust your filters or check back soon. This feed refreshes
                     every 30 seconds.
                   </p>
                 </div>
               ) : null}
 
-              <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2 pr-1 shadow-inner">
+              <div className="az-contractor-panel mt-4 max-h-[360px] space-y-2 overflow-y-auto p-2 pr-1">
                 {contractorAvailableJobCards.map((job) => (
                   <article
                     key={job.jobId}
-                    className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
+                    className="az-contractor-card-compact px-3 py-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="text-[13px] font-bold leading-5 text-black">
+                        <h3 className="text-[15px] font-semibold leading-5 text-[var(--azisto-contractor-text)]">
                           {job.selectedServiceCategory || "Service request"}
                         </h3>
-                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
                           {job.jobId}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                      <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
                         {[job.city, job.province].filter(Boolean).join(", ") ||
                           "Location pending"}
                       </span>
                     </div>
 
                     {job.tasks.length > 0 ? (
-                      <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-1.5">
+                      <div className="mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
                         {job.tasks.map((task, index) => (
                           <div
                             key={task.taskId || `${job.jobId}-${task.label}`}
-                            className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2 py-1"
+                            className="flex items-center justify-between gap-2 rounded-xl border border-[var(--azisto-contractor-border)] bg-white px-2 py-1"
                           >
-                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] az-job-id">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                               {task.taskId || `Task ${index + 1}`}
                             </span>
-                            <span className="text-[11px] font-bold text-slate-800">
+                            <span className="text-[11px] font-bold text-[var(--azisto-contractor-text)]">
                               {task.label}
                             </span>
                           </div>
@@ -1012,7 +1022,7 @@ export default function HomePage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                    <div className="mt-2 space-y-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
                       <div className="flex items-center justify-between gap-3">
                         <p className="min-w-0 truncate">
                           Customer: {job.customerFirstName || "Customer"}
@@ -1033,7 +1043,7 @@ export default function HomePage() {
 
                     <Link
                       href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="az-btn-royal-blue mt-2 flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                      className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
                     >
                       View job
                     </Link>

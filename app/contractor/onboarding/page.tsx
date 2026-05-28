@@ -858,8 +858,8 @@ export default function ContractorOnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -1483,7 +1483,7 @@ export default function ContractorOnboardingPage() {
               type="button"
               onClick={handleContinue}
               disabled={isSaving || authLoading || isUploadingDocument}
-              className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+              className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
             >
               {authLoading
                 ? "Checking account..."

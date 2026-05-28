@@ -154,13 +154,13 @@ function JobCard({
   onMarkInProgress: (jobId: string) => void;
 }) {
   return (
-    <article className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm">
+    <article className="az-contractor-card-compact p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">
             {job.jobId}
           </p>
-          <h3 className="mt-1 text-lg font-bold text-black">
+          <h3 className="mt-1 text-lg font-normal text-[var(--azisto-contractor-text)]">
             {job.selectedServiceCategory || "Service request"}
           </h3>
         </div>
@@ -174,7 +174,7 @@ function JobCard({
           {job.selectedSubcategories.slice(0, 3).map((item) => (
             <span
               key={item}
-              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700"
+              className="rounded-full bg-[var(--azisto-contractor-soft)] px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-text)]"
             >
               {item}
             </span>
@@ -182,14 +182,14 @@ function JobCard({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
+      <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
         <p>{[job.city, job.province].filter(Boolean).join(", ")}</p>
         <p>
-          <span className="font-bold text-slate-800">When:</span>{" "}
+          <span className="font-bold text-[var(--azisto-contractor-text)]">When:</span>{" "}
           {formatWhen(job.preferredDate, job.preferredTime)}
         </p>
         <p>
-          <span className="font-bold text-slate-800">Urgency:</span>{" "}
+          <span className="font-bold text-[var(--azisto-contractor-text)]">Urgency:</span>{" "}
           {job.urgency || "Flexible"}
         </p>
       </div>
@@ -197,7 +197,7 @@ function JobCard({
       <div className="mt-4 grid gap-2">
         <Link
           href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-          className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+          className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
         >
           View job
         </Link>
@@ -205,7 +205,7 @@ function JobCard({
           type="button"
           onClick={() => onMessage(job.jobId)}
           disabled={activeJobId === job.jobId}
-          className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
+          className="az-btn-contractor flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold"
         >
           <MessageCircle aria-hidden="true" className="h-4 w-4" />
           Message customer
@@ -215,7 +215,7 @@ function JobCard({
             type="button"
             onClick={() => onMarkInProgress(job.jobId)}
             disabled={activeJobId === job.jobId}
-            className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+            className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
           >
             Mark in progress
           </button>
@@ -332,8 +332,8 @@ export default function ContractorMyJobsPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -359,13 +359,13 @@ export default function ContractorMyJobsPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
               Contractor jobs
             </p>
-            <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
+            <h1 className="mt-1 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
               My jobs
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
+            <p className="mt-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Follow interested, hired, active, and completed AZISTO jobs.
             </p>
             <Link
@@ -377,7 +377,7 @@ export default function ContractorMyJobsPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="az-contractor-card-compact mt-6 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Loading your jobs...
             </p>
           ) : null}
@@ -389,12 +389,12 @@ export default function ContractorMyJobsPage() {
           ) : null}
 
           {!isLoading && !errorMessage && jobs.length === 0 ? (
-            <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
+            <section className="az-contractor-card mt-6 p-5 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[var(--azisto-contractor-burgundy)]">
                 <Briefcase aria-hidden="true" className="h-6 w-6" />
               </div>
-              <p className="mt-4 text-sm font-bold text-black">No jobs yet</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-4 text-sm font-bold text-[var(--azisto-contractor-text)]">No jobs yet</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 Jobs you express interest in or get hired for will appear here.
               </p>
             </section>

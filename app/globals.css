@@ -14,6 +14,14 @@
   --azisto-success: #10B981;
   --azisto-warning: #F59E0B;
   --azisto-danger: #EF4444;
+  --azisto-contractor-bg: #F4F3FB;
+  --azisto-contractor-card: #FFFFFF;
+  --azisto-contractor-border: #E8E5F1;
+  --azisto-contractor-text: #20242C;
+  --azisto-contractor-muted: #5B6270;
+  --azisto-contractor-burgundy: #8A0F4D;
+  --azisto-contractor-burgundy-hover: #741042;
+  --azisto-contractor-burgundy-soft: #A21D5D;
 }
 
 body {
@@ -124,6 +132,106 @@ body {
     background-image: linear-gradient(120deg, #4169E1, #1E3A8A, #050505);
     background-size: 220% 220%;
     animation: azisto-royal-black-fade 3.2s ease-in-out infinite;
+  }
+
+  .az-contractor-shell {
+    background: var(--azisto-contractor-bg);
+    color: var(--azisto-contractor-text);
+    font-family: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .az-contractor-shell img[src="/azisto-logo-cropped.png"] {
+    mix-blend-mode: multiply;
+  }
+
+  .az-contractor-card {
+    border: 1px solid var(--azisto-contractor-border);
+    border-radius: 24px;
+    background: var(--azisto-contractor-card);
+    box-shadow: 0 16px 34px rgb(33 31 45 / 0.07);
+  }
+
+  .az-contractor-hero-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.28);
+    border-radius: 30px;
+    background:
+      radial-gradient(circle at 82% 74%, rgb(255 255 255 / 0.18) 0 58px, transparent 59px),
+      radial-gradient(circle at 12% 0%, rgb(255 255 255 / 0.11), transparent 34%),
+      linear-gradient(135deg, #12000D 0%, #620033 44%, #A21D5D 100%);
+    box-shadow: 0 22px 46px rgb(98 0 51 / 0.24);
+    color: white;
+  }
+
+  .az-contractor-hero-card::before {
+    content: "";
+    position: absolute;
+    inset: -40px -52px auto auto;
+    width: 240px;
+    height: 240px;
+    border: 2px solid rgb(255 255 255 / 0.1);
+    border-radius: 48% 52% 45% 55%;
+    transform: rotate(38deg);
+  }
+
+  .az-contractor-hero-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -22px -38px auto;
+    width: 152px;
+    height: 152px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.12);
+  }
+
+  .az-contractor-card-compact {
+    border: 1px solid var(--azisto-contractor-border);
+    border-radius: 20px;
+    background: var(--azisto-contractor-card);
+    box-shadow: 0 12px 26px rgb(33 31 45 / 0.06);
+  }
+
+  .az-contractor-panel {
+    border: 1px solid var(--azisto-contractor-border);
+    border-radius: 26px;
+    background: rgb(255 255 255 / 0.72);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  }
+
+  .az-btn-contractor {
+    @apply text-white transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+    border: 1px solid var(--azisto-contractor-burgundy);
+    background: linear-gradient(135deg, var(--azisto-contractor-burgundy), var(--azisto-contractor-burgundy-soft));
+    box-shadow: 0 12px 24px rgb(138 15 77 / 0.18);
+  }
+
+  .az-btn-contractor:hover {
+    border-color: var(--azisto-contractor-burgundy-hover);
+    background: linear-gradient(135deg, var(--azisto-contractor-burgundy-hover), var(--azisto-contractor-burgundy));
+  }
+
+  .az-btn-contractor-outline {
+    @apply transition disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400;
+    border: 1px solid rgb(138 15 77 / 0.55);
+    background: white;
+    color: var(--azisto-contractor-burgundy);
+    box-shadow: 0 10px 22px rgb(33 31 45 / 0.05);
+  }
+
+  .az-btn-contractor-outline:hover {
+    background: rgb(138 15 77 / 0.06);
+  }
+
+  .az-contractor-chip {
+    border: 1px solid rgb(138 15 77 / 0.13);
+    background: rgb(138 15 77 / 0.07);
+    color: var(--azisto-contractor-burgundy);
+  }
+
+  .az-contractor-soft {
+    border: 1px solid var(--azisto-contractor-border);
+    background: rgb(248 247 252 / 0.9);
   }
 
   .az-btn-danger-soft {

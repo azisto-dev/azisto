@@ -131,8 +131,16 @@ export default function BottomNav({ role }: { role: UserRole }) {
     };
   }, [role]);
 
+  const isContractor = role === "contractor";
+
   return (
-    <nav className="border-t border-azisto-border bg-white px-3 py-2">
+    <nav
+      className={`border-t px-3 py-2 ${
+        isContractor
+          ? "border-[var(--azisto-contractor-border)] bg-white/95"
+          : "border-azisto-border bg-white"
+      }`}
+    >
       <div className="grid grid-cols-4">
         {navItems.map((item) => {
           const isActive = item.matchPaths.some((matchPath) =>
@@ -144,7 +152,13 @@ export default function BottomNav({ role }: { role: UserRole }) {
               key={item.label}
               href={item.href}
               className={`relative rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
-                isActive ? "text-azisto-accent" : "text-azisto-muted"
+                isActive
+                  ? isContractor
+                    ? "text-[var(--azisto-contractor-burgundy)]"
+                    : "text-azisto-accent"
+                  : isContractor
+                    ? "text-[var(--azisto-contractor-muted)]"
+                    : "text-azisto-muted"
               }`}
             >
               {item.label === "Messages" && messageBadgeCount > 0 ? (
@@ -153,7 +167,11 @@ export default function BottomNav({ role }: { role: UserRole }) {
                 </span>
               ) : null}
               <NavIcon path={item.path} />
-              <span className={`mt-1 block ${isActive ? azistoUi.kicker : ""}`}>
+              <span
+                className={`mt-1 block ${
+                  isActive && !isContractor ? azistoUi.kicker : ""
+                }`}
+              >
                 {item.label}
               </span>
             </Link>

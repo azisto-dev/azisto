@@ -124,8 +124,8 @@ export default function MessagesPage() {
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -149,20 +149,25 @@ export default function MessagesPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
-              Inbox
-            </p>
-            <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
-              Messages
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Conversations about your AZISTO job requests will appear here.
-            </p>
+          <section className="az-contractor-hero-card mt-8 p-5">
+            <div className="relative z-10">
+              <p className="text-lg font-normal leading-6 text-white/90">
+                AZISTO inbox
+              </p>
+              <h1 className="mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] text-white">
+                Messages
+              </h1>
+              <p className="mt-12 text-sm font-semibold leading-6 text-white/80">
+                Conversations about your AZISTO job requests will appear here.
+              </p>
+              <span className="mt-4 inline-flex rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
+                {threads.length} thread{threads.length === 1 ? "" : "s"}
+              </span>
+            </div>
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="az-contractor-card-compact mt-6 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Loading messages...
             </p>
           ) : null}
@@ -174,14 +179,14 @@ export default function MessagesPage() {
           ) : null}
 
           {!isLoading && !errorMessage && threads.length === 0 ? (
-            <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
+            <section className="az-contractor-card mt-6 p-5 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]">
                 <MessageCircle aria-hidden="true" className="h-6 w-6" />
               </div>
-              <p className="mt-4 text-sm font-bold text-black">
+              <p className="mt-4 text-sm font-bold text-[var(--azisto-contractor-text)]">
                 No messages yet
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 Start a conversation from an interested contractor or job page.
               </p>
             </section>
@@ -192,14 +197,14 @@ export default function MessagesPage() {
               <Link
                 key={thread.threadId}
                 href={`/messages/${encodeURIComponent(thread.threadId)}`}
-                className="block rounded-xl border border-azisto-border bg-white p-4 shadow-sm"
+                className="az-contractor-card-compact block p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">
                       {thread.jobId}
                     </p>
-                    <h2 className="mt-1 text-base font-bold text-black">
+                    <h2 className="mt-1 text-base font-semibold text-[var(--azisto-contractor-text)]">
                       {thread.displayName ||
                         thread.businessName ||
                         thread.contractorName ||
@@ -219,20 +224,20 @@ export default function MessagesPage() {
                   </span>
                 </div>
 
-                <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+                <p className="mt-3 line-clamp-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   {thread.lastMessage || "No messages yet."}
                 </p>
 
                 <div className="mt-2 flex items-center justify-between gap-3">
                   {thread.lastMessageAt ? (
-                    <p className="text-xs font-semibold text-slate-400">
+                    <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]/70">
                       {formatDateTime(thread.lastMessageAt)}
                     </p>
                   ) : (
                     <span />
                   )}
 
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
+                  <span className="rounded-full bg-[rgb(138_15_77_/_0.07)] px-2.5 py-1 text-[11px] font-bold text-[var(--azisto-contractor-burgundy)]">
                     {thread.unreadCount || 0} unread
                   </span>
                 </div>

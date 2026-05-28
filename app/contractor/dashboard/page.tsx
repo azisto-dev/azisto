@@ -302,11 +302,11 @@ function SubcategoryList({ items }: { items: string[] }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
+    <section className="az-contractor-card mt-6 p-5 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-[var(--azisto-contractor-burgundy)]">
         <Briefcase aria-hidden="true" className="h-6 w-6" />
       </div>
-      <p className="mt-4 text-sm font-bold text-black">{message}</p>
+      <p className="mt-4 text-sm font-bold text-[var(--azisto-contractor-text)]">{message}</p>
     </section>
   );
 }
@@ -423,8 +423,8 @@ export default function ContractorDashboardPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -450,32 +450,32 @@ export default function ContractorDashboardPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
               Contractor workspace
             </p>
-            <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
+            <h1 className="mt-1 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
               Contractor Dashboard
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
+            <p className="mt-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Manage current work, browse open requests, and review completed
               jobs in one place.
             </p>
           </section>
 
-          <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-azisto-border bg-white p-1">
+          <div className="az-contractor-card mt-5 grid grid-cols-3 gap-1 p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedTab(tab.id)}
-                className={`min-h-12 rounded-xl border px-2 text-xs font-bold leading-tight transition ${
+                className={`min-h-12 rounded-[18px] border px-2 text-xs font-bold leading-tight transition ${
                   selectedTab === tab.id
-                    ? "border-slate-300 bg-slate-100 text-azisto-text shadow-sm ring-1 ring-[#4169E1]/20"
-                    : "border-slate-200 bg-slate-100 text-slate-700"
+                    ? "border-[rgb(138_15_77_/_0.28)] bg-[rgb(138_15_77_/_0.08)] text-[var(--azisto-contractor-burgundy)] shadow-sm"
+                    : "border-transparent bg-transparent text-[var(--azisto-contractor-muted)]"
                 }`}
               >
                 {tab.label}
-                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-azisto-gold px-1.5 py-0.5 text-[10px] text-[#111111]">
+                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--azisto-contractor-burgundy)] px-1.5 py-0.5 text-[10px] text-white">
                   {tab.count}
                 </span>
               </button>
@@ -515,14 +515,14 @@ export default function ContractorDashboardPage() {
               {activeJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
+                  className="az-contractor-card-compact px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="text-[13px] font-bold leading-5 text-black">
+                      <h2 className="text-[15px] font-semibold leading-5 text-[var(--azisto-contractor-text)]">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
-                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
                         {job.taskId || job.jobId}
                       </p>
                       {job.parentJobId ? (
@@ -531,7 +531,7 @@ export default function ContractorDashboardPage() {
                         </p>
                       ) : null}
                     </div>
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
                       {[job.city, job.province].filter(Boolean).join(", ") ||
                         "Location pending"}
                     </span>
@@ -539,7 +539,7 @@ export default function ContractorDashboardPage() {
 
                   <SubcategoryList items={job.selectedSubcategories} />
 
-                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate">
                         Customer: {job.customerFirstName || "Customer"}
@@ -563,7 +563,7 @@ export default function ContractorDashboardPage() {
                       type="button"
                       onClick={() => handleMessage(job)}
                       disabled={activeJobId === job.jobId}
-                      className="az-btn-primary flex h-9 items-center justify-center gap-2 rounded-xl text-xs font-bold"
+                      className="az-btn-contractor flex h-10 items-center justify-center gap-2 rounded-full text-xs font-bold"
                     >
                       <MessageCircle aria-hidden="true" className="h-3.5 w-3.5" />
                       Message customer
@@ -573,7 +573,7 @@ export default function ContractorDashboardPage() {
                         type="button"
                         onClick={() => handleMarkInProgress(job)}
                         disabled={activeJobId === job.jobId}
-                        className="az-btn-primary flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                        className="az-btn-contractor flex h-10 items-center justify-center rounded-full text-xs font-bold"
                       >
                         Mark in progress
                       </button>
@@ -582,7 +582,7 @@ export default function ContractorDashboardPage() {
                       href={`/contractor/jobs/${encodeURIComponent(
                         job.parentJobId || job.jobId,
                       )}${job.taskId ? `?taskId=${encodeURIComponent(job.taskId)}` : ""}`}
-                      className="az-btn-secondary flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                      className="az-btn-contractor-outline flex h-10 items-center justify-center rounded-full text-xs font-bold"
                     >
                       View details
                     </Link>
@@ -601,31 +601,31 @@ export default function ContractorDashboardPage() {
               {availableJobCards.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
+                  className="az-contractor-card-compact px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="text-[13px] font-bold leading-5 text-black">
+                      <h2 className="text-[15px] font-semibold leading-5 text-[var(--azisto-contractor-text)]">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
-                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
                         {job.jobId}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
                       {[job.city, job.province].filter(Boolean).join(", ") ||
                         "Location pending"}
                     </span>
                   </div>
 
                   {job.tasks.length > 0 ? (
-                    <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-1.5">
+                    <div className="mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
                       {job.tasks.map((task, index) => (
                         <div
                           key={task.taskId || `${job.jobId}-${task.label}`}
-                          className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2 py-1"
+                          className="flex items-center justify-between gap-2 rounded-xl border border-[var(--azisto-contractor-border)] bg-white px-2 py-1"
                         >
-                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] az-job-id">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                             {task.taskId || `Task ${index + 1}`}
                           </span>
                           <span className="text-[11px] font-bold text-slate-800">
@@ -638,7 +638,7 @@ export default function ContractorDashboardPage() {
                     <SubcategoryList items={job.selectedSubcategories} />
                   )}
 
-                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate">
                         Customer: {job.customerFirstName || "Customer"}
@@ -659,7 +659,7 @@ export default function ContractorDashboardPage() {
 
                   <Link
                     href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                    className="az-btn-royal-blue mt-2 flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                    className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
                   >
                     View job
                   </Link>
@@ -677,24 +677,24 @@ export default function ContractorDashboardPage() {
               {pastJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="rounded-xl border border-azisto-primary bg-white px-3 py-2.5 shadow-sm"
+                  className="az-contractor-card-compact px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="text-[13px] font-bold leading-5 text-black">
+                      <h2 className="text-[15px] font-semibold leading-5 text-[var(--azisto-contractor-text)]">
                         {job.selectedServiceCategory || "Service request"}
                       </h2>
-                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[#1E3A8A]">
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
                         {job.jobId}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-black">
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
                       {[job.city, job.province].filter(Boolean).join(", ") ||
                         "Location pending"}
                     </span>
                   </div>
 
-                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                  <div className="mt-2 space-y-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate">
                         Customer: {job.customerFirstName || "Customer"}
@@ -713,7 +713,7 @@ export default function ContractorDashboardPage() {
 
                   <Link
                     href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                    className="az-btn-royal-blue mt-2 flex h-9 items-center justify-center rounded-xl text-xs font-bold"
+                    className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
                   >
                     View details
                   </Link>

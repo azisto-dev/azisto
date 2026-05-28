@@ -119,8 +119,8 @@ export default function NotificationsPage() {
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -142,15 +142,15 @@ export default function NotificationsPage() {
             <span aria-hidden="true" />
           </header>
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
               Notifications
             </p>
-            <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
+            <h1 className="mt-1 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
               Updates
             </h1>
           </section>
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <p className="az-contractor-card-compact mt-6 px-4 py-3 text-sm text-[var(--azisto-contractor-muted)]">
               Loading notifications...
             </p>
           ) : null}
@@ -160,30 +160,30 @@ export default function NotificationsPage() {
             </p>
           ) : null}
           {!isLoading && notifications.length === 0 ? (
-            <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
-              <Bell aria-hidden="true" className="mx-auto h-8 w-8 text-azisto-text" />
-              <p className="mt-3 text-sm font-bold">No notifications yet</p>
+            <section className="az-contractor-card mt-6 p-5 text-center">
+              <Bell aria-hidden="true" className="mx-auto h-8 w-8 text-[var(--azisto-contractor-burgundy)]" />
+              <p className="mt-3 text-sm font-bold text-[var(--azisto-contractor-text)]">No notifications yet</p>
             </section>
           ) : null}
           <section className="mt-6 space-y-3">
             {notifications.map((notification) => (
               <article
                 key={notification.notificationId}
-                className="rounded-xl border border-azisto-border bg-white p-4 shadow-sm"
+                className="az-contractor-card-compact p-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-sm font-bold text-black">
+                  <h2 className="text-sm font-bold text-[var(--azisto-contractor-text)]">
                     {notification.title}
                   </h2>
-                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                  <span className="rounded-full border border-[rgb(138_15_77_/_0.14)] bg-[rgb(138_15_77_/_0.08)] px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-burgundy)]">
                     {notification.read ? "Read" : "Unread"}
                   </span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   {notification.message}
                 </p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">
-                  <span className="az-job-id">{notification.jobId}</span> ·{" "}
+                <p className="mt-2 text-xs font-semibold text-[var(--azisto-contractor-muted)]">
+                  <span className="text-[var(--azisto-contractor-burgundy)]">{notification.jobId}</span> ·{" "}
                   {formatDate(notification.createdAt)}
                 </p>
               </article>

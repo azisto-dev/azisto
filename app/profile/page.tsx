@@ -432,11 +432,11 @@ async function uploadContractorDocument(
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-azisto-border bg-white px-4 py-3">
-      <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-400">
+    <div className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-white px-4 py-3 shadow-sm shadow-slate-100/60">
+      <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-slate-900">
+      <p className="mt-1 text-sm font-semibold text-[var(--azisto-contractor-text)]">
         {value || "Not provided"}
       </p>
     </div>
@@ -445,9 +445,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3">
-      <p className="text-sm font-bold text-black">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-600">
+    <div className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] px-4 py-3">
+      <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-[var(--azisto-contractor-muted)]">
         {value || "Not provided"}
       </p>
       <p className="mt-1 text-[11px] font-semibold text-slate-400">
@@ -468,11 +468,11 @@ function EditField({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold text-black">{label}</span>
+      <span className="text-sm font-bold text-[var(--azisto-contractor-text)]">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-12 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm font-semibold text-slate-900 outline-none az-focus-field"
+        className="mt-2 h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-4 text-sm font-semibold text-slate-900 outline-none az-focus-field"
       />
     </label>
   );
@@ -741,8 +741,8 @@ export default function ProfilePage() {
     profile?.role === "contractor" ? profile.contractorId : profile?.customerId;
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="flex-1 overflow-y-auto px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -768,63 +768,74 @@ export default function ProfilePage() {
           </header>
 
           {isLoading ? (
-            <p className="mt-8 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            <p className="az-contractor-card-compact mt-8 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
               Loading profile...
             </p>
           ) : null}
 
           {profile ? (
             <>
-              <section className="mt-8 rounded-2xl border border-azisto-primary bg-white p-5 text-center shadow-sm">
-                {profile.profilePhotoUrl ? (
-                  <img
-                    src={profile.profilePhotoUrl}
-                    alt={`${displayName} profile photo`}
-                    className="mx-auto h-20 w-20 rounded-3xl border border-azisto-border object-cover shadow-sm"
-                  />
-                ) : (
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-azisto-gold/30 bg-white text-2xl font-black text-azisto-text shadow-sm">
-                    {getInitials(displayName)}
+              <section className="az-contractor-hero-card mt-6 p-4">
+                <div className="relative z-10 flex items-start justify-between gap-3">
+                  <div className="min-w-0 text-left">
+                    <p className="truncate text-base font-normal leading-6 text-[#C8A96B]">
+                      {displayName}
+                    </p>
+                    <h1 className="mt-1 text-2xl font-normal uppercase leading-none tracking-[0.04em] text-white">
+                      {profile.role}
+                    </h1>
+                    <p className="mt-2 truncate text-xs font-semibold text-white/80">
+                      {readableId || "ID pending"}
+                    </p>
                   </div>
-                )}
+                  {profile.profilePhotoUrl ? (
+                    <img
+                      src={profile.profilePhotoUrl}
+                      alt={`${displayName} profile photo`}
+                      className="h-14 w-14 shrink-0 rounded-full border border-white/30 object-cover shadow-lg"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black text-white shadow-lg">
+                      {getInitials(displayName)}
+                    </div>
+                  )}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={isUploadingPhoto}
-                  className="mt-3 text-xs font-bold text-azisto-text"
-                >
-                  {isUploadingPhoto
-                    ? "Uploading photo..."
-                    : profile.profilePhotoUrl
-                      ? "Edit profile photo"
-                      : "Upload profile photo"}
-                </button>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
-                <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                  JPG, PNG, or WEBP. Max 5 MB.
-                </p>
+                <div className="relative z-10 mt-7">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="rounded-full border border-white/35 bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm disabled:opacity-60"
+                  >
+                    {isUploadingPhoto
+                      ? "Uploading photo..."
+                      : profile.profilePhotoUrl
+                        ? "Edit profile photo"
+                        : "Upload profile photo"}
+                  </button>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                  <p className="mt-2 text-[11px] font-semibold text-white/65">
+                    JPG, PNG, or WEBP. Max 5 MB.
+                  </p>
+                </div>
 
-                <h1 className="mt-4 text-2xl font-bold leading-tight text-black">
-                  {displayName}
-                </h1>
-
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold capitalize text-amber-700">
+                <div className="relative z-10 mt-3 flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold capitalize text-white">
                     <UserRound aria-hidden="true" className="h-3.5 w-3.5" />
                     {profile.role}
                   </span>
-                  <span className="rounded-full border border-azisto-border bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
+                  <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
                     {readableId || "ID pending"}
                   </span>
                   {profile.role === "contractor" ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold capitalize text-amber-700">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold capitalize text-white">
                       <ShieldCheck
                         aria-hidden="true"
                         className="h-3.5 w-3.5"
@@ -847,16 +858,16 @@ export default function ProfilePage() {
                 </p>
               ) : null}
 
-              <section className="mt-6 rounded-2xl border border-azisto-primary bg-white p-4 shadow-sm">
+              <section className="az-contractor-card mt-6 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-bold text-black">
+                  <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">
                     Profile details
                   </h2>
                   {!isEditing ? (
                     <button
                       type="button"
                       onClick={() => setIsEditing(true)}
-                      className="rounded-full border border-azisto-border bg-white px-3 py-1.5 text-xs font-bold text-azisto-text"
+                      className="az-btn-contractor-outline rounded-full px-4 py-2 text-xs font-bold"
                     >
                       Edit Profile
                     </button>
@@ -886,8 +897,8 @@ export default function ProfilePage() {
 
                     {profile.role === "contractor" ? (
                       <>
-                        <div className="rounded-xl border border-azisto-border bg-slate-50 p-3">
-                          <p className="text-sm font-bold text-black">
+                        <div className="rounded-[22px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] p-3">
+                          <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
                             Service categories
                           </p>
                           <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -908,7 +919,7 @@ export default function ProfilePage() {
                               return (
                                 <div
                                   key={service.name}
-                                  className="rounded-xl border border-azisto-gold bg-white"
+                                  className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-white"
                                 >
                                   <button
                                     type="button"
@@ -920,7 +931,7 @@ export default function ProfilePage() {
                                     className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left"
                                   >
                                     <span>
-                                      <span className="block text-sm font-bold text-black">
+                                      <span className="block text-sm font-bold text-[var(--azisto-contractor-text)]">
                                         {service.name}
                                       </span>
                                       <span className="mt-0.5 block text-xs font-semibold text-slate-500">
@@ -931,14 +942,14 @@ export default function ProfilePage() {
                                     </span>
                                     <ChevronDown
                                       aria-hidden="true"
-                                      className={`h-4 w-4 text-azisto-text transition ${
+                                      className={`h-4 w-4 text-[var(--azisto-contractor-burgundy)] transition ${
                                         isOpen ? "rotate-180" : ""
                                       }`}
                                     />
                                   </button>
 
                                   {isOpen ? (
-                                    <div className="border-t border-azisto-border px-3 pb-3 pt-2">
+                                    <div className="border-t border-[var(--azisto-contractor-border)] px-3 pb-3 pt-2">
                                       <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1">
                                         {service.subcategories.map(
                                           (subcategory) => {
@@ -959,8 +970,8 @@ export default function ProfilePage() {
                                                 }
                                                 className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
                                                   isSubcategorySelected
-                                                    ? "border-azisto-gold bg-azisto-gold/10 text-azisto-text"
-                                                    : "border-azisto-border bg-white text-slate-700"
+                                                    ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+                                                    : "border-[var(--azisto-contractor-border)] bg-white text-slate-700"
                                                 }`}
                                               >
                                                 <span>{subcategory}</span>
@@ -968,7 +979,7 @@ export default function ProfilePage() {
                                                   aria-hidden="true"
                                                   className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
                                                     isSubcategorySelected
-                                                      ? "border-azisto-gold bg-azisto-gold"
+                                                      ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)]"
                                                       : "border-slate-300 bg-white"
                                                   }`}
                                                 >
@@ -1039,7 +1050,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={handleCancel}
                           disabled={isSaving}
-                          className="flex h-12 items-center justify-center rounded-xl border border-azisto-border bg-white text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
+                          className="az-btn-contractor-outline flex h-12 items-center justify-center rounded-full text-sm font-bold"
                         >
                           Cancel
                         </button>
@@ -1047,7 +1058,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={handleSave}
                           disabled={isSaving}
-                          className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                          className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
                         >
                           {isSaving ? "Saving..." : "Save Changes"}
                         </button>
@@ -1107,15 +1118,15 @@ export default function ProfilePage() {
                           label="Postal code"
                           value={profile.postalCode ?? ""}
                         />
-                        <div className="rounded-xl border border-azisto-border bg-white px-4 py-3">
-                          <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-400">
+                        <div className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-white px-4 py-3">
+                          <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">
                             Selected services
                           </p>
                           {profile.selectedServices?.length ? (
                             <div className="mt-2 space-y-3">
                               {profile.selectedServices.map((service) => (
                                 <div key={service}>
-                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                                  <span className="az-contractor-chip rounded-full px-3 py-1 text-xs font-bold">
                                     {service}
                                   </span>
                                   {profile.selectedSubcategoriesByService?.[
@@ -1127,7 +1138,7 @@ export default function ProfilePage() {
                                       ]?.map((subcategory) => (
                                         <span
                                           key={subcategory}
-                                          className="rounded-full border border-azisto-gold/40 bg-azisto-gold/10 px-2.5 py-1 text-[11px] font-bold text-azisto-text"
+                                          className="rounded-full border border-[rgb(138_15_77_/_0.2)] bg-[rgb(138_15_77_/_0.07)] px-2.5 py-1 text-[11px] font-bold text-[var(--azisto-contractor-burgundy)]"
                                         >
                                           {subcategory}
                                         </span>
@@ -1162,21 +1173,21 @@ export default function ProfilePage() {
               </section>
 
               {profile.role === "contractor" ? (
-                <section className="mt-5 rounded-2xl border border-azisto-primary bg-white p-4 shadow-sm">
+                <section className="az-contractor-card mt-5 p-4">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-azisto-background text-azisto-text">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]">
                       <FileText aria-hidden="true" className="h-5 w-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-black">
+                      <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">
                         Documents
                       </h2>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                      <p className="mt-1 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                         Upload or replace key verification documents for AZISTO
                         review.
                       </p>
                       {profile.documentsVerificationStatus ? (
-                        <p className="mt-2 inline-flex rounded-full border border-azisto-gold/30 bg-azisto-gold/10 px-3 py-1 text-xs font-bold capitalize text-azisto-text">
+                        <p className="az-contractor-chip mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize">
                           {profile.documentsVerificationStatus}
                         </p>
                       ) : null}
@@ -1193,11 +1204,11 @@ export default function ProfilePage() {
                       return (
                         <div
                           key={documentOption.key}
-                          className="rounded-xl border border-azisto-border bg-slate-50 p-3"
+                          className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] p-3"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-black">
+                              <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
                                 {documentOption.label}
                               </p>
                               <p className="mt-1 truncate text-xs font-semibold text-slate-500">
@@ -1206,7 +1217,7 @@ export default function ProfilePage() {
                                   : "No file uploaded"}
                               </p>
                             </div>
-                            <label className="flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-azisto-gold bg-white px-3 text-xs font-bold text-azisto-text transition hover:bg-azisto-gold/10">
+                            <label className="az-btn-contractor-outline flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-xs font-bold">
                               <Upload aria-hidden="true" className="h-4 w-4" />
                               {isUploading
                                 ? "Uploading"
@@ -1233,7 +1244,7 @@ export default function ProfilePage() {
                               href={document.fileUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-2 inline-flex text-xs font-bold text-azisto-text underline"
+                              className="mt-2 inline-flex text-xs font-bold text-[var(--azisto-contractor-burgundy)] underline"
                             >
                               View uploaded file
                             </a>
@@ -1243,12 +1254,12 @@ export default function ProfilePage() {
 	                    })}
 	                  </div>
 	                  {isEditing ? (
-	                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-azisto-border pt-4">
+	                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--azisto-contractor-border)] pt-4">
 	                      <button
 	                        type="button"
 	                        onClick={handleCancel}
 	                        disabled={isSaving}
-	                        className="flex h-12 items-center justify-center rounded-xl border border-azisto-border bg-white text-sm font-bold text-slate-800 disabled:cursor-not-allowed disabled:text-slate-400"
+	                        className="az-btn-contractor-outline flex h-12 items-center justify-center rounded-full text-sm font-bold"
 	                      >
 	                        Cancel
 	                      </button>
@@ -1256,7 +1267,7 @@ export default function ProfilePage() {
 	                        type="button"
 	                        onClick={handleSave}
 	                        disabled={isSaving}
-	                        className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+	                        className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
 	                      >
 	                        {isSaving
 	                          ? "Sending..."
@@ -1267,16 +1278,16 @@ export default function ProfilePage() {
 	                </section>
               ) : null}
 
-              <section className="mt-5 rounded-2xl border border-azisto-primary bg-white p-4 shadow-sm">
-                <h2 className="text-lg font-bold text-black">Security</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+              <section className="az-contractor-card mt-5 p-4">
+                <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">Security</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   We’ll email a secure password reset link to your account
                   email.
                 </p>
                 <button
                   type="button"
                   onClick={handlePasswordReset}
-                  className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-azisto-border bg-white text-sm font-bold text-slate-900"
+                  className="az-btn-contractor-outline mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
                 >
                   Change password
                 </button>
