@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   Briefcase,
@@ -9,13 +9,20 @@ import {
   RotateCw,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { fetchBadgeCounts } from "@/lib/badgeCounts";
+import { subscribeBadgeCounts } from "@/lib/badgeCounts";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import {
+  connectionInterruptedMessage,
   firebaseQuotaMessage,
+  getRetryBackoffMs,
   isQuotaExceededError,
   isQuotaExceededMessage,
+  isTransientApiError,
 } from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
 import BottomNav from "@/app/components/BottomNav";
 import AppMenu from "@/app/components/AppMenu";
 import ContractorJobFilters, {
@@ -132,6 +139,16 @@ type ContractorHomeData = {
   filterOptions: ContractorJobFilterOptions;
   updatedAt: string;
 };
+
+const contractorHomeCacheTtlMs = 60_000;
+const contractorHomeCache = new Map<
+  string,
+  {
+    data: ContractorHomeData;
+    expiresAt: number;
+  }
+>();
+const contractorHomeRequests = new Map<string, Promise<ContractorHomeData>>();
 
 function groupContractorHomeJobs(jobs: ContractorHomeJob[]) {
   const groupedJobs = new Map<string, ContractorHomeJobCard>();
@@ -423,19 +440,15 @@ function formatDateTime(date: string, time: string) {
 }
 
 async function fetchContractorFilterPreferences(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/contractors/job-filters", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await authenticatedFetch(user, "/api/contractors/job-filters");
   const body = (await response.json().catch(() => null)) as {
     preferences?: unknown;
     message?: unknown;
   } | null;
 
   if (!response.ok) {
-    throw new Error(
+    await throwApiResponseError(
+      response,
       typeof body?.message === "string"
         ? body.message
         : "Unable to load saved filters.",
@@ -449,11 +462,9 @@ async function saveContractorFilterPreferences(
   user: User,
   filters: ContractorJobFilterPreferences,
 ) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/contractors/job-filters", {
+  const response = await authenticatedFetch(user, "/api/contractors/job-filters", {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(filters),
@@ -464,7 +475,8 @@ async function saveContractorFilterPreferences(
   } | null;
 
   if (!response.ok) {
-    throw new Error(
+    await throwApiResponseError(
+      response,
       typeof body?.message === "string"
         ? body.message
         : "Unable to save filters.",
@@ -477,13 +489,31 @@ async function saveContractorFilterPreferences(
 async function fetchContractorHome(
   user: User,
   filters: ContractorJobFilterPreferences,
+  source: string,
+  forceRefresh = false,
 ) {
-  const token = await user.getIdToken();
-  const response = await fetch(
+  const requestKey = `${user.uid}:${buildFilterQuery(filters)}`;
+  const now = Date.now();
+  const cachedHome = contractorHomeCache.get(requestKey);
+
+  if (!forceRefresh && cachedHome && cachedHome.expiresAt > now) {
+    return cachedHome.data;
+  }
+
+  const pendingRequest = contractorHomeRequests.get(requestKey);
+
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  const request = (async () => {
+  console.log(`[${new Date().toISOString()}] HOME API FETCH`, source);
+  const response = await authenticatedFetch(
+    user,
     `/api/contractors/home${buildFilterQuery(filters)}`,
     {
       headers: {
-        Authorization: `Bearer ${token}`,
+        "X-Azisto-Trigger": source,
       },
     },
   );
@@ -495,12 +525,25 @@ async function fetchContractorHome(
         ? body.message
         : "Unable to load contractor workspace.";
 
-    throw new Error(
+    await throwApiResponseError(
+      response,
       isQuotaExceededMessage(message) ? firebaseQuotaMessage : message,
     );
   }
 
-  return readContractorHomeData(body);
+    const data = readContractorHomeData(body);
+
+    contractorHomeCache.set(requestKey, {
+      data,
+      expiresAt: Date.now() + contractorHomeCacheTtlMs,
+    });
+
+    return data;
+  })().finally(() => contractorHomeRequests.delete(requestKey));
+
+  contractorHomeRequests.set(requestKey, request);
+
+  return request;
 }
 
 export default function HomePage() {
@@ -523,6 +566,10 @@ export default function HomePage() {
   const [isSavingFilters, setIsSavingFilters] = useState(false);
   const [homeErrorMessage, setHomeErrorMessage] = useState("");
   const [contractorHomeError, setContractorHomeError] = useState("");
+  const contractorHomeRequestInFlightRef = useRef(false);
+  const contractorHomeRetryAfterRef = useRef(0);
+  const contractorHomeInitializedUidRef = useRef("");
+  const contractorFiltersRef = useRef(contractorFilters);
   const notificationsHref = role === "unknown" ? "/login" : "/notifications";
 
   useEffect(() => {
@@ -575,38 +622,45 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    async function loadNotificationBadge(user: User) {
-      try {
-        const counts = await fetchBadgeCounts(user);
-        setNotificationBadgeCount(counts.notifications);
-      } catch (error) {
-        if (!isQuotaExceededError(error)) {
-          console.error("Home notification badge lookup failed:", error);
-        }
-
-        setNotificationBadgeCount(0);
-      }
-    }
+    let unsubscribeBadges: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribeBadges?.();
+      unsubscribeBadges = null;
+
       if (!user) {
         setNotificationBadgeCount(0);
         return;
       }
 
-      void loadNotificationBadge(user);
+      unsubscribeBadges = subscribeBadgeCounts(
+        user,
+        (counts) => setNotificationBadgeCount(counts.notifications),
+        "HomePage",
+      );
     });
 
     return () => {
       unsubscribe();
+      unsubscribeBadges?.();
     };
   }, []);
 
   async function loadContractorWorkspace(
     user: User,
     filters: ContractorJobFilterPreferences,
-    options: { showLoading?: boolean } = {},
+    options: { showLoading?: boolean; forceRefresh?: boolean } = {},
+    source = "manual",
   ) {
+    if (
+      contractorHomeRequestInFlightRef.current ||
+      contractorHomeRetryAfterRef.current > Date.now()
+    ) {
+      return;
+    }
+
+    contractorHomeRequestInFlightRef.current = true;
+
     if (options.showLoading) {
       setIsContractorHomeLoading(true);
     } else {
@@ -614,17 +668,31 @@ export default function HomePage() {
     }
 
     try {
-      const nextHome = await fetchContractorHome(user, filters);
+      const nextHome = await fetchContractorHome(
+        user,
+        filters,
+        source,
+        options.forceRefresh,
+      );
       setContractorHome(nextHome);
       setFilterOptions(nextHome.filterOptions);
       setContractorHomeError("");
     } catch (error) {
+      const backoffMs = getRetryBackoffMs(error);
+
+      if (backoffMs > 0) {
+        contractorHomeRetryAfterRef.current = Date.now() + backoffMs;
+      }
+
       setContractorHomeError(
-        error instanceof Error
+        isTransientApiError(error)
+          ? connectionInterruptedMessage
+          : error instanceof Error
           ? error.message
           : "Unable to load contractor workspace.",
       );
     } finally {
+      contractorHomeRequestInFlightRef.current = false;
       setIsContractorHomeLoading(false);
       setIsRefreshingContractorHome(false);
     }
@@ -634,6 +702,15 @@ export default function HomePage() {
     let isCancelled = false;
 
     async function loadInitialContractorWorkspace(user: User) {
+      if (
+        contractorHomeRequestInFlightRef.current ||
+        contractorHomeInitializedUidRef.current === user.uid
+      ) {
+        return;
+      }
+
+      contractorHomeInitializedUidRef.current = user.uid;
+      contractorHomeRequestInFlightRef.current = true;
       setIsContractorHomeLoading(true);
       setContractorHomeError("");
 
@@ -645,7 +722,7 @@ export default function HomePage() {
         }
 
         setContractorFilters(savedFilters);
-        const nextHome = await fetchContractorHome(user, savedFilters);
+        const nextHome = await fetchContractorHome(user, savedFilters, "initial");
 
         if (isCancelled) {
           return;
@@ -655,13 +732,23 @@ export default function HomePage() {
         setFilterOptions(nextHome.filterOptions);
       } catch (error) {
         if (!isCancelled) {
+          const backoffMs = getRetryBackoffMs(error);
+
+          if (backoffMs > 0) {
+            contractorHomeRetryAfterRef.current = Date.now() + backoffMs;
+          }
+
           setContractorHomeError(
-            error instanceof Error
+            isTransientApiError(error)
+              ? connectionInterruptedMessage
+              : error instanceof Error
               ? error.message
               : "Unable to load contractor workspace.",
           );
         }
       } finally {
+        contractorHomeRequestInFlightRef.current = false;
+
         if (!isCancelled) {
           setIsContractorHomeLoading(false);
         }
@@ -669,6 +756,7 @@ export default function HomePage() {
     }
 
     if (role !== "contractor" || !currentUser) {
+      contractorHomeInitializedUidRef.current = "";
       setContractorHome(null);
       return () => {
         isCancelled = true;
@@ -683,20 +771,47 @@ export default function HomePage() {
   }, [currentUser, role]);
 
   useEffect(() => {
+    contractorFiltersRef.current = contractorFilters;
+  }, [contractorFilters]);
+
+  useEffect(() => {
     if (role !== "contractor" || !currentUser) {
       return;
     }
 
+    const runtimeWindow = window as typeof window & {
+      __azistoContractorHomeInterval?: ReturnType<typeof setInterval>;
+    };
+
+    if (runtimeWindow.__azistoContractorHomeInterval) {
+      clearInterval(runtimeWindow.__azistoContractorHomeInterval);
+    }
+
+    console.log(`[${new Date().toISOString()}] HOME_INTERVAL_CREATED`);
+    console.count("HOME_INTERVAL_CREATED");
     const intervalId = setInterval(() => {
-      if (document.visibilityState === "hidden") {
+      if (document.visibilityState !== "visible") {
         return;
       }
 
-      void loadContractorWorkspace(currentUser, contractorFilters);
+      void loadContractorWorkspace(
+        currentUser,
+        contractorFiltersRef.current,
+        {},
+        "interval",
+      );
     }, 60000);
 
-    return () => clearInterval(intervalId);
-  }, [contractorFilters, currentUser, role]);
+    runtimeWindow.__azistoContractorHomeInterval = intervalId;
+
+    return () => {
+      clearInterval(intervalId);
+
+      if (runtimeWindow.__azistoContractorHomeInterval === intervalId) {
+        delete runtimeWindow.__azistoContractorHomeInterval;
+      }
+    };
+  }, [currentUser, role]);
 
   async function handleApplyContractorFilters(
     nextFilters: ContractorJobFilterPreferences,
@@ -705,7 +820,7 @@ export default function HomePage() {
     setIsFilterSheetOpen(false);
 
     if (currentUser) {
-      await loadContractorWorkspace(currentUser, nextFilters);
+      await loadContractorWorkspace(currentUser, nextFilters, {}, "apply-filters");
     }
   }
 
@@ -725,7 +840,7 @@ export default function HomePage() {
       );
       setContractorFilters(savedFilters);
       setIsFilterSheetOpen(false);
-      await loadContractorWorkspace(currentUser, savedFilters);
+      await loadContractorWorkspace(currentUser, savedFilters, {}, "save-filters");
     } catch (error) {
       setContractorHomeError(
         error instanceof Error ? error.message : "Unable to save filters.",
@@ -740,7 +855,12 @@ export default function HomePage() {
     setIsFilterSheetOpen(false);
 
     if (currentUser) {
-      await loadContractorWorkspace(currentUser, emptyContractorFilters);
+      await loadContractorWorkspace(
+        currentUser,
+        emptyContractorFilters,
+        {},
+        "clear-filters",
+      );
     }
   }
 
@@ -906,7 +1026,12 @@ export default function HomePage() {
                 type="button"
                 onClick={() =>
                   currentUser &&
-                  void loadContractorWorkspace(currentUser, contractorFilters)
+                  void loadContractorWorkspace(
+                    currentUser,
+                    contractorFilters,
+                    { forceRefresh: true },
+                    "refresh-button",
+                  )
                 }
                 className="az-btn-contractor flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold"
               >
@@ -978,7 +1103,7 @@ export default function HomePage() {
                   </p>
                   <p className="mt-1 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                     Adjust your filters or check back soon. This feed refreshes
-                    every 30 seconds.
+                    every 60 seconds.
                   </p>
                 </div>
               ) : null}

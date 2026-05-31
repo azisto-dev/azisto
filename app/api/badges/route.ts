@@ -32,6 +32,10 @@ function getErrorDetails(error: unknown) {
 export async function GET(request: NextRequest) {
   try {
     assertFirebaseAdminConfig();
+    console.log(
+      `[${new Date().toISOString()}] BADGE API FETCH`,
+      request.headers.get("x-azisto-trigger") || "unknown",
+    );
 
     const token = getBearerToken(request.headers.get("authorization"));
 

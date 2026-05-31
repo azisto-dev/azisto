@@ -176,7 +176,10 @@ function getSafetyBadges(data: Record<string, unknown>) {
   return badges;
 }
 
-async function getCustomerFirstName(data: Record<string, unknown>) {
+async function getCustomerFirstName(
+  data: Record<string, unknown>,
+  customerFirstNames: Map<string, string>,
+) {
   const savedFirstName = getFirstName(readText(data.customerFirstName));
 
   if (savedFirstName) {
@@ -189,13 +192,24 @@ async function getCustomerFirstName(data: Record<string, unknown>) {
     return "Customer";
   }
 
+  const cachedFirstName = customerFirstNames.get(customerId);
+
+  if (cachedFirstName) {
+    return cachedFirstName;
+  }
+
   const customerSnapshot = await adminDb.collection("customers").doc(customerId).get();
 
   if (!customerSnapshot.exists) {
     return "Customer";
   }
 
-  return getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
+  const firstName =
+    getFirstName(readText(customerSnapshot.get("fullName"))) || "Customer";
+
+  customerFirstNames.set(customerId, firstName);
+
+  return firstName;
 }
 
 function getErrorDetails(error: unknown) {
@@ -233,12 +247,15 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
-async function serializeAvailableJob(data: Record<string, unknown>) {
+async function serializeAvailableJob(
+  data: Record<string, unknown>,
+  customerFirstNames = new Map<string, string>(),
+) {
   return {
     jobId: readText(data.jobId),
     parentJobId: readText(data.parentJobId),
     taskId: readText(data.taskId),
-    customerFirstName: await getCustomerFirstName(data),
+    customerFirstName: await getCustomerFirstName(data, customerFirstNames),
     customerSafetyBadges: getSafetyBadges(data),
     selectedServiceCategory: readText(data.selectedServiceCategory),
     selectedSubcategories: readStringList(data.selectedSubcategories),
@@ -257,6 +274,7 @@ async function serializeAvailableJob(data: Record<string, unknown>) {
 async function serializeAvailableTask(
   parentData: Record<string, unknown>,
   taskData: Record<string, unknown>,
+  customerFirstNames: Map<string, string>,
 ) {
   const parentJobId = readText(taskData.parentJobId) || readText(parentData.jobId);
   const taskId = readText(taskData.taskId);
@@ -264,24 +282,27 @@ async function serializeAvailableTask(
     readText(taskData.category) || readText(parentData.selectedServiceCategory);
   const subcategory = readText(taskData.subcategory);
 
-  return serializeAvailableJob({
-    ...parentData,
-    jobId: taskId || parentJobId,
-    parentJobId,
-    taskId,
-    selectedServiceCategory: category,
-    selectedSubcategories: subcategory ? [subcategory] : [],
-    city: readText(taskData.city) || readText(parentData.city),
-    province: readText(taskData.province) || readText(parentData.province),
-    preferredDate:
-      readText(taskData.preferredDate) || readText(parentData.preferredDate),
-    preferredTime:
-      readText(taskData.preferredTime) || readText(parentData.preferredTime),
-    urgency: readText(taskData.urgency) || readText(parentData.urgency),
-    status: readText(taskData.status) || readText(parentData.status),
-    createdAt: taskData.createdAt ?? parentData.createdAt,
-    updatedAt: taskData.updatedAt ?? parentData.updatedAt,
-  });
+  return serializeAvailableJob(
+    {
+      ...parentData,
+      jobId: taskId || parentJobId,
+      parentJobId,
+      taskId,
+      selectedServiceCategory: category,
+      selectedSubcategories: subcategory ? [subcategory] : [],
+      city: readText(taskData.city) || readText(parentData.city),
+      province: readText(taskData.province) || readText(parentData.province),
+      preferredDate:
+        readText(taskData.preferredDate) || readText(parentData.preferredDate),
+      preferredTime:
+        readText(taskData.preferredTime) || readText(parentData.preferredTime),
+      urgency: readText(taskData.urgency) || readText(parentData.urgency),
+      status: readText(taskData.status) || readText(parentData.status),
+      createdAt: taskData.createdAt ?? parentData.createdAt,
+      updatedAt: taskData.updatedAt ?? parentData.updatedAt,
+    },
+    customerFirstNames,
+  );
 }
 
 function isBaseAvailableJob(data: Record<string, unknown>) {
@@ -406,6 +427,10 @@ async function getUnreadMessagesCount(firebaseUid: string) {
 export async function GET(request: NextRequest) {
   try {
     assertFirebaseAdminConfig();
+    console.log(
+      `[${new Date().toISOString()}] HOME API FETCH`,
+      request.headers.get("x-azisto-trigger") || "unknown",
+    );
 
     const token = getBearerToken(request.headers.get("authorization"));
 
@@ -444,7 +469,7 @@ export async function GET(request: NextRequest) {
         adminDb
           .collection("jobs")
           .where("status", "==", "open")
-          .limit(30)
+          .limit(20)
           .get(),
         adminDb
           .collection("jobs")
@@ -454,26 +479,35 @@ export async function GET(request: NextRequest) {
         getUnreadMessagesCount(decodedToken.uid),
       ]);
 
+    const customerFirstNames = new Map<string, string>();
     const baseAvailableJobs = (
       await Promise.all(
         openJobsSnapshot.docs
           .filter((jobSnapshot) => isBaseAvailableJob(jobSnapshot.data()))
           .map(async (jobSnapshot) => {
             const parentData = jobSnapshot.data();
+            await getCustomerFirstName(parentData, customerFirstNames);
             const tasksSnapshot = await jobSnapshot.ref
               .collection("tasks")
               .where("status", "==", "open")
+              .limit(10)
               .get();
 
             if (tasksSnapshot.empty) {
-              return [await serializeAvailableJob(parentData)];
+              return [
+                await serializeAvailableJob(parentData, customerFirstNames),
+              ];
             }
 
             return Promise.all(
               tasksSnapshot.docs
                 .filter((taskSnapshot) => !readText(taskSnapshot.get("hiredContractorId")))
                 .map((taskSnapshot) =>
-                  serializeAvailableTask(parentData, taskSnapshot.data()),
+                  serializeAvailableTask(
+                    parentData,
+                    taskSnapshot.data(),
+                    customerFirstNames,
+                  ),
                 ),
             );
           }),

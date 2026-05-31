@@ -260,12 +260,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
     };
 
-    await threadSnapshot.ref.set(
-      {
-        unreadBy: FieldValue.arrayRemove(decodedToken.uid),
-      },
-      { merge: true },
-    );
+    if (readStringList(threadData.unreadBy).includes(decodedToken.uid)) {
+      await threadSnapshot.ref.set(
+        {
+          unreadBy: FieldValue.arrayRemove(decodedToken.uid),
+        },
+        { merge: true },
+      );
+    }
 
     return NextResponse.json({ ok: true, thread, messages });
   } catch (error) {

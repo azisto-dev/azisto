@@ -14,6 +14,15 @@ import {
 } from "lucide-react";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase";
+import {
+  connectionInterruptedMessage,
+  getRetryBackoffMs,
+  isTransientApiError,
+} from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
 import BottomNav from "@/app/components/BottomNav";
 
 type MessageThread = {
@@ -62,11 +71,11 @@ function StatusBar() {
   );
 }
 
-function createApiError(_code: string, message: string) {
-  return new Error(message);
-}
-
 function getErrorMessage(error: unknown) {
+  if (isTransientApiError(error)) {
+    return connectionInterruptedMessage;
+  }
+
   if (error instanceof Error) {
     return error.message;
   }
@@ -85,14 +94,9 @@ function formatMessageTime(value: string) {
 }
 
 async function fetchMessages(user: User, threadId: string) {
-  const token = await user.getIdToken();
-  const response = await fetch(
+  const response = await authenticatedFetch(
+    user,
     `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
   );
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
@@ -102,10 +106,8 @@ async function fetchMessages(user: User, threadId: string) {
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -156,13 +158,12 @@ async function sendMessage(
   text: string,
   attachments: MessageAttachment[],
 ) {
-  const token = await user.getIdToken();
-  const response = await fetch(
+  const response = await authenticatedFetch(
+    user,
     `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ text, attachments }),
@@ -174,10 +175,8 @@ async function sendMessage(
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -186,11 +185,9 @@ async function sendMessage(
 }
 
 async function updateJobStatus(user: User, jobId: string, status: string) {
-  const token = await user.getIdToken();
-  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
+  const response = await authenticatedFetch(user, `/api/jobs/${encodeURIComponent(jobId)}/status`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ status }),
@@ -201,10 +198,8 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -213,12 +208,7 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
 }
 
 async function fetchProfilePhoneNumber(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/profile", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await authenticatedFetch(user, "/api/profile");
   const responseBody = (await response.json().catch(() => null)) as {
     profile?: unknown;
   } | null;
@@ -241,11 +231,9 @@ async function hireContractorForThread(
   contractorId: string,
   taskIds: string[],
 ) {
-  const token = await user.getIdToken();
-  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/hire`, {
+  const response = await authenticatedFetch(user, `/api/jobs/${encodeURIComponent(jobId)}/hire`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ contractorId, taskIds }),
@@ -256,10 +244,8 @@ async function hireContractorForThread(
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -292,6 +278,8 @@ export default function MessageThreadPage() {
   const takePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const uploadPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const isLeavingForReviewRef = useRef(false);
+  const isMessageRequestInFlightRef = useRef(false);
+  const messageRetryAfterRef = useRef(0);
   const hasComposerContent = Boolean(draft.trim() || selectedPhoto);
   const canHireContractor =
     thread?.currentUserRole === "customer" &&
@@ -301,9 +289,34 @@ export default function MessageThreadPage() {
       !thread.jobStatus);
 
   async function loadMessages(user: User) {
-    const conversation = await fetchMessages(user, threadId);
-    setThread(conversation.thread);
-    setMessages(conversation.messages);
+    if (
+      isMessageRequestInFlightRef.current ||
+      messageRetryAfterRef.current > Date.now()
+    ) {
+      return;
+    }
+
+    isMessageRequestInFlightRef.current = true;
+
+    try {
+      const conversation = await fetchMessages(user, threadId);
+      setThread(conversation.thread);
+      setMessages(conversation.messages);
+      messageRetryAfterRef.current = 0;
+      setErrorMessage((currentValue) =>
+        currentValue === connectionInterruptedMessage ? "" : currentValue,
+      );
+    } catch (error) {
+      const backoffMs = getRetryBackoffMs(error);
+
+      if (backoffMs > 0) {
+        messageRetryAfterRef.current = Date.now() + backoffMs;
+      }
+
+      throw error;
+    } finally {
+      isMessageRequestInFlightRef.current = false;
+    }
   }
 
   useEffect(() => {
@@ -380,16 +393,23 @@ export default function MessageThreadPage() {
     }
 
     const intervalId = window.setInterval(async () => {
-      if (isLeavingForReviewRef.current) {
+      if (
+        isLeavingForReviewRef.current ||
+        document.visibilityState !== "visible"
+      ) {
         return;
       }
 
       try {
         await loadMessages(currentUser);
       } catch (error) {
-        console.error("Message polling failed:", error);
+        setErrorMessage(getErrorMessage(error));
+
+        if (!isTransientApiError(error)) {
+          console.error("Message polling failed:", error);
+        }
       }
-    }, 2500);
+    }, 15000);
 
     return () => window.clearInterval(intervalId);
   }, [currentUser, threadId]);

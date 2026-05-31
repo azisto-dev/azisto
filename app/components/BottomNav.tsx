@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { fetchBadgeCounts } from "@/lib/badgeCounts";
+import { subscribeBadgeCounts } from "@/lib/badgeCounts";
 import { azistoUi } from "@/lib/theme";
-import { isQuotaExceededError } from "@/lib/apiErrors";
 
 type UserRole = "customer" | "contractor" | "unknown";
 
@@ -78,56 +77,33 @@ export default function BottomNav({ role }: { role: UserRole }) {
   const [messageBadgeCount, setMessageBadgeCount] = useState(0);
 
   useEffect(() => {
-    let currentUser: User | null = null;
     let isMounted = true;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-
-    async function loadMessageBadge(user: User) {
-      try {
-        const counts = await fetchBadgeCounts(user);
-
-        if (isMounted) {
-          setMessageBadgeCount(counts.messages);
-        }
-      } catch (error) {
-        if (!isQuotaExceededError(error)) {
-          console.error("Bottom nav badge lookup failed:", error);
-        }
-
-        if (isMounted) {
-          setMessageBadgeCount(0);
-        }
-      }
-    }
+    let unsubscribeBadges: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      currentUser = user;
+      unsubscribeBadges?.();
+      unsubscribeBadges = null;
 
       if (!user || role === "unknown") {
         setMessageBadgeCount(0);
         return;
       }
 
-      void loadMessageBadge(user);
+      unsubscribeBadges = subscribeBadgeCounts(
+        user,
+        (counts) => {
+          if (isMounted) {
+            setMessageBadgeCount(counts.messages);
+          }
+        },
+        "BottomNav",
+      );
     });
-
-    intervalId = setInterval(() => {
-      if (document.visibilityState === "hidden") {
-        return;
-      }
-
-      if (currentUser && role !== "unknown") {
-        void loadMessageBadge(currentUser);
-      }
-    }, 60000);
 
     return () => {
       isMounted = false;
       unsubscribe();
-
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      unsubscribeBadges?.();
     };
   }, [role]);
 
