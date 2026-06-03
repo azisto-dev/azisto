@@ -45,6 +45,15 @@ function getFirstName(value: string) {
   return value.trim().split(" ").filter(Boolean)[0] ?? "";
 }
 
+function getJobTitle(jobData: Record<string, unknown>) {
+  return (
+    readText(jobData.selectedServiceCategory) ||
+    readText(jobData.serviceCategory) ||
+    readText(jobData.category) ||
+    "Service request"
+  );
+}
+
 function readStringList(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -187,6 +196,43 @@ async function getCustomerFirstName({
   return "Customer";
 }
 
+async function getThreadTaskLabels(
+  jobId: string,
+  threadData: Record<string, unknown>,
+) {
+  const savedLabels = readStringList(threadData.selectedTaskLabels);
+
+  if (savedLabels.length > 0 || !jobId) {
+    return savedLabels;
+  }
+
+  const selectedTaskIds = readStringList(threadData.selectedTaskIds);
+
+  if (selectedTaskIds.length === 0) {
+    return [];
+  }
+
+  const taskSnapshots = await Promise.all(
+    selectedTaskIds.map((taskId) =>
+      adminDb.collection("jobs").doc(jobId).collection("tasks").doc(taskId).get(),
+    ),
+  );
+
+  return taskSnapshots
+    .map((taskSnapshot, index) => {
+      if (!taskSnapshot.exists) {
+        return selectedTaskIds[index];
+      }
+
+      return (
+        readText(taskSnapshot.get("subcategory")) ||
+        readText(taskSnapshot.get("category")) ||
+        selectedTaskIds[index]
+      );
+    })
+    .filter(Boolean);
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     assertFirebaseAdminConfig();
@@ -220,13 +266,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const messagesSnapshot = await threadSnapshot.ref
-      .collection("items")
-      .orderBy("createdAt", "asc")
-      .get();
-    const messages = messagesSnapshot.docs.map((documentSnapshot) =>
-      serializeMessage(documentSnapshot.data()),
-    );
     const threadData = threadSnapshot.data() ?? {};
     const jobId = readText(threadData.jobId);
     const jobSnapshot = jobId
@@ -243,9 +282,48 @@ export async function GET(request: NextRequest, context: RouteContext) {
       threadData,
       jobData,
     });
+    const selectedTaskLabels = await getThreadTaskLabels(jobId, threadData);
+    const messagesSnapshot = await threadSnapshot.ref
+      .collection("items")
+      .orderBy("createdAt", "asc")
+      .get();
+    const currentUserRole = currentUserIsCustomer ? "customer" : "contractor";
+    const readBatch = adminDb.batch();
+    let hasReadUpdates = false;
+    const messages = messagesSnapshot.docs.map((documentSnapshot) => {
+      const messageData = documentSnapshot.data();
+      const readBy = readStringList(messageData.readBy);
+      const senderAuthUid = readText(messageData.senderAuthUid);
+      const senderRole = readText(messageData.senderRole);
+      const isIncomingMessage =
+        senderAuthUid
+          ? senderAuthUid !== decodedToken.uid
+          : senderRole !== currentUserRole;
+
+      if (isIncomingMessage && !readBy.includes(decodedToken.uid)) {
+        hasReadUpdates = true;
+        readBatch.set(
+          documentSnapshot.ref,
+          { readBy: FieldValue.arrayUnion(decodedToken.uid) },
+          { merge: true },
+        );
+      }
+
+      return serializeMessage(
+        isIncomingMessage
+          ? {
+              ...messageData,
+              readBy: readBy.includes(decodedToken.uid)
+                ? readBy
+                : [...readBy, decodedToken.uid],
+            }
+          : messageData,
+      );
+    });
     const thread = {
       threadId,
       jobId,
+      jobTitle: getJobTitle(jobData),
       displayName: currentUserIsCustomer
         ? contractorLabel || "Contractor"
         : customerLabel || "Customer",
@@ -254,19 +332,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
       contractorName: readText(threadData.contractorName),
       businessName: readText(threadData.businessName),
       selectedTaskIds: readStringList(threadData.selectedTaskIds),
-      selectedTaskLabels: readStringList(threadData.selectedTaskLabels),
-      currentUserRole: currentUserIsCustomer ? "customer" : "contractor",
+      selectedTaskLabels,
+      currentUserRole,
       status: readText(threadData.status),
       jobStatus: jobSnapshot?.exists ? readText(jobSnapshot.get("status")) : "",
     };
 
-    if (readStringList(threadData.unreadBy).includes(decodedToken.uid)) {
+    if (
+      readStringList(threadData.unreadBy).includes(decodedToken.uid) ||
+      hasReadUpdates
+    ) {
       await threadSnapshot.ref.set(
         {
           unreadBy: FieldValue.arrayRemove(decodedToken.uid),
         },
         { merge: true },
       );
+    }
+
+    if (hasReadUpdates) {
+      await readBatch.commit();
     }
 
     return NextResponse.json({ ok: true, thread, messages });
@@ -380,6 +465,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           ? `${notificationMessage.slice(0, 77)}...`
           : notificationMessage,
       jobId: readText(threadSnapshot.get("jobId")),
+      threadId,
     });
 
     return NextResponse.json({ ok: true, messageId });

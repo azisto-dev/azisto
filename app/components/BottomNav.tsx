@@ -113,7 +113,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
     <nav
       className={`border-t px-3 py-2 ${
         isContractor
-          ? "border-[var(--azisto-contractor-border)] bg-white/95"
+          ? "az-contractor-floating-nav border-[var(--azisto-contractor-border)]"
           : "border-azisto-border bg-white"
       }`}
     >

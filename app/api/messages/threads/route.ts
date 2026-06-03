@@ -43,6 +43,52 @@ function getFirstName(value: string) {
   return value.trim().split(" ").filter(Boolean)[0] ?? "";
 }
 
+function getJobTitle(jobData: Record<string, unknown>) {
+  return (
+    readText(jobData.selectedServiceCategory) ||
+    readText(jobData.serviceCategory) ||
+    readText(jobData.category) ||
+    "Service request"
+  );
+}
+
+async function getThreadTaskLabels(
+  jobId: string,
+  threadData: Record<string, unknown>,
+) {
+  const savedLabels = readStringList(threadData.selectedTaskLabels);
+
+  if (savedLabels.length > 0 || !jobId) {
+    return savedLabels;
+  }
+
+  const selectedTaskIds = readStringList(threadData.selectedTaskIds);
+
+  if (selectedTaskIds.length === 0) {
+    return [];
+  }
+
+  const taskSnapshots = await Promise.all(
+    selectedTaskIds.map((taskId) =>
+      adminDb.collection("jobs").doc(jobId).collection("tasks").doc(taskId).get(),
+    ),
+  );
+
+  return taskSnapshots
+    .map((taskSnapshot, index) => {
+      if (!taskSnapshot.exists) {
+        return selectedTaskIds[index];
+      }
+
+      return (
+        readText(taskSnapshot.get("subcategory")) ||
+        readText(taskSnapshot.get("category")) ||
+        selectedTaskIds[index]
+      );
+    })
+    .filter(Boolean);
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -198,10 +244,12 @@ async function serializeThread(
     threadData: data,
     jobData,
   });
+  const selectedTaskLabels = await getThreadTaskLabels(jobId, data);
 
   return {
     threadId: readText(data.threadId),
     jobId,
+    jobTitle: getJobTitle(jobData),
     displayName: currentUserIsCustomer
       ? contractorLabel || "Contractor"
       : customerLabel || "Customer",
@@ -210,7 +258,7 @@ async function serializeThread(
     contractorName: readText(data.contractorName),
     businessName: readText(data.businessName),
     selectedTaskIds: readStringList(data.selectedTaskIds),
-    selectedTaskLabels: readStringList(data.selectedTaskLabels),
+    selectedTaskLabels,
     lastMessage: readText(data.lastMessage),
     lastMessageAt: serializeTimestamp(data.lastMessageAt),
     status: readText(data.status),
@@ -344,6 +392,7 @@ export async function POST(request: NextRequest) {
       customerFirstName: getFirstName(
         readText(jobSnapshot.get("customerFirstName")),
       ),
+      jobTitle: getJobTitle(jobSnapshot.data() ?? {}),
       selectedTaskIds,
       selectedTaskLabels,
       participants: [customerAuthUid, contractorAuthUid],

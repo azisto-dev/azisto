@@ -140,6 +140,8 @@ type ContractorHomeData = {
   updatedAt: string;
 };
 
+type ContractorNetworkStatus = "online" | "offline" | "limited";
+
 const contractorHomeCacheTtlMs = 60_000;
 const contractorHomeCache = new Map<
   string,
@@ -149,6 +151,7 @@ const contractorHomeCache = new Map<
   }
 >();
 const contractorHomeRequests = new Map<string, Promise<ContractorHomeData>>();
+let lastGlobalContractorHomeSuccessAt: number | null = null;
 
 function groupContractorHomeJobs(jobs: ContractorHomeJob[]) {
   const groupedJobs = new Map<string, ContractorHomeJobCard>();
@@ -431,6 +434,40 @@ function formatRelativeTime(value: string) {
   return `Posted ${differenceInDays} day${differenceInDays === 1 ? "" : "s"} ago`;
 }
 
+function isRecentlyPosted(value: string) {
+  const timestamp = new Date(value).getTime();
+
+  return !Number.isNaN(timestamp) && Date.now() - timestamp < 24 * 60 * 60 * 1000;
+}
+
+function getTimeOfDayGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return "Good Morning";
+  }
+
+  if (hour < 18) {
+    return "Good Afternoon";
+  }
+
+  return "Good Evening";
+}
+
+function formatWorkspaceUpdateTime(value: number | null) {
+  if (!value) {
+    return "Retrying soon";
+  }
+
+  const minutesAgo = Math.max(0, Math.floor((Date.now() - value) / 60_000));
+
+  if (minutesAgo < 1) {
+    return "Updated just now";
+  }
+
+  return `Updated ${minutesAgo} min ago`;
+}
+
 function formatDateTime(date: string, time: string) {
   if (!date && !time) {
     return "Flexible timing";
@@ -497,6 +534,7 @@ async function fetchContractorHome(
   const cachedHome = contractorHomeCache.get(requestKey);
 
   if (!forceRefresh && cachedHome && cachedHome.expiresAt > now) {
+    lastGlobalContractorHomeSuccessAt = now;
     return cachedHome.data;
   }
 
@@ -537,6 +575,7 @@ async function fetchContractorHome(
       data,
       expiresAt: Date.now() + contractorHomeCacheTtlMs,
     });
+    lastGlobalContractorHomeSuccessAt = Date.now();
 
     return data;
   })().finally(() => contractorHomeRequests.delete(requestKey));
@@ -566,10 +605,23 @@ export default function HomePage() {
   const [isSavingFilters, setIsSavingFilters] = useState(false);
   const [homeErrorMessage, setHomeErrorMessage] = useState("");
   const [contractorHomeError, setContractorHomeError] = useState("");
+  const [contractorNetworkStatus, setContractorNetworkStatus] =
+    useState<ContractorNetworkStatus>(() =>
+      lastGlobalContractorHomeSuccessAt !== null &&
+      Date.now() - lastGlobalContractorHomeSuccessAt < 135_000
+        ? "online"
+        : "limited",
+    );
+  const [lastSuccessfulContractorFetchAt, setLastSuccessfulContractorFetchAt] =
+    useState<number | null>(lastGlobalContractorHomeSuccessAt);
+  const [networkStatusClock, setNetworkStatusClock] = useState(() => Date.now());
   const contractorHomeRequestInFlightRef = useRef(false);
   const contractorHomeRetryAfterRef = useRef(0);
   const contractorHomeInitializedUidRef = useRef("");
   const contractorFiltersRef = useRef(contractorFilters);
+  const lastSuccessfulContractorFetchAtRef = useRef<number | null>(
+    lastGlobalContractorHomeSuccessAt,
+  );
   const notificationsHref = role === "unknown" ? "/login" : "/notifications";
 
   useEffect(() => {
@@ -646,6 +698,40 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleOnline() {
+      const lastSuccess =
+        lastSuccessfulContractorFetchAtRef.current ??
+        lastGlobalContractorHomeSuccessAt;
+      const hasRecentSuccess =
+        lastSuccess !== null && Date.now() - lastSuccess < 135_000;
+
+      setContractorNetworkStatus(hasRecentSuccess ? "online" : "limited");
+    }
+
+    function handleOffline() {
+      setContractorNetworkStatus("offline");
+    }
+
+    handleOnline();
+    if (!window.navigator.onLine) {
+      setContractorNetworkStatus("offline");
+    }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    const statusClockInterval = window.setInterval(
+      () => setNetworkStatusClock(Date.now()),
+      30_000,
+    );
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.clearInterval(statusClockInterval);
+    };
+  }, []);
+
   async function loadContractorWorkspace(
     user: User,
     filters: ContractorJobFilterPreferences,
@@ -677,6 +763,12 @@ export default function HomePage() {
       setContractorHome(nextHome);
       setFilterOptions(nextHome.filterOptions);
       setContractorHomeError("");
+      const fetchedAt = Date.now();
+      lastSuccessfulContractorFetchAtRef.current = fetchedAt;
+      setLastSuccessfulContractorFetchAt(fetchedAt);
+      setContractorNetworkStatus(
+        window.navigator.onLine ? "online" : "offline",
+      );
     } catch (error) {
       const backoffMs = getRetryBackoffMs(error);
 
@@ -690,6 +782,9 @@ export default function HomePage() {
           : error instanceof Error
           ? error.message
           : "Unable to load contractor workspace.",
+      );
+      setContractorNetworkStatus(
+        window.navigator.onLine ? "limited" : "offline",
       );
     } finally {
       contractorHomeRequestInFlightRef.current = false;
@@ -730,6 +825,12 @@ export default function HomePage() {
 
         setContractorHome(nextHome);
         setFilterOptions(nextHome.filterOptions);
+        const fetchedAt = Date.now();
+        lastSuccessfulContractorFetchAtRef.current = fetchedAt;
+        setLastSuccessfulContractorFetchAt(fetchedAt);
+        setContractorNetworkStatus(
+          window.navigator.onLine ? "online" : "offline",
+        );
       } catch (error) {
         if (!isCancelled) {
           const backoffMs = getRetryBackoffMs(error);
@@ -744,6 +845,9 @@ export default function HomePage() {
               : error instanceof Error
               ? error.message
               : "Unable to load contractor workspace.",
+          );
+          setContractorNetworkStatus(
+            window.navigator.onLine ? "limited" : "offline",
           );
         }
       } finally {
@@ -813,6 +917,56 @@ export default function HomePage() {
     };
   }, [currentUser, role]);
 
+  useEffect(() => {
+    if (role !== "contractor" || !currentUser) {
+      return;
+    }
+
+    function markCachedWorkspaceFresh() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (!window.navigator.onLine) {
+        setContractorNetworkStatus("offline");
+        return;
+      }
+
+      if (contractorHomeRetryAfterRef.current > Date.now()) {
+        setContractorNetworkStatus("limited");
+        return;
+      }
+
+      if (contractorHome) {
+        const refreshedAt = Date.now();
+        lastSuccessfulContractorFetchAtRef.current = refreshedAt;
+        lastGlobalContractorHomeSuccessAt = refreshedAt;
+        setLastSuccessfulContractorFetchAt(refreshedAt);
+        setContractorNetworkStatus("online");
+        return;
+      }
+
+      if (
+        lastGlobalContractorHomeSuccessAt !== null &&
+        Date.now() - lastGlobalContractorHomeSuccessAt < 135_000
+      ) {
+        lastSuccessfulContractorFetchAtRef.current =
+          lastGlobalContractorHomeSuccessAt;
+        setLastSuccessfulContractorFetchAt(lastGlobalContractorHomeSuccessAt);
+        setContractorNetworkStatus("online");
+      }
+    }
+
+    window.addEventListener("pageshow", markCachedWorkspaceFresh);
+    document.addEventListener("visibilitychange", markCachedWorkspaceFresh);
+    markCachedWorkspaceFresh();
+
+    return () => {
+      window.removeEventListener("pageshow", markCachedWorkspaceFresh);
+      document.removeEventListener("visibilitychange", markCachedWorkspaceFresh);
+    };
+  }, [contractorHome, currentUser, role]);
+
   async function handleApplyContractorFilters(
     nextFilters: ContractorJobFilterPreferences,
   ) {
@@ -866,10 +1020,32 @@ export default function HomePage() {
 
   if (role === "contractor") {
     const contractorGreetingName =
-      getFirstName(contractorHome?.contractorName ?? "") || greetingName;
+      contractorHome?.contractorName.trim() || greetingName || "Contractor";
     const contractorAvailableJobCards = groupContractorHomeJobs(
       contractorHome?.availableJobs ?? [],
     );
+    const hasRecentSuccessfulContractorFetch =
+      lastSuccessfulContractorFetchAt !== null &&
+      networkStatusClock - lastSuccessfulContractorFetchAt < 135_000;
+    const workspaceNetworkStatus: ContractorNetworkStatus =
+      contractorNetworkStatus === "offline"
+        ? "offline"
+        : contractorNetworkStatus === "limited" ||
+            !hasRecentSuccessfulContractorFetch
+          ? "limited"
+          : "online";
+    const workspaceUpdateText =
+      workspaceNetworkStatus === "offline"
+        ? "Connection paused"
+        : workspaceNetworkStatus === "limited"
+          ? "Retrying soon"
+          : formatWorkspaceUpdateTime(lastSuccessfulContractorFetchAt);
+    const workspaceNetworkPillClassName =
+      workspaceNetworkStatus === "online"
+        ? "live-pill-online"
+        : workspaceNetworkStatus === "offline"
+          ? "live-pill-offline"
+          : "live-pill-limited";
     const hasActiveFilters =
       contractorFilters.categories.length > 0 ||
       contractorFilters.subcategories.length > 0 ||
@@ -918,18 +1094,15 @@ export default function HomePage() {
             </header>
 
             <section className="mt-6">
-              <h1 className="text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
-                Hello
-                {contractorGreetingName ? (
-                  <>
-                    ,{" "}
-                    <span className="text-[var(--azisto-contractor-text)]">
-                      {contractorGreetingName}
-                    </span>
-                  </>
-                ) : null}
+              <h1 className="mt-4 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
+                <span className="block text-lg text-[var(--azisto-contractor-muted)]">
+                  {getTimeOfDayGreeting()},
+                </span>
+                <span className="mt-1 block text-[var(--azisto-contractor-burgundy)]">
+                  {contractorGreetingName}
+                </span>
               </h1>
-              <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+              <p className="mt-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                 New jobs near you are updating live.
               </p>
             </section>
@@ -949,25 +1122,33 @@ export default function HomePage() {
             <section className="mt-5 grid grid-cols-2 gap-2">
               {[
                 {
-                  label: "Available",
+                  label: "New Jobs",
                   value: contractorHome?.availableJobsCount ?? 0,
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-emerald-700",
                   valueClassName: "text-emerald-700",
+                  supportingText:
+                    contractorHome && contractorHome.newTodayCount > 0
+                      ? `+${contractorHome.newTodayCount} recently`
+                      : "Marketplace live",
                 },
                 {
-                  label: "New today",
-                  value: contractorHome?.newTodayCount ?? 0,
+                  label: "Interested",
+                  value: 0,
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-[#4169E1]",
                   valueClassName: "text-[#4169E1]",
+                  supportingText: "Waiting for customer",
                 },
                 {
-                  label: "Unread",
-                  value: contractorHome?.unreadMessagesCount ?? 0,
+                  label: "Active Jobs",
+                  value: contractorHome?.activeJob ? 1 : 0,
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-black",
                   valueClassName: "text-black",
+                  supportingText: contractorHome?.activeJob
+                    ? "In progress"
+                    : "Ready for work",
                 },
                 {
                   label: "Rating",
@@ -976,11 +1157,12 @@ export default function HomePage() {
                   labelClassName: "text-black",
                   valueClassName: "text-black",
                   isRating: true,
+                  supportingText: "Premium score",
                 },
               ].map((stat) => (
                 <div
                   key={stat.label}
-                  className={`rounded-[22px] border px-3 py-3 shadow-sm ${stat.className}`}
+                  className={`az-contractor-stat-card rounded-[22px] border px-3 py-3 ${stat.className}`}
                 >
                   <p className={`text-[11px] font-bold uppercase tracking-[0.12em] ${stat.labelClassName}`}>
                     {stat.label}
@@ -1017,6 +1199,9 @@ export default function HomePage() {
                       {stat.value}
                     </p>
                   )}
+                  <p className="mt-1 truncate text-[10px] font-semibold text-[var(--azisto-contractor-muted)]">
+                    {stat.supportingText}
+                  </p>
                 </div>
               ))}
             </section>
@@ -1033,24 +1218,42 @@ export default function HomePage() {
                     "refresh-button",
                   )
                 }
+                disabled={
+                  workspaceNetworkStatus === "offline" ||
+                  isRefreshingContractorHome
+                }
                 className="az-btn-contractor flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold"
               >
                 <RotateCw
                   aria-hidden="true"
                   className={`h-4 w-4 ${isRefreshingContractorHome ? "animate-spin" : ""}`}
                 />
-                Refresh
+                {workspaceNetworkStatus === "limited" ? "Retry" : "Refresh"}
               </button>
+              <div className="mt-3 flex items-center justify-center">
+                <span className={workspaceNetworkPillClassName}>
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      workspaceNetworkStatus === "online"
+                        ? "live-dot-pulse bg-emerald-500"
+                        : workspaceNetworkStatus === "limited"
+                          ? "bg-amber-500"
+                          : "bg-slate-400"
+                    }`}
+                  />
+                  {workspaceNetworkStatus === "online"
+                    ? "Live"
+                    : workspaceNetworkStatus === "limited"
+                      ? "Connection limited"
+                      : "Offline"}
+                </span>
+              </div>
             </div>
 
             <section className="mt-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                    Live
-                  </span>
-                  <h2 className="mt-2 text-2xl font-normal text-[var(--azisto-contractor-text)]">
+                  <h2 className="text-2xl font-normal text-[var(--azisto-contractor-text)]">
                     Available jobs
                   </h2>
                 </div>
@@ -1065,7 +1268,7 @@ export default function HomePage() {
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-azisto-muted">
-                  Updated just now
+                  {workspaceUpdateText}
                 </span>
                 {contractorHome && contractorHome.newTodayCount > 0 ? (
                   <span className="az-contractor-chip rounded-full px-3 py-1 text-xs font-bold">
@@ -1112,16 +1315,23 @@ export default function HomePage() {
                 {contractorAvailableJobCards.map((job) => (
                   <article
                     key={job.jobId}
-                    className="az-contractor-card-compact px-3 py-2.5"
+                    className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="text-[15px] font-semibold leading-5 text-[var(--azisto-contractor-text)]">
                           {job.selectedServiceCategory || "Service request"}
                         </h3>
-                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
-                          {job.jobId}
-                        </p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
+                            {job.jobId}
+                          </p>
+                          {isRecentlyPosted(job.createdAt) ? (
+                            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700">
+                              Recently posted
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
                         {[job.city, job.province].filter(Boolean).join(", ") ||
@@ -1130,7 +1340,7 @@ export default function HomePage() {
                     </div>
 
                     {job.tasks.length > 0 ? (
-                      <div className="mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
+                      <div className="az-contractor-task-panel mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
                         {job.tasks.map((task, index) => (
                           <div
                             key={task.taskId || `${job.jobId}-${task.label}`}
@@ -1168,7 +1378,7 @@ export default function HomePage() {
 
                     <Link
                       href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
+                      className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-[rgb(122_0_60_/_0.08)] text-xs font-bold text-[#5C0032]"
                     >
                       View job
                     </Link>

@@ -515,7 +515,7 @@ export default function ContractorDashboardPage() {
               {activeJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="az-contractor-card-compact px-3 py-2.5"
+                  className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -601,7 +601,7 @@ export default function ContractorDashboardPage() {
               {availableJobCards.map((job) => (
                 <article
                   key={job.jobId}
-                  className="az-contractor-card-compact px-3 py-2.5"
+                  className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -619,7 +619,7 @@ export default function ContractorDashboardPage() {
                   </div>
 
                   {job.tasks.length > 0 ? (
-                    <div className="mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
+                    <div className="az-contractor-task-panel mt-2 space-y-1 rounded-2xl bg-[rgb(248_247_252_/_0.9)] p-1.5">
                       {job.tasks.map((task, index) => (
                         <div
                           key={task.taskId || `${job.jobId}-${task.label}`}
@@ -677,7 +677,7 @@ export default function ContractorDashboardPage() {
               {pastJobs.map((job) => (
                 <article
                   key={job.jobId}
-                  className="az-contractor-card-compact px-3 py-2.5"
+                  className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

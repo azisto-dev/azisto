@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 
 export type ContractorJobFilterPreferences = {
   categories: string[];
@@ -54,6 +54,102 @@ function toggleValue(values: string[], value: string) {
     : [...values, value];
 }
 
+function MultiSelectDropdown({
+  title,
+  placeholder,
+  values,
+  selectedValues,
+  isOpen,
+  onToggleOpen,
+  onToggleValue,
+  emptyText,
+}: {
+  title: string;
+  placeholder: string;
+  values: string[];
+  selectedValues: string[];
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  onToggleValue: (value: string) => void;
+  emptyText: string;
+}) {
+  const summary =
+    selectedValues.length > 0
+      ? `${selectedValues.length} selected`
+      : placeholder;
+
+  return (
+    <section>
+      <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
+        {title}
+      </p>
+      <div className="relative mt-3">
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          className="az-contractor-card-compact flex min-h-12 w-full items-center justify-between gap-3 rounded-[18px] px-3 py-2 text-left"
+          aria-expanded={isOpen}
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold text-[var(--azisto-contractor-text)]">
+              {summary}
+            </span>
+            {selectedValues.length > 0 ? (
+              <span className="mt-0.5 block truncate text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+                {selectedValues.join(", ")}
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-4 w-4 shrink-0 text-[var(--azisto-contractor-burgundy)] transition ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {isOpen ? (
+          <div className="az-contractor-card absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 max-h-56 overflow-y-auto p-2">
+            {values.length > 0 ? (
+              values.map((value) => {
+                const isSelected = selectedValues.includes(value);
+
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => onToggleValue(value)}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-xs font-bold transition ${
+                      isSelected
+                        ? "bg-[rgb(122_0_60_/_0.08)] text-[var(--azisto-contractor-burgundy)]"
+                        : "text-[var(--azisto-contractor-text)] hover:bg-[rgb(248_247_252_/_0.9)]"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                        isSelected
+                          ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
+                          : "border-[var(--azisto-contractor-border)] bg-white text-transparent"
+                      }`}
+                    >
+                      <Check aria-hidden="true" className="h-3 w-3" />
+                    </span>
+                    <span>{value}</span>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="px-3 py-2 text-xs font-semibold text-[var(--azisto-contractor-muted)]">
+                {emptyText}
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function FilterChip({
   isSelected,
   label,
@@ -69,7 +165,7 @@ function FilterChip({
       onClick={onClick}
       className={`rounded-full border px-3 py-2 text-xs font-bold transition ${
         isSelected
-          ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+          ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(122_0_60_/_0.08)] text-[var(--azisto-contractor-burgundy)]"
           : "border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-muted)]"
       }`}
     >
@@ -89,14 +185,12 @@ export default function ContractorJobFilters({
   onClear,
 }: ContractorJobFiltersProps) {
   const [draftFilters, setDraftFilters] = useState(filters);
+  const [openDropdown, setOpenDropdown] = useState<
+    "categories" | "subcategories" | null
+  >(null);
   const visibleSubcategories = useMemo(() => {
     if (draftFilters.categories.length === 0) {
-      return Object.values(options.subcategoriesByCategory)
-        .flat()
-        .filter((subcategory, index, allSubcategories) =>
-          allSubcategories.indexOf(subcategory) === index,
-        )
-        .sort((first, second) => first.localeCompare(second));
+      return [];
     }
 
     return draftFilters.categories
@@ -110,6 +204,7 @@ export default function ContractorJobFilters({
   useEffect(() => {
     if (isOpen) {
       setDraftFilters(filters);
+      setOpenDropdown(null);
     }
   }, [filters, isOpen]);
 
@@ -119,6 +214,24 @@ export default function ContractorJobFilters({
 
   function updateDraftFilters(nextFilters: ContractorJobFilterPreferences) {
     setDraftFilters(nextFilters);
+  }
+
+  function updateCategories(category: string) {
+    const nextCategories = toggleValue(draftFilters.categories, category);
+    const nextVisibleSubcategories =
+      nextCategories.length === 0
+        ? []
+        : nextCategories.flatMap(
+            (item) => options.subcategoriesByCategory[item] ?? [],
+          );
+
+    updateDraftFilters({
+      ...draftFilters,
+      categories: nextCategories,
+      subcategories: draftFilters.subcategories.filter((subcategory) =>
+        nextVisibleSubcategories.includes(subcategory),
+      ),
+    });
   }
 
   return (
@@ -142,58 +255,47 @@ export default function ContractorJobFilters({
         </div>
 
         <div className="mt-5 space-y-5">
-          <section>
-            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Service category</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {options.categories.length > 0 ? (
-                options.categories.map((category) => (
-                  <FilterChip
-                    key={category}
-                    label={category}
-                    isSelected={draftFilters.categories.includes(category)}
-                    onClick={() =>
-                      updateDraftFilters({
-                        ...draftFilters,
-                        categories: toggleValue(draftFilters.categories, category),
-                      })
-                    }
-                  />
-                ))
-              ) : (
-                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
-                  No categories available yet.
-                </p>
-              )}
-            </div>
-          </section>
+          <MultiSelectDropdown
+            title="All categories"
+            placeholder="Choose service categories"
+            values={options.categories}
+            selectedValues={draftFilters.categories}
+            isOpen={openDropdown === "categories"}
+            onToggleOpen={() =>
+              setOpenDropdown((currentValue) =>
+                currentValue === "categories" ? null : "categories",
+              )
+            }
+            onToggleValue={updateCategories}
+            emptyText="No categories available yet."
+          />
 
-          <section>
-            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Subcategory</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {visibleSubcategories.length > 0 ? (
-                visibleSubcategories.map((subcategory) => (
-                  <FilterChip
-                    key={subcategory}
-                    label={subcategory}
-                    isSelected={draftFilters.subcategories.includes(subcategory)}
-                    onClick={() =>
-                      updateDraftFilters({
-                        ...draftFilters,
-                        subcategories: toggleValue(
-                          draftFilters.subcategories,
-                          subcategory,
-                        ),
-                      })
-                    }
-                  />
-                ))
-              ) : (
-                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
-                  Select a category to see matching subcategories.
-                </p>
-              )}
-            </div>
-          </section>
+          <MultiSelectDropdown
+            title="Subcategories"
+            placeholder={
+              draftFilters.categories.length > 0
+                ? "Choose subcategories"
+                : "Choose a category first"
+            }
+            values={visibleSubcategories}
+            selectedValues={draftFilters.subcategories}
+            isOpen={openDropdown === "subcategories"}
+            onToggleOpen={() =>
+              setOpenDropdown((currentValue) =>
+                currentValue === "subcategories" ? null : "subcategories",
+              )
+            }
+            onToggleValue={(subcategory) =>
+              updateDraftFilters({
+                ...draftFilters,
+                subcategories: toggleValue(
+                  draftFilters.subcategories,
+                  subcategory,
+                ),
+              })
+            }
+            emptyText="Select a category to see matching subcategories."
+          />
 
           <section>
             <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">City</p>

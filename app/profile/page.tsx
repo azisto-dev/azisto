@@ -778,10 +778,10 @@ export default function ProfilePage() {
               <section className="az-contractor-hero-card mt-6 p-4">
                 <div className="relative z-10 flex items-start justify-between gap-3">
                   <div className="min-w-0 text-left">
-                    <p className="truncate text-base font-normal leading-6 text-[#C8A96B]">
+                    <p className="truncate text-2xl font-normal leading-tight text-[#C8A96B]">
                       {displayName}
                     </p>
-                    <h1 className="mt-1 text-2xl font-normal uppercase leading-none tracking-[0.04em] text-white">
+                    <h1 className="mt-1 text-base font-normal uppercase leading-none tracking-[0.08em] text-white">
                       {profile.role}
                     </h1>
                     <p className="mt-2 truncate text-xs font-semibold text-white/80">
@@ -1271,7 +1271,7 @@ export default function ProfilePage() {
 	                      >
 	                        {isSaving
 	                          ? "Sending..."
-	                          : "Send to AZISTO for review"}
+	                          : "Send for review"}
 	                      </button>
 	                    </div>
 	                  ) : null}

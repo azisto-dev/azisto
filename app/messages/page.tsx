@@ -13,11 +13,13 @@ import BottomNav from "@/app/components/BottomNav";
 type MessageThread = {
   threadId: string;
   jobId: string;
+  jobTitle: string;
   displayName: string;
   customerId: string;
   contractorId: string;
   contractorName: string;
   businessName: string;
+  selectedTaskLabels: string[];
   lastMessage: string;
   lastMessageAt: string;
   status: string;
@@ -59,6 +61,18 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatTaskSummary(tasks: string[]) {
+  if (tasks.length === 0) {
+    return "Task details";
+  }
+
+  if (tasks.length === 1) {
+    return tasks[0];
+  }
+
+  return `${tasks[0]} +${tasks.length - 1} more`;
 }
 
 async function fetchThreads(user: User) {
@@ -149,18 +163,18 @@ export default function MessagesPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="az-contractor-hero-card mt-8 p-5">
+          <section className="az-contractor-soft-hero mt-8 p-5">
             <div className="relative z-10">
-              <p className="text-lg font-normal leading-6 text-white/90">
+              <p className="text-lg font-normal leading-6 text-[var(--azisto-contractor-muted)]">
                 AZISTO inbox
               </p>
-              <h1 className="mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] text-white">
+              <h1 className="mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] text-[var(--azisto-contractor-text)]">
                 Messages
               </h1>
-              <p className="mt-12 text-sm font-semibold leading-6 text-white/80">
+              <p className="mt-12 text-sm font-semibold leading-6 text-[var(--azisto-contractor-muted)]">
                 Conversations about your AZISTO job requests will appear here.
               </p>
-              <span className="mt-4 inline-flex rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
+              <span className="mt-4 inline-flex rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-burgundy)]">
                 {threads.length} thread{threads.length === 1 ? "" : "s"}
               </span>
             </div>
@@ -211,6 +225,9 @@ export default function MessagesPage() {
                         thread.contractorId ||
                         "Conversation"}
                     </h2>
+                    <p className="mt-1 text-xs font-bold text-[var(--azisto-contractor-text)]">
+                      {thread.jobTitle || "Service request"}
+                    </p>
                   </div>
                   <span
                     className={getStatusChipClass(
@@ -221,6 +238,15 @@ export default function MessagesPage() {
                       "_",
                       " ",
                     )}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[var(--azisto-contractor-burgundy)]">
+                    {formatTaskSummary(thread.selectedTaskLabels ?? [])}
+                  </span>
+                  <span className="rounded-full bg-[rgb(248_247_252_/_0.9)] px-2.5 py-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+                    {thread.jobId}
                   </span>
                 </div>
 

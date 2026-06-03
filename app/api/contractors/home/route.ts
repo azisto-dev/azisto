@@ -8,6 +8,7 @@ import {
   firebaseQuotaMessage,
   isQuotaExceededMessage,
 } from "@/lib/apiErrors";
+import { getServiceFilterOptions } from "@/lib/serviceCatalog";
 
 export const runtime = "nodejs";
 
@@ -374,13 +375,16 @@ function sortJobs(
 function buildFilterOptions(
   jobs: Array<Awaited<ReturnType<typeof serializeAvailableJob>>>,
 ) {
-  const categories = new Set<string>();
-  const subcategoriesByCategory: Record<string, string[]> = {};
+  const catalogFilterOptions = getServiceFilterOptions();
+  const categorySet = new Set(catalogFilterOptions.categories);
+  const subcategoriesByCategory: Record<string, string[]> = {
+    ...catalogFilterOptions.subcategoriesByCategory,
+  };
   const cities = new Set<string>();
 
   jobs.forEach((job) => {
     if (job.selectedServiceCategory) {
-      categories.add(job.selectedServiceCategory);
+      categorySet.add(job.selectedServiceCategory);
     }
 
     if (job.city) {
@@ -405,7 +409,7 @@ function buildFilterOptions(
   });
 
   return {
-    categories: Array.from(categories).sort((first, second) =>
+    categories: Array.from(categorySet).sort((first, second) =>
       first.localeCompare(second),
     ),
     subcategoriesByCategory,

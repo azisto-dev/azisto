@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Check, ChevronLeft, Flag, MapPin, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, Flag, MapPin, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
@@ -270,6 +270,7 @@ export default function ContractorJobDetailPage() {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [reportReason, setReportReason] = useState("fake_job");
+  const [isReportReasonOpen, setIsReportReasonOpen] = useState(false);
   const [reportDetails, setReportDetails] = useState("");
   const [reportMessage, setReportMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -277,6 +278,9 @@ export default function ContractorJobDetailPage() {
   const [lifecycleMessage, setLifecycleMessage] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [isMessagePromptOpen, setIsMessagePromptOpen] = useState(false);
+  const selectedReportReason =
+    reportReasonOptions.find((option) => option.value === reportReason) ??
+    { value: "other", label: "Other" };
 
   async function loadJob(user: User) {
     const jobDetails = await fetchContractorJob(user, jobId);
@@ -466,37 +470,37 @@ export default function ContractorJobDetailPage() {
 
           {job ? (
             <>
-              <section className="az-contractor-hero-card mt-8 p-5">
+              <section className="az-contractor-soft-hero mt-8 p-5">
                 <div className="relative z-10">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
                     {job.jobId}
                   </p>
-                  <h1 className="mt-2 text-3xl font-normal leading-tight text-white">
+                  <h1 className="mt-2 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
                     {job.selectedServiceCategory || "Service request"}
                   </h1>
-                  <p className="mt-8 flex items-center gap-2 text-sm font-semibold leading-6 text-white/80">
+                  <p className="mt-8 flex items-center gap-2 text-sm font-semibold leading-6 text-[var(--azisto-contractor-muted)]">
                     <MapPin aria-hidden="true" className="h-4 w-4" />
                     {[job.city, job.province].filter(Boolean).join(", ") ||
                       "Location not provided"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold capitalize text-white">
+                    <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold capitalize text-[var(--azisto-contractor-text)]">
                       {job.status || "open"}
                     </span>
-                    <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
+                    <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-text)]">
                       {job.urgency || "Flexible"}
                     </span>
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-3 text-sm leading-5">
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/65">When</p>
-                      <p className="mt-1 font-semibold text-white">
+                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">When</p>
+                      <p className="mt-1 font-semibold text-[var(--azisto-contractor-text)]">
                         {formatWhen(job.preferredDate, job.preferredTime)}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-white/65">Customer</p>
-                      <p className="mt-1 font-semibold text-white">
+                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">Customer</p>
+                      <p className="mt-1 font-semibold text-[var(--azisto-contractor-text)]">
                         {job.customerFirstName || "Customer"}
                       </p>
                     </div>
@@ -598,7 +602,13 @@ export default function ContractorJobDetailPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setIsReportOpen((currentValue) => !currentValue);
+                    setIsReportOpen((currentValue) => {
+                      const nextValue = !currentValue;
+                      if (!nextValue) {
+                        setIsReportReasonOpen(false);
+                      }
+                      return nextValue;
+                    });
                     setReportMessage("");
                   }}
                   className="flex w-full items-center justify-between gap-3 text-left text-sm font-bold text-slate-900"
@@ -618,17 +628,58 @@ export default function ContractorJobDetailPage() {
                       <label className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
                         Reason
                       </label>
-                      <select
-                        value={reportReason}
-                        onChange={(event) => setReportReason(event.target.value)}
-                        className="h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 text-sm font-semibold text-slate-800 outline-none az-focus-field"
-                      >
-                        {reportReasonOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIsReportReasonOpen((currentValue) => !currentValue)
+                          }
+                          className="az-contractor-card-compact flex h-12 w-full items-center justify-between rounded-[18px] bg-[rgb(248_247_252_/_0.9)] px-3 text-left text-sm font-semibold text-[var(--azisto-contractor-text)] outline-none az-focus-field"
+                          aria-expanded={isReportReasonOpen}
+                        >
+                          <span>{selectedReportReason.label}</span>
+                          <ChevronDown
+                            aria-hidden="true"
+                            className={`h-4 w-4 text-[var(--azisto-contractor-burgundy)] transition ${
+                              isReportReasonOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                        {isReportReasonOpen ? (
+                          <div className="az-contractor-card absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden p-1.5">
+                            {reportReasonOptions.map((option) => {
+                              const isSelected = option.value === reportReason;
+
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setReportReason(option.value);
+                                    setIsReportReasonOpen(false);
+                                  }}
+                                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                                    isSelected
+                                      ? "bg-[rgb(122_0_60_/_0.08)] text-[var(--azisto-contractor-burgundy)]"
+                                      : "text-[var(--azisto-contractor-text)] hover:bg-[rgb(248_247_252_/_0.9)]"
+                                  }`}
+                                >
+                                  <span
+                                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                                      isSelected
+                                        ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
+                                        : "border-[var(--azisto-contractor-border)] bg-white text-transparent"
+                                    }`}
+                                  >
+                                    <Check aria-hidden="true" className="h-3 w-3" />
+                                  </span>
+                                  <span>{option.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -639,7 +690,7 @@ export default function ContractorJobDetailPage() {
                         value={reportDetails}
                         onChange={(event) => setReportDetails(event.target.value)}
                         placeholder="Add any details that will help AZISTO review this job."
-                        className="min-h-24 w-full resize-none rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 az-focus-field"
+                        className="min-h-24 w-full resize-none rounded-[18px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] px-3 py-3 text-sm leading-6 text-[var(--azisto-contractor-text)] shadow-[0_2px_8px_rgba(0,0,0,0.05)] outline-none placeholder:text-slate-400 az-focus-field"
                       />
                     </div>
 
@@ -679,50 +730,57 @@ export default function ContractorJobDetailPage() {
                 </p>
               ) : null}
 
-              {job.status === "open" ? (
-                <button
-                  type="button"
-                  onClick={handleInterestSubmit}
-                  disabled={
-                    isSubmittingInterest ||
-                    hasSubmittedInterest ||
-                    selectedTaskIds.length === 0
-                  }
-                  className="az-btn-contractor mt-6 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
-                >
-                  {isSubmittingInterest
-                    ? "Submitting..."
-                    : hasSubmittedInterest
-                      ? "Interest submitted"
-                      : selectedTaskIds.length === 0
-                        ? "Select at least one task"
-                        : selectedTaskIds.length > 1
-                        ? "Submit interest for selected tasks"
-                        : "I\u2019m interested"}
-                </button>
-              ) : null}
+              {job.status === "open" ||
+              job.status === "hired" ||
+              hasSubmittedInterest ||
+              ["in_progress", "completed"].includes(job.status) ? (
+                <div className="az-contractor-action-bar sticky bottom-3 z-20 mt-6 rounded-[24px] p-2">
+                  {job.status === "open" ? (
+                    <button
+                      type="button"
+                      onClick={handleInterestSubmit}
+                      disabled={
+                        isSubmittingInterest ||
+                        hasSubmittedInterest ||
+                        selectedTaskIds.length === 0
+                      }
+                      className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+                    >
+                      {isSubmittingInterest
+                        ? "Submitting..."
+                        : hasSubmittedInterest
+                          ? "Interest submitted"
+                          : selectedTaskIds.length === 0
+                            ? "Select at least one task"
+                            : selectedTaskIds.length > 1
+                            ? "Submit interest for selected tasks"
+                            : "I\u2019m interested"}
+                    </button>
+                  ) : null}
 
-              {job.status === "hired" ? (
-                <button
-                  type="button"
-                  onClick={handleMarkInProgress}
-                  disabled={isUpdatingStatus}
-                  className="az-btn-contractor mt-6 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
-                >
-                  {isUpdatingStatus ? "Updating..." : "Mark in progress"}
-                </button>
-              ) : null}
+                  {job.status === "hired" ? (
+                    <button
+                      type="button"
+                      onClick={handleMarkInProgress}
+                      disabled={isUpdatingStatus}
+                      className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+                    >
+                      {isUpdatingStatus ? "Updating..." : "Mark in progress"}
+                    </button>
+                  ) : null}
 
-              {hasSubmittedInterest ||
-              ["hired", "in_progress", "completed"].includes(job.status) ? (
-                <button
-                  type="button"
-                  onClick={handleMessageCustomer}
-                  disabled={isOpeningThread}
-                  className="az-btn-contractor mt-3 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
-                >
-                  {isOpeningThread ? "Opening conversation..." : "Message customer"}
-                </button>
+                  {hasSubmittedInterest ||
+                  ["hired", "in_progress", "completed"].includes(job.status) ? (
+                    <button
+                      type="button"
+                      onClick={handleMessageCustomer}
+                      disabled={isOpeningThread}
+                      className="az-btn-contractor mt-2 flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+                    >
+                      {isOpeningThread ? "Opening conversation..." : "Message customer"}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </>
           ) : null}

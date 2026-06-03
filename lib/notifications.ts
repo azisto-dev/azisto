@@ -8,6 +8,7 @@ type CreateNotificationInput = {
   title: string;
   message: string;
   jobId: string;
+  threadId?: string;
 };
 
 export async function createNotification(input: CreateNotificationInput) {
@@ -25,6 +26,7 @@ export async function createNotification(input: CreateNotificationInput) {
     title: input.title,
     message: input.message,
     jobId: input.jobId,
+    threadId: input.threadId ?? "",
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   });

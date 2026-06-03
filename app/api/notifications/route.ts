@@ -50,6 +50,7 @@ function serializeNotification(data: Record<string, unknown>) {
     title: readText(data.title),
     message: readText(data.message),
     jobId: readText(data.jobId),
+    threadId: readText(data.threadId),
     read: data.read === true,
     createdAt: serializeTimestamp(data.createdAt),
   };
@@ -72,6 +73,35 @@ export async function GET(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
+    const body = (await request.json().catch(() => null)) as {
+      notificationId?: unknown;
+    } | null;
+    const notificationId = readText(body?.notificationId);
+
+    if (notificationId) {
+      const notificationSnapshot = await adminDb
+        .collection("notifications")
+        .doc(notificationId)
+        .get();
+
+      if (
+        notificationSnapshot.exists &&
+        notificationSnapshot.get("recipientAuthUid") === decodedToken.uid
+      ) {
+        await notificationSnapshot.ref.set(
+          {
+            read: true,
+            readAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return NextResponse.json({ ok: true, updated: 1 });
+      }
+
+      return NextResponse.json({ ok: true, updated: 0 });
+    }
+
     const notificationsSnapshot = await adminDb
       .collection("notifications")
       .where("recipientAuthUid", "==", decodedToken.uid)

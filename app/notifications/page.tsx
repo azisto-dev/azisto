@@ -11,11 +11,18 @@ import BottomNav from "@/app/components/BottomNav";
 
 type NotificationItem = {
   notificationId: string;
+  type: string;
   title: string;
   message: string;
   jobId: string;
+  threadId: string;
   read: boolean;
   createdAt: string;
+};
+
+type NotificationThreadLink = {
+  threadId: string;
+  jobId: string;
 };
 
 function StatusBar() {
@@ -63,15 +70,57 @@ async function fetchNotifications(user: User) {
     : [];
 }
 
-async function markNotificationsRead(user: User) {
+async function markNotificationsRead(user: User, notificationId?: string) {
   const token = await user.getIdToken();
 
   await fetch("/api/notifications", {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify(notificationId ? { notificationId } : {}),
   });
+}
+
+async function fetchMessageThreadLinks(user: User) {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/messages/threads", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = (await response.json().catch(() => null)) as {
+    threads?: unknown;
+  } | null;
+
+  if (!response.ok || !Array.isArray(body?.threads)) {
+    return [];
+  }
+
+  return body.threads
+    .map((thread) => {
+      const data =
+        typeof thread === "object" && thread !== null
+          ? (thread as Record<string, unknown>)
+          : {};
+
+      return {
+        threadId: typeof data.threadId === "string" ? data.threadId : "",
+        jobId: typeof data.jobId === "string" ? data.jobId : "",
+      };
+    })
+    .filter((thread): thread is NotificationThreadLink =>
+      Boolean(thread.threadId && thread.jobId),
+    );
+}
+
+function getNotificationHref(notification: NotificationItem) {
+  if (notification.type === "new_message") {
+    return notification.threadId
+      ? `/messages/${encodeURIComponent(notification.threadId)}`
+      : "/messages";
+  }
+
+  return notification.jobId ? `/customer/jobs` : "/notifications";
 }
 
 export default function NotificationsPage() {
@@ -80,6 +129,7 @@ export default function NotificationsPage() {
   const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
     "unknown",
   );
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -90,24 +140,17 @@ export default function NotificationsPage() {
         return;
       }
 
+      setCurrentUser(user);
+
       try {
         setIsLoading(true);
         setErrorMessage("");
         const profile = await fetchSessionProfile(user);
         setRole(profile.role);
         const userNotifications = await fetchNotifications(user);
-        setNotifications(userNotifications);
-        try {
-          await markNotificationsRead(user);
-          setNotifications(
-            userNotifications.map((notification) => ({
-              ...notification,
-              read: true,
-            })),
-          );
-        } catch (error) {
-          console.error("Mark notifications read failed:", error);
-        }
+        setNotifications(
+          userNotifications.filter((notification) => !notification.read),
+        );
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load notifications.");
       } finally {
@@ -117,6 +160,42 @@ export default function NotificationsPage() {
 
     return unsubscribe;
   }, [router]);
+
+  async function handleNotificationClick(notification: NotificationItem) {
+    let href = getNotificationHref(notification);
+
+    if (
+      notification.type === "new_message" &&
+      !notification.threadId &&
+      notification.jobId &&
+      currentUser
+    ) {
+      const matchingThread = (await fetchMessageThreadLinks(currentUser)).find(
+        (thread) => thread.jobId === notification.jobId,
+      );
+
+      if (matchingThread) {
+        href = `/messages/${encodeURIComponent(matchingThread.threadId)}`;
+      }
+    }
+
+    setNotifications((currentNotifications) =>
+      currentNotifications.filter(
+        (currentNotification) =>
+          currentNotification.notificationId !== notification.notificationId,
+      ),
+    );
+
+    if (currentUser) {
+      try {
+        await markNotificationsRead(currentUser, notification.notificationId);
+      } catch (error) {
+        console.error("Mark notification read failed:", error);
+      }
+    }
+
+    router.push(href);
+  }
 
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
@@ -167,9 +246,11 @@ export default function NotificationsPage() {
           ) : null}
           <section className="mt-6 space-y-3">
             {notifications.map((notification) => (
-              <article
+              <button
                 key={notification.notificationId}
-                className="az-contractor-card-compact p-4"
+                type="button"
+                onClick={() => void handleNotificationClick(notification)}
+                className="az-contractor-card-compact block w-full p-4 text-left transition hover:-translate-y-0.5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-sm font-bold text-[var(--azisto-contractor-text)]">
@@ -186,7 +267,7 @@ export default function NotificationsPage() {
                   <span className="text-[var(--azisto-contractor-burgundy)]">{notification.jobId}</span> ·{" "}
                   {formatDate(notification.createdAt)}
                 </p>
-              </article>
+              </button>
             ))}
           </section>
         </div>

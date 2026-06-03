@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { signOut } from "firebase/auth";
 import {
   BookOpen,
@@ -150,19 +151,19 @@ export default function AppMenu({ role }: { role: UserRole }) {
     {
       href: "/contact",
       label: "Contact AZISTO",
-      subtext: "Support and safety",
+      subtext: "",
       icon: Mail,
     },
     {
       href: "/help-safety",
       label: "Help & Safety",
-      subtext: "Booking guidance",
+      subtext: "",
       icon: ShieldCheck,
     },
     {
       href: "/legal",
       label: "Terms & Privacy",
-      subtext: "Legal placeholders",
+      subtext: "",
       icon: BookOpen,
     },
   ];
@@ -183,11 +184,12 @@ export default function AppMenu({ role }: { role: UserRole }) {
         )}
       </button>
 
-      {isOpen ? (
-        <div className="fixed inset-0 z-40 overflow-hidden bg-black/5 md:left-1/2 md:right-auto md:top-8 md:h-[min(780px,calc(100vh-4rem))] md:w-full md:max-w-[390px] md:-translate-x-1/2 md:rounded-[28px]">
+      {isOpen && typeof document !== "undefined"
+        ? createPortal(
+        <div className="fixed inset-0 z-[100] overflow-hidden bg-black/5 md:left-1/2 md:right-auto md:top-8 md:h-[min(780px,calc(100vh-4rem))] md:w-full md:max-w-[390px] md:-translate-x-1/2 md:rounded-[28px]">
           <aside
             ref={panelRef}
-            className="az-app-menu-panel az-contractor-shell flex h-fit w-[50%] min-w-[190px] max-w-[220px] flex-col rounded-r-3xl border border-l-0 border-[var(--azisto-contractor-border)] bg-[var(--azisto-contractor-bg)] p-3 text-[var(--azisto-contractor-text)] shadow-2xl shadow-black/15"
+            className="az-app-menu-panel az-contractor-shell flex h-fit w-[50%] min-w-[190px] max-w-[220px] flex-col rounded-r-3xl border border-l-0 border-[var(--azisto-contractor-border)] bg-[var(--azisto-contractor-bg)] p-3 text-[var(--azisto-contractor-text)] shadow-[0_16px_40px_rgba(92,0,50,0.18)]"
           >
             <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/80 p-3 shadow-lg shadow-black/5">
               <div className="flex items-center justify-between gap-3">
@@ -242,7 +244,7 @@ export default function AppMenu({ role }: { role: UserRole }) {
                         key={item.href}
                         href={item.href}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-2 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/85 px-2.5 py-2.5 text-[var(--azisto-contractor-text)] transition hover:bg-white"
+                        className="flex items-center gap-2 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/90 px-2.5 py-2.5 text-[var(--azisto-contractor-text)] shadow-[0_2px_8px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
                       >
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--azisto-contractor-soft)] text-[var(--azisto-contractor-burgundy)]">
                           <Icon aria-hidden={true} className="h-4 w-4" />
@@ -274,7 +276,7 @@ export default function AppMenu({ role }: { role: UserRole }) {
                         key={item.href}
                         href={item.href}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-2 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/85 px-2.5 py-2.5 text-[var(--azisto-contractor-text)] transition hover:bg-white"
+                        className="flex items-center gap-2 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/90 px-2.5 py-2.5 text-[var(--azisto-contractor-text)] shadow-[0_2px_8px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
                       >
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--azisto-contractor-soft)] text-[var(--azisto-contractor-text)]">
                           <Icon aria-hidden={true} className="h-4 w-4" />
@@ -283,9 +285,11 @@ export default function AppMenu({ role }: { role: UserRole }) {
                           <span className="block text-xs font-bold">
                             {item.label}
                           </span>
-                          <span className="mt-0.5 block text-[11px] font-semibold leading-4 text-[var(--azisto-contractor-muted)]">
-                            {item.subtext}
-                          </span>
+                          {item.subtext ? (
+                            <span className="mt-0.5 block text-[11px] font-semibold leading-4 text-[var(--azisto-contractor-muted)]">
+                              {item.subtext}
+                            </span>
+                          ) : null}
                         </span>
                       </Link>
                     );
@@ -299,15 +303,17 @@ export default function AppMenu({ role }: { role: UserRole }) {
                 type="button"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="mt-3 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-xs font-bold text-white shadow-sm shadow-[rgb(138_15_77_/_0.18)] transition hover:bg-[#6F0C3E] disabled:cursor-not-allowed disabled:opacity-60"
+                className="az-btn-contractor mt-3 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <LogOut aria-hidden="true" className="h-4 w-4" />
                 {isLoggingOut ? "Logging out..." : "Logout"}
               </button>
             ) : null}
           </aside>
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   );
 }

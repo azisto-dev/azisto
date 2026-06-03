@@ -6,6 +6,8 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   Camera,
+  Check,
+  CheckCheck,
   ChevronLeft,
   Image as ImageIcon,
   Paperclip,
@@ -28,6 +30,7 @@ import BottomNav from "@/app/components/BottomNav";
 type MessageThread = {
   threadId: string;
   jobId: string;
+  jobTitle: string;
   displayName: string;
   customerId: string;
   contractorId: string;
@@ -91,6 +94,38 @@ function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function getMessageReceipt(message: MessageItem) {
+  if (!message.createdAt) {
+    return { label: "Sent", state: "sent" as const };
+  }
+
+  if (message.readBy.length > 1) {
+    return { label: "Read", state: "read" as const };
+  }
+
+  return { label: "Delivered", state: "delivered" as const };
+}
+
+function MessageReceipt({ message }: { message: MessageItem }) {
+  const receipt = getMessageReceipt(message);
+  const className =
+    receipt.state === "read" ? "text-[#2563EB]" : "text-white/75";
+
+  return (
+    <span
+      className={`inline-flex items-center ${className}`}
+      aria-label={receipt.label}
+      title={receipt.label}
+    >
+      {receipt.state === "sent" ? (
+        <Check aria-hidden="true" className="h-3.5 w-3.5" />
+      ) : (
+        <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
+      )}
+    </span>
+  );
 }
 
 async function fetchMessages(user: User, threadId: string) {
@@ -551,38 +586,39 @@ export default function MessageThreadPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="az-contractor-hero-card mt-5 p-4">
+          <section className="az-contractor-soft-hero mt-5 p-4">
             <div className="relative z-10 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-white/75">Messages</p>
-                <h1 className="mt-1 text-2xl font-normal leading-7 text-white">
+                <p className="text-sm font-semibold text-[var(--azisto-contractor-muted)]">Messages</p>
+                <h1 className="mt-1 text-2xl font-normal leading-7 text-[var(--azisto-contractor-text)]">
                   {thread?.displayName || "Messages"}
                 </h1>
-                <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.09em] text-white/80">
-                  {thread?.jobId ?? "Conversation"}
+                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Active recently
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-white/20 bg-white/15 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-white">
+              <span className="shrink-0 rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-[var(--azisto-contractor-text)]">
                 {thread?.jobStatus
                   ? thread.jobStatus.replaceAll("_", " ")
                   : thread?.status || "Open"}
               </span>
             </div>
-            <div className="relative z-10 mt-4 space-y-1 text-[11px] font-semibold text-white/85">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-2 py-1">
-                <p className="min-w-0 truncate">Conversation</p>
-                <p className="shrink-0 text-right capitalize">
-                  {thread?.status || "Open thread"}
+            <div className="relative z-10 mt-4 rounded-xl border border-[var(--azisto-contractor-border)] bg-white/70 px-3 py-2 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+              <p className="truncate text-[var(--azisto-contractor-text)]">
+                {thread?.jobTitle || "Service request"}
+              </p>
+              <p className="mt-1 truncate">
+                {thread?.jobId ?? "Conversation"}
+              </p>
+              {thread?.selectedTaskLabels &&
+              thread.selectedTaskLabels.length > 0 ? (
+                <p className="mt-1 truncate text-[var(--azisto-contractor-muted)]">
+                  Tasks: {thread.selectedTaskLabels.join(", ")}
                 </p>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-2 py-1">
-                <p className="min-w-0 truncate">Role</p>
-                <p className="shrink-0 text-right capitalize">
-                  {thread?.currentUserRole || "Member"}
-                </p>
-              </div>
+              ) : null}
             </div>
-            <p className="relative z-10 mt-3 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold leading-5 text-white/85">
+            <p className="relative z-10 mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-600">
               Keep communication inside AZISTO until booking is confirmed.
             </p>
             {thread?.currentUserRole === "customer" &&
@@ -591,7 +627,7 @@ export default function MessageThreadPage() {
                 type="button"
                 onClick={handleMarkCompleted}
                 disabled={isUpdatingStatus}
-                className="relative z-10 mt-3 flex h-10 w-full items-center justify-center rounded-full border border-white/30 bg-white text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
+                className="relative z-10 mt-3 flex h-10 w-full items-center justify-center rounded-full border border-[var(--azisto-contractor-burgundy)] bg-white text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
               >
                 {isUpdatingStatus ? "Completing..." : "Mark job completed"}
               </button>
@@ -628,10 +664,10 @@ export default function MessageThreadPage() {
                   className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                    className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                       isOwnMessage
-                        ? "rounded-br-md border border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
-                        : "rounded-bl-md border border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-text)]"
+                        ? "az-message-bubble-outgoing rounded-br-md"
+                        : "az-message-bubble-incoming rounded-bl-md"
                     }`}
                   >
                     {message.text ? <p>{message.text}</p> : null}
@@ -654,15 +690,18 @@ export default function MessageThreadPage() {
                         ))}
                       </div>
                     ) : null}
-                    {message.createdAt ? (
-                      <p
-                        className={`mt-1 text-[11px] font-semibold ${
-                          isOwnMessage ? "text-white/75" : "text-slate-400"
-                        }`}
-                      >
-                        {formatMessageTime(message.createdAt)}
-                      </p>
-                    ) : null}
+                    <div
+                      className={`mt-1 flex items-center gap-1.5 text-[11px] font-semibold ${
+                        isOwnMessage
+                          ? "justify-end text-white/75"
+                          : "justify-start text-slate-400"
+                      }`}
+                    >
+                      {message.createdAt ? (
+                        <span>{formatMessageTime(message.createdAt)}</span>
+                      ) : null}
+                      {isOwnMessage ? <MessageReceipt message={message} /> : null}
+                    </div>
                   </div>
                 </div>
               );
@@ -698,7 +737,10 @@ export default function MessageThreadPage() {
             </div>
           ) : null}
 
-          <form onSubmit={handleSend} className="relative flex items-center gap-2">
+          <form
+            onSubmit={handleSend}
+            className="az-contractor-action-bar relative flex items-center gap-2 rounded-[22px] p-2"
+          >
             <input
               ref={takePhotoInputRef}
               type="file"
