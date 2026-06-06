@@ -30,11 +30,20 @@ export function getStatusChipClass(status: string) {
     return "az-status-chip az-status-success";
   }
 
-  if (normalizedStatus === "pending") {
+  if (
+    normalizedStatus === "pending" ||
+    normalizedStatus === "hired pending contractor" ||
+    normalizedStatus === "cancel requested"
+  ) {
     return "az-status-chip az-status-warning";
   }
 
-  if (normalizedStatus === "hired" || normalizedStatus === "in progress") {
+  if (
+    normalizedStatus === "hired" ||
+    normalizedStatus === "accepted" ||
+    normalizedStatus === "on the way" ||
+    normalizedStatus === "in progress"
+  ) {
     return "az-status-chip az-status-info";
   }
 
@@ -42,7 +51,10 @@ export function getStatusChipClass(status: string) {
     normalizedStatus === "cancelled" ||
     normalizedStatus === "canceled" ||
     normalizedStatus === "error" ||
-    normalizedStatus === "failed"
+    normalizedStatus === "failed" ||
+    normalizedStatus === "disputed" ||
+    normalizedStatus === "under review" ||
+    normalizedStatus === "rejected"
   ) {
     return "az-status-chip az-status-danger";
   }

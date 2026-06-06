@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Check, ChevronDown, ChevronLeft, Flag, MapPin, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -50,6 +51,10 @@ type ContractorJobDetail = {
   matchingStatus: string;
   hiredContractorId: string;
   hiredBusinessName: string;
+  contractorDecisionStatus: string;
+  isAssignedToCurrentContractor?: boolean;
+  assignedTaskIds?: string[];
+  contractorAssignedStatus?: string;
   tasks?: JobTask[];
 };
 
@@ -60,6 +65,8 @@ type JobTask = {
   subcategory: string;
   status: string;
   hiredContractorId: string;
+  hiredContractorAuthUid?: string;
+  contractorDecisionStatus?: string;
   interestedContractorIds: string[];
   contractorServiceMatch?: boolean;
 };
@@ -256,6 +263,41 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
   }
 }
 
+async function submitContractorDecision(
+  user: User,
+  jobId: string,
+  decision: "accepted" | "rejected",
+  reason?: string,
+) {
+  const token = await user.getIdToken();
+  const response = await fetch(
+    `/api/jobs/${encodeURIComponent(jobId)}/contractor-decision`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ decision, reason }),
+    },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    code?: unknown;
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw createApiError(
+      typeof responseBody?.code === "string"
+        ? responseBody.code
+        : `api/${response.status}`,
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : response.statusText,
+    );
+  }
+}
+
 export default function ContractorJobDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -279,6 +321,8 @@ export default function ContractorJobDetailPage() {
   const [lifecycleMessage, setLifecycleMessage] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [isMessagePromptOpen, setIsMessagePromptOpen] = useState(false);
+  const [isRejectPromptOpen, setIsRejectPromptOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const selectedReportReason =
     reportReasonOptions.find((option) => option.value === reportReason) ??
     { value: "other", label: "Other" };
@@ -292,7 +336,7 @@ export default function ContractorJobDetailPage() {
       requestedTaskId &&
       openTasks.some((task) => task.taskId === requestedTaskId)
         ? [requestedTaskId]
-        : [];
+        : jobDetails.assignedTaskIds ?? [];
 
     setJob(jobDetails);
     setSelectedTaskIds(initialTaskIds);
@@ -394,7 +438,10 @@ export default function ContractorJobDetailPage() {
     );
   }
 
-  async function handleMarkInProgress() {
+  async function handleLifecycleStatus(
+    status: "on_the_way" | "in_progress" | "completed",
+    successMessage: string,
+  ) {
     if (!currentUser || isUpdatingStatus) {
       return;
     }
@@ -402,9 +449,40 @@ export default function ContractorJobDetailPage() {
     try {
       setIsUpdatingStatus(true);
       setLifecycleMessage("");
-      await updateJobStatus(currentUser, jobId, "in_progress");
+      await updateJobStatus(currentUser, jobId, status);
       await loadJob(currentUser);
-      setLifecycleMessage("Job marked in progress");
+      setLifecycleMessage(successMessage);
+    } catch (error) {
+      setLifecycleMessage(getErrorMessage(error));
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  }
+
+  async function handleContractorDecision(
+    decision: "accepted" | "rejected",
+  ) {
+    if (!currentUser || isUpdatingStatus) {
+      return;
+    }
+
+    try {
+      setIsUpdatingStatus(true);
+      setLifecycleMessage("");
+      await submitContractorDecision(
+        currentUser,
+        jobId,
+        decision,
+        decision === "rejected" ? rejectReason : undefined,
+      );
+      setIsRejectPromptOpen(false);
+      setRejectReason("");
+      await loadJob(currentUser);
+      setLifecycleMessage(
+        decision === "accepted"
+          ? "Job accepted. Let the customer know when you are on the way."
+          : "Job declined. It is available to other contractors again.",
+      );
     } catch (error) {
       setLifecycleMessage(getErrorMessage(error));
     } finally {
@@ -486,7 +564,9 @@ export default function ContractorJobDetailPage() {
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold capitalize text-[var(--azisto-contractor-text)]">
-                      {job.status || "open"}
+                      {getJobStatusLabel(
+                        job.contractorAssignedStatus || job.status || "open",
+                      )}
                     </span>
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-3 text-sm leading-5">
@@ -556,7 +636,7 @@ export default function ContractorJobDetailPage() {
                           <span className={`${getStatusChipClass(task.status || "open")} shrink-0`}>
                             {task.contractorServiceMatch === false
                               ? "Not in profile"
-                              : task.status || "open"}
+                              : getJobStatusLabel(task.status || "open")}
                           </span>
                         </button>
                       );
@@ -732,12 +812,16 @@ export default function ContractorJobDetailPage() {
                 </p>
               ) : null}
 
-              {job.status === "open" ||
-              job.status === "hired" ||
+              {(job.status === "open" &&
+                !job.isAssignedToCurrentContractor) ||
+              job.isAssignedToCurrentContractor ||
               hasSubmittedInterest ||
-              ["in_progress", "completed"].includes(job.status) ? (
+              ["hired", "accepted", "on_the_way", "in_progress", "completed"].includes(
+                job.contractorAssignedStatus || job.status,
+              ) ? (
                 <div className="az-contractor-action-bar sticky bottom-3 z-20 mt-6 rounded-[24px] p-2">
-                  {job.status === "open" ? (
+                  {job.status === "open" &&
+                  !job.isAssignedToCurrentContractor ? (
                     <button
                       type="button"
                       onClick={handleInterestSubmit}
@@ -760,19 +844,85 @@ export default function ContractorJobDetailPage() {
                     </button>
                   ) : null}
 
-                  {job.status === "hired" ? (
+                  {(job.contractorAssignedStatus || job.status) ===
+                  "hired_pending_contractor" ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsRejectPromptOpen(true)}
+                        disabled={isUpdatingStatus}
+                        className="az-btn-contractor-outline flex h-14 items-center justify-center rounded-full text-sm font-bold"
+                      >
+                        Reject job
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleContractorDecision("accepted")}
+                        disabled={isUpdatingStatus}
+                        className="az-btn-contractor flex h-14 items-center justify-center rounded-full text-sm font-bold"
+                      >
+                        {isUpdatingStatus ? "Updating..." : "Accept job"}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {["accepted", "hired"].includes(
+                    job.contractorAssignedStatus || job.status,
+                  ) ? (
                     <button
                       type="button"
-                      onClick={handleMarkInProgress}
+                      onClick={() =>
+                        handleLifecycleStatus(
+                          "on_the_way",
+                          "Customer notified that you are on the way.",
+                        )
+                      }
                       disabled={isUpdatingStatus}
                       className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
                     >
-                      {isUpdatingStatus ? "Updating..." : "Mark in progress"}
+                      {isUpdatingStatus ? "Updating..." : "Mark on the way"}
+                    </button>
+                  ) : null}
+
+                  {(job.contractorAssignedStatus || job.status) ===
+                  "on_the_way" ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleLifecycleStatus(
+                          "in_progress",
+                          "Job marked in progress.",
+                        )
+                      }
+                      disabled={isUpdatingStatus}
+                      className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+                    >
+                      {isUpdatingStatus ? "Updating..." : "Start job"}
+                    </button>
+                  ) : null}
+
+                  {(job.contractorAssignedStatus || job.status) ===
+                  "in_progress" ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleLifecycleStatus(
+                          "completed",
+                          "Job marked completed.",
+                        )
+                      }
+                      disabled={isUpdatingStatus}
+                      className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+                    >
+                      {isUpdatingStatus ? "Updating..." : "Complete job"}
                     </button>
                   ) : null}
 
                   {hasSubmittedInterest ||
-                  ["hired", "in_progress", "completed"].includes(job.status) ? (
+                  job.isAssignedToCurrentContractor ||
+                  ["hired", "accepted", "on_the_way", "in_progress", "completed"].includes(
+                    job.contractorAssignedStatus || job.status,
+                  ) ? (
                     <button
                       type="button"
                       onClick={handleMessageCustomer}
@@ -825,6 +975,50 @@ export default function ContractorJobDetailPage() {
               className="az-btn-contractor mt-5 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
             >
               {isOpeningThread ? "Opening conversation..." : "Message customer"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {isRejectPromptOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-job-title"
+        >
+          <div className="az-contractor-card relative w-full max-w-[340px] p-5">
+            <button
+              type="button"
+              onClick={() => setIsRejectPromptOpen(false)}
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+              aria-label="Close reject prompt"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+            <h2
+              id="reject-job-title"
+              className="pr-10 text-lg font-bold text-[var(--azisto-contractor-text)]"
+            >
+              Reject this job?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+              The customer will be notified and the job will open to other
+              contractors again.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Reason (optional)"
+              className="mt-4 min-h-24 w-full resize-none rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 py-3 text-sm outline-none az-focus-field"
+            />
+            <button
+              type="button"
+              onClick={() => handleContractorDecision("rejected")}
+              disabled={isUpdatingStatus}
+              className="az-btn-danger-soft mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
+            >
+              {isUpdatingStatus ? "Updating..." : "Reject job"}
             </button>
           </div>
         </div>

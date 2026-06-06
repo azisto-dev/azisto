@@ -113,14 +113,23 @@ async function fetchMessageThreadLinks(user: User) {
     );
 }
 
-function getNotificationHref(notification: NotificationItem) {
+function getNotificationHref(
+  notification: NotificationItem,
+  role: "customer" | "contractor" | "unknown",
+) {
   if (notification.type === "new_message") {
     return notification.threadId
       ? `/messages/${encodeURIComponent(notification.threadId)}`
       : "/messages";
   }
 
-  return notification.jobId ? `/customer/jobs` : "/notifications";
+  if (!notification.jobId) {
+    return "/notifications";
+  }
+
+  return role === "contractor"
+    ? `/contractor/jobs/${encodeURIComponent(notification.jobId)}`
+    : "/customer/jobs";
 }
 
 export default function NotificationsPage() {
@@ -185,7 +194,7 @@ export default function NotificationsPage() {
   }, [router]);
 
   async function handleNotificationClick(notification: NotificationItem) {
-    let href = getNotificationHref(notification);
+    let href = getNotificationHref(notification, role);
 
     if (
       notification.type === "new_message" &&

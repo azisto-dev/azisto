@@ -492,7 +492,12 @@ export async function GET(request: NextRequest) {
     );
     const activePreferenceOverride = readQueryPreferences(request);
     const activePreferences = activePreferenceOverride ?? savedPreferences;
-    const [openJobsSnapshot, hiredJobsSnapshot, unreadMessagesCount] =
+    const [
+      openJobsSnapshot,
+      hiredJobsSnapshot,
+      hiredTaskParentsSnapshot,
+      unreadMessagesCount,
+    ] =
       await Promise.all([
         adminDb
           .collection("jobs")
@@ -502,6 +507,11 @@ export async function GET(request: NextRequest) {
         adminDb
           .collection("jobs")
           .where("hiredContractorId", "==", contractorId)
+          .limit(10)
+          .get(),
+        adminDb
+          .collection("jobs")
+          .where("hiredContractorIds", "array-contains", contractorId)
           .limit(10)
           .get(),
         getUnreadMessagesCount(decodedToken.uid),
@@ -550,9 +560,47 @@ export async function GET(request: NextRequest) {
       10,
     );
     const today = getTodayDateString();
-    const activeJob = hiredJobsSnapshot.docs
+    const directActiveJob = hiredJobsSnapshot.docs
       .map((jobSnapshot) => jobSnapshot.data())
-      .find((job) => ["hired", "in_progress"].includes(readText(job.status)));
+      .find((job) =>
+        [
+          "hired_pending_contractor",
+          "accepted",
+          "hired",
+          "on_the_way",
+          "in_progress",
+          "cancel_requested",
+        ].includes(readText(job.status)),
+      );
+    let taskActiveJob: Record<string, unknown> | undefined;
+
+    if (!directActiveJob) {
+      for (const parentSnapshot of hiredTaskParentsSnapshot.docs) {
+        const tasksSnapshot = await parentSnapshot.ref.collection("tasks").get();
+        const activeTask = tasksSnapshot.docs.find(
+          (taskSnapshot) =>
+            readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
+            [
+              "hired_pending_contractor",
+              "accepted",
+              "hired",
+              "on_the_way",
+              "in_progress",
+              "cancel_requested",
+            ].includes(readText(taskSnapshot.get("status"))),
+        );
+
+        if (activeTask) {
+          taskActiveJob = {
+            ...parentSnapshot.data(),
+            status: activeTask.get("status"),
+          };
+          break;
+        }
+      }
+    }
+
+    const activeJob = directActiveJob ?? taskActiveJob;
     const serializedActiveJob = activeJob
       ? {
           jobId: readText(activeJob.jobId),

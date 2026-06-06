@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -56,7 +57,12 @@ async function fetchActiveJobs(user: User) {
   return Array.isArray(body?.jobs) ? (body.jobs as ActiveJob[]) : [];
 }
 
-async function updateStatus(user: User, jobId: string, status: string) {
+async function updateStatus(
+  user: User,
+  jobId: string,
+  status: string,
+  cancelReason?: string,
+) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
     method: "POST",
@@ -64,7 +70,7 @@ async function updateStatus(user: User, jobId: string, status: string) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, cancelReason }),
   });
   const body = (await response.json().catch(() => null)) as {
     message?: unknown;
@@ -73,6 +79,8 @@ async function updateStatus(user: User, jobId: string, status: string) {
   if (!response.ok) {
     throw new Error(typeof body?.message === "string" ? body.message : "Unable to update job.");
   }
+
+  return body;
 }
 
 async function openThread(user: User, job: ActiveJob) {
@@ -145,6 +153,50 @@ export default function CustomerActiveJobsPage() {
     }
   }
 
+  async function handleCancel(job: ActiveJob) {
+    if (!user) return;
+    const compatibleStatus = job.status === "hired" ? "accepted" : job.status;
+    let cancelReason = "";
+
+    if (
+      compatibleStatus === "accepted" &&
+      !window.confirm(
+        "Your contractor has accepted this job. Cancelling now may affect your account reliability.",
+      )
+    ) {
+      return;
+    }
+
+    if (
+      compatibleStatus === "on_the_way" ||
+      compatibleStatus === "in_progress"
+    ) {
+      const enteredReason = window.prompt(
+        "Please tell us why you need to request cancellation.",
+      );
+
+      if (enteredReason === null) return;
+      cancelReason = enteredReason.trim();
+      if (!cancelReason) {
+        setErrorMessage("Please add a reason for this cancellation request.");
+        return;
+      }
+    }
+
+    try {
+      setActiveJobId(job.jobId);
+      setErrorMessage("");
+      await updateStatus(user, job.jobId, "cancelled", cancelReason);
+      await loadJobs(user);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to update job.",
+      );
+    } finally {
+      setActiveJobId("");
+    }
+  }
+
   async function handleMessage(job: ActiveJob) {
     if (!user) return;
     try {
@@ -186,7 +238,9 @@ export default function CustomerActiveJobsPage() {
                     <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">{job.jobId}</p>
                     <h2 className="mt-1 text-lg font-bold">{job.selectedServiceCategory || "Service request"}</h2>
                   </div>
-                  <span className={getStatusChipClass(job.status)}>{job.status}</span>
+                  <span className={getStatusChipClass(job.status)}>
+                    {getJobStatusLabel(job.status)}
+                  </span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">Contractor: {job.hiredBusinessName || job.hiredContractorName || job.hiredContractorId}</p>
                 <p className="mt-1 text-sm text-slate-600">{formatScheduleLabel(job)}</p>
@@ -201,14 +255,37 @@ export default function CustomerActiveJobsPage() {
                   <button type="button" onClick={() => handleMessage(job)} disabled={activeJobId === job.jobId} className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold">
                     <MessageCircle className="h-4 w-4" /> Message contractor
                   </button>
-                  {job.status === "in_progress" ? (
-                    <button type="button" onClick={() => handleStatus(job.jobId, "completed")} disabled={activeJobId === job.jobId} className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold">Mark completed</button>
-                  ) : null}
-                  {job.status === "hired" ? (
-                    <button type="button" onClick={() => handleStatus(job.jobId, "cancelled")} disabled={activeJobId === job.jobId} className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold">Cancel job</button>
+                  {[
+                    "hired_pending_contractor",
+                    "accepted",
+                    "hired",
+                    "on_the_way",
+                    "in_progress",
+                  ].includes(job.status) ? (
+                    <button type="button" onClick={() => handleCancel(job)} disabled={activeJobId === job.jobId} className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold">
+                      {["on_the_way", "in_progress"].includes(job.status)
+                        ? "Request cancellation"
+                        : "Cancel job"}
+                    </button>
                   ) : null}
                   {job.status === "completed" ? (
-                    <Link href={`/customer/jobs/${encodeURIComponent(job.jobId)}/review`} className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold">Review contractor</Link>
+                    <>
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
+                        Completed jobs cannot be cancelled. You can leave a
+                        review or contact support.
+                      </p>
+                      <Link href={`/customer/jobs/${encodeURIComponent(job.jobId)}/review`} className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold">Review contractor</Link>
+                    </>
+                  ) : null}
+                  {job.status === "cancel_requested" ? (
+                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                      Cancellation requested. The contractor has been notified.
+                    </p>
+                  ) : null}
+                  {job.status === "disputed" ? (
+                    <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                      This job is now under review.
+                    </p>
                   ) : null}
                 </div>
               </article>

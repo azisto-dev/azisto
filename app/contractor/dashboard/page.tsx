@@ -11,6 +11,11 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import {
+  getJobStatusLabel,
+  isContractorActiveStatus,
+  isContractorPastStatus,
+} from "@/lib/jobStatus";
 import BottomNav from "@/app/components/BottomNav";
 
 type DashboardTab = "active" | "available" | "past";
@@ -35,6 +40,7 @@ type AvailableJob = {
   preferredTimeWindow: string;
   schedule: JobSchedule | null;
   status: string;
+  contractorDecisionStatus: string;
   matchingStatus: string;
 };
 
@@ -209,38 +215,6 @@ async function fetchContractorJobs(user: User) {
     : [];
 }
 
-async function updateJobStatus(
-  user: User,
-  jobId: string,
-  status: string,
-  taskId?: string,
-) {
-  const token = await user.getIdToken();
-  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ status, taskId }),
-  });
-  const responseBody = (await response.json().catch(() => null)) as {
-    code?: unknown;
-    message?: unknown;
-  } | null;
-
-  if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
-      typeof responseBody?.message === "string"
-        ? responseBody.message
-        : response.statusText,
-    );
-  }
-}
-
 async function createMessageThread(user: User, job: ContractorJob) {
   const parentJobId = job.parentJobId || job.jobId;
   const token = await user.getIdToken();
@@ -326,7 +300,7 @@ export default function ContractorDashboardPage() {
       contractorJobs.filter(
         (job) =>
           job.relationship === "hired" &&
-          ["hired", "in_progress"].includes(job.status),
+          isContractorActiveStatus(job.status),
       ),
     [contractorJobs],
   );
@@ -335,7 +309,7 @@ export default function ContractorDashboardPage() {
       contractorJobs.filter(
         (job) =>
           job.relationship === "hired" &&
-          ["completed", "cancelled"].includes(job.status),
+          isContractorPastStatus(job.status),
       ),
     [contractorJobs],
   );
@@ -387,27 +361,6 @@ export default function ContractorDashboardPage() {
       setErrorMessage("");
       const threadId = await createMessageThread(currentUser, job);
       router.push(`/messages/${encodeURIComponent(threadId)}`);
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setActiveJobId("");
-    }
-  }
-
-  async function handleMarkInProgress(job: ContractorJob) {
-    if (!currentUser || activeJobId) {
-      return;
-    }
-
-    const parentJobId = job.parentJobId || job.jobId;
-
-    try {
-      setActiveJobId(job.jobId);
-      setErrorMessage("");
-      setSuccessMessage("");
-      await updateJobStatus(currentUser, parentJobId, "in_progress", job.taskId);
-      await loadDashboard(currentUser);
-      setSuccessMessage("Job marked in progress.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -544,7 +497,7 @@ export default function ContractorDashboardPage() {
                         Customer: {job.customerFirstName || "Customer"}
                       </p>
                       <p className="shrink-0 text-right capitalize">
-                        {job.status.replaceAll("_", " ")}
+                        {getJobStatusLabel(job.status)}
                       </p>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -564,16 +517,6 @@ export default function ContractorDashboardPage() {
                       <MessageCircle aria-hidden="true" className="h-3.5 w-3.5" />
                       Message customer
                     </button>
-                    {job.status === "hired" ? (
-                      <button
-                        type="button"
-                        onClick={() => handleMarkInProgress(job)}
-                        disabled={activeJobId === job.jobId}
-                        className="az-btn-contractor flex h-10 items-center justify-center rounded-full text-xs font-bold"
-                      >
-                        Mark in progress
-                      </button>
-                    ) : null}
                     <Link
                       href={`/contractor/jobs/${encodeURIComponent(
                         job.parentJobId || job.jobId,
@@ -696,7 +639,7 @@ export default function ContractorDashboardPage() {
                         Customer: {job.customerFirstName || "Customer"}
                       </p>
                       <p className="shrink-0 text-right capitalize">
-                        {job.status.replaceAll("_", " ")}
+                        {getJobStatusLabel(job.status)}
                       </p>
                     </div>
                     <div className="flex items-center justify-between gap-3">

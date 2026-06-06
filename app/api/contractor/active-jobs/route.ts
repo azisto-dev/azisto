@@ -7,7 +7,14 @@ import {
 
 export const runtime = "nodejs";
 
-const activeStatuses = new Set(["hired", "in_progress", "completed"]);
+const activeStatuses = new Set([
+  "hired_pending_contractor",
+  "accepted",
+  "hired",
+  "on_the_way",
+  "in_progress",
+  "cancel_requested",
+]);
 
 function getBearerToken(authorizationHeader: string | null) {
   return authorizationHeader?.startsWith("Bearer ")
@@ -79,6 +86,8 @@ async function findContractorId(firebaseUid: string) {
 function serializeJob(data: Record<string, unknown>) {
   return {
     jobId: readText(data.jobId),
+    parentJobId: readText(data.parentJobId),
+    taskId: readText(data.taskId),
     customerId: readText(data.customerId),
     selectedServiceCategory: readText(data.selectedServiceCategory),
     selectedSubcategories: readStringList(data.selectedSubcategories),
@@ -93,6 +102,42 @@ function serializeJob(data: Record<string, unknown>) {
     schedule: readSchedule(data.schedule),
     createdAt: serializeTimestamp(data.createdAt),
   };
+}
+
+function serializeTaskJob(
+  parentData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+) {
+  const parentJobId =
+    readText(taskData.parentJobId) || readText(parentData.jobId);
+  const taskId = readText(taskData.taskId);
+  const subcategory = readText(taskData.subcategory);
+
+  return serializeJob({
+    ...parentData,
+    jobId: taskId || parentJobId,
+    parentJobId,
+    taskId,
+    selectedServiceCategory:
+      readText(taskData.category) ||
+      readText(parentData.selectedServiceCategory),
+    selectedSubcategories: subcategory ? [subcategory] : [],
+    city: readText(taskData.city) || readText(parentData.city),
+    province: readText(taskData.province) || readText(parentData.province),
+    status: readText(taskData.status) || readText(parentData.status),
+    scheduleMode:
+      readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
+    preferredDate:
+      readText(taskData.preferredDate) || readText(parentData.preferredDate),
+    preferredTime:
+      readText(taskData.preferredTime) || readText(parentData.preferredTime),
+    preferredTimeWindow:
+      readText(taskData.preferredTimeWindow) ||
+      readText(parentData.preferredTimeWindow),
+    urgency: readText(taskData.urgency) || readText(parentData.urgency),
+    schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
+    createdAt: taskData.createdAt ?? parentData.createdAt,
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -118,14 +163,46 @@ export async function GET(request: NextRequest) {
       .collection("jobs")
       .where("hiredContractorId", "==", contractorId)
       .get();
-    const jobs = jobsSnapshot.docs
+    const taskParentsSnapshot = await adminDb
+      .collection("jobs")
+      .where("hiredContractorIds", "array-contains", contractorId)
+      .get();
+    const jobsById = new Map<string, ReturnType<typeof serializeJob>>();
+
+    jobsSnapshot.docs
       .filter((documentSnapshot) =>
         activeStatuses.has(readText(documentSnapshot.get("status"))),
       )
-      .map((documentSnapshot) => serializeJob(documentSnapshot.data()))
-      .sort((firstJob, secondJob) =>
-        secondJob.createdAt.localeCompare(firstJob.createdAt),
-      );
+      .forEach((documentSnapshot) => {
+        jobsById.set(
+          documentSnapshot.id,
+          serializeJob(documentSnapshot.data()),
+        );
+      });
+
+    for (const parentSnapshot of taskParentsSnapshot.docs) {
+      const tasksSnapshot = await parentSnapshot.ref.collection("tasks").get();
+
+      tasksSnapshot.docs
+        .filter(
+          (taskSnapshot) =>
+            readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
+            activeStatuses.has(readText(taskSnapshot.get("status"))),
+        )
+        .forEach((taskSnapshot) => {
+          jobsById.set(
+            taskSnapshot.id,
+            serializeTaskJob(
+              parentSnapshot.data() ?? {},
+              taskSnapshot.data() ?? {},
+            ),
+          );
+        });
+    }
+
+    const jobs = Array.from(jobsById.values()).sort((firstJob, secondJob) =>
+      secondJob.createdAt.localeCompare(firstJob.createdAt),
+    );
 
     return NextResponse.json({ ok: true, jobs });
   } catch (error) {

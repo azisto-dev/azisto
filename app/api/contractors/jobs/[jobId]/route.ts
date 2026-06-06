@@ -188,8 +188,10 @@ async function serializeJob(data: Record<string, unknown>) {
       typeof data.matchingStatus === "string" ? data.matchingStatus : "",
     hiredContractorId:
       typeof data.hiredContractorId === "string" ? data.hiredContractorId : "",
+    hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
     hiredBusinessName:
       typeof data.hiredBusinessName === "string" ? data.hiredBusinessName : "",
+    contractorDecisionStatus: readText(data.contractorDecisionStatus),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -204,6 +206,7 @@ function serializeTask(data: Record<string, unknown>) {
     status: readText(data.status),
     hiredContractorId: readText(data.hiredContractorId),
     hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
+    contractorDecisionStatus: readText(data.contractorDecisionStatus),
     interestedContractorIds: readStringList(data.interestedContractorIds),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
@@ -330,6 +333,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
           task.hiredContractorId === contractorId,
       );
     const hasOpenTask = tasks.some((task) => task.status === "open");
+    const assignedTasks = tasks.filter(
+      (task) =>
+        task.hiredContractorAuthUid === decodedToken.uid ||
+        task.hiredContractorId === contractorId,
+    );
+    const assignedTaskIds = assignedTasks.map((task) => task.taskId);
+    const contractorAssignedStatus =
+      assignedTasks.find((task) => task.status === "in_progress")?.status ||
+      assignedTasks.find((task) => task.status === "on_the_way")?.status ||
+      assignedTasks.find(
+        (task) => task.status === "accepted" || task.status === "hired",
+      )?.status ||
+      assignedTasks.find(
+        (task) => task.status === "hired_pending_contractor",
+      )?.status ||
+      assignedTasks.find((task) => task.status === "cancel_requested")?.status ||
+      assignedTasks.find((task) => task.status === "disputed")?.status ||
+      assignedTasks.find((task) => task.status === "completed")?.status ||
+      assignedTasks.find((task) => task.status === "cancelled")?.status ||
+      (callerIsHiredContractor ? job.status : "");
 
     if (job.status !== "open" && !hasOpenTask && !callerIsHiredContractor) {
       return NextResponse.json(
@@ -341,7 +364,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ ok: true, job: { ...job, tasks } });
+    return NextResponse.json({
+      ok: true,
+      job: {
+        ...job,
+        tasks,
+        isAssignedToCurrentContractor: callerIsHiredContractor,
+        assignedTaskIds,
+        contractorAssignedStatus,
+      },
+    });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 

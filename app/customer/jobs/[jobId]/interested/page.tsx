@@ -243,7 +243,9 @@ export default function CustomerInterestedContractorsPage() {
         contractor.contractorId,
         contractor.taskIds,
       );
-      setSuccessMessage("Contractor hired successfully");
+      setSuccessMessage(
+        "Contractor selected. Waiting for them to accept the job.",
+      );
       router.push("/customer/jobs");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));

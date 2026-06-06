@@ -167,6 +167,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const interestedSnapshot = await jobDocument
       .collection("interestedContractors")
       .get();
+    const rejectedContractorIds = new Set(
+      readStringList(jobSnapshot.get("rejectedContractorIds")),
+    );
     const groupedContractors = new Map<
       string,
       ReturnType<typeof serializeInterestedContractor>
@@ -175,7 +178,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     interestedSnapshot.docs.forEach((documentSnapshot) => {
       const contractor = serializeInterestedContractor(documentSnapshot.data());
 
-      if (contractor.contractorId) {
+      if (
+        contractor.contractorId &&
+        !rejectedContractorIds.has(contractor.contractorId)
+      ) {
         groupedContractors.set(contractor.contractorId, contractor);
       }
     });
@@ -199,7 +205,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
             documentSnapshot.data(),
           );
 
-          if (!contractor.contractorId) {
+          if (
+            !contractor.contractorId ||
+            rejectedContractorIds.has(contractor.contractorId)
+          ) {
             return;
           }
 

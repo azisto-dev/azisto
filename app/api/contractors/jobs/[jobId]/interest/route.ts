@@ -91,7 +91,16 @@ async function getActiveContractorParentJobIds(contractorId: string) {
     .get();
 
   jobsSnapshot.docs.forEach((jobSnapshot) => {
-    if (["hired", "in_progress"].includes(readText(jobSnapshot.get("status")))) {
+    if (
+      [
+        "hired_pending_contractor",
+        "accepted",
+        "hired",
+        "on_the_way",
+        "in_progress",
+        "cancel_requested",
+      ].includes(readText(jobSnapshot.get("status")))
+    ) {
       parentJobIds.add(readText(jobSnapshot.get("jobId")) || jobSnapshot.id);
     }
   });
@@ -103,7 +112,14 @@ async function getActiveContractorParentJobIds(contractorId: string) {
       tasksSnapshot.docs.forEach((taskSnapshot) => {
         if (
           readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
-          ["hired", "in_progress"].includes(readText(taskSnapshot.get("status")))
+          [
+            "hired_pending_contractor",
+            "accepted",
+            "hired",
+            "on_the_way",
+            "in_progress",
+            "cancel_requested",
+          ].includes(readText(taskSnapshot.get("status")))
         ) {
           parentJobIds.add(readText(taskSnapshot.get("parentJobId")) || jobSnapshot.id);
         }

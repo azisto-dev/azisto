@@ -106,6 +106,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const hiredContractorAuthUid =
       readText(interestedContractor.get("contractorUid")) ||
       interestedContractor.id;
+    const hiredContractorName =
+      readText(interestedContractor.get("contractorName")) ||
+      readText(interestedContractor.get("businessName")) ||
+      contractorId;
+    const hiredBusinessName = readText(
+      interestedContractor.get("businessName"),
+    );
     const savedInterestedTaskIds = readStringList(
       interestedContractor.get("selectedTaskIds"),
     );
@@ -181,10 +188,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
           transaction.set(
             taskSnapshot.ref,
             {
-              status: "hired",
+              status: "hired_pending_contractor",
               hiredContractorId: contractorId,
               hiredContractorAuthUid,
+              hiredContractorName,
+              hiredBusinessName,
               hiredAt: FieldValue.serverTimestamp(),
+              contractorDecisionStatus: "pending",
               updatedAt: FieldValue.serverTimestamp(),
             },
             { merge: true },
@@ -197,17 +207,31 @@ export async function POST(request: NextRequest, context: RouteContext) {
           return taskSnapshot.get("status") === "open" && !taskIds.includes(taskId);
         }).length;
         const nextOverallStatus =
-          remainingOpenTaskCount > 0 ? "partially_hired" : "hired";
+          remainingOpenTaskCount > 0
+            ? "partially_hired"
+            : "hired_pending_contractor";
 
         transaction.set(
           jobDocument,
           {
-            status: remainingOpenTaskCount > 0 ? "open" : "hired",
+            status:
+              remainingOpenTaskCount > 0
+                ? "open"
+                : "hired_pending_contractor",
             overallStatus: nextOverallStatus,
-            matchingStatus: remainingOpenTaskCount > 0 ? "pending" : "closed",
+            matchingStatus: remainingOpenTaskCount > 0 ? "open" : "closed",
+            ...(remainingOpenTaskCount === 0
+              ? {
+                  hiredContractorId: contractorId,
+                  hiredContractorAuthUid,
+                  hiredContractorName,
+                  hiredBusinessName,
+                }
+              : {}),
             hiredContractorIds: FieldValue.arrayUnion(contractorId),
             hiredContractorAuthUids: FieldValue.arrayUnion(hiredContractorAuthUid),
             hiredAt: FieldValue.serverTimestamp(),
+            contractorDecisionStatus: "pending",
             updatedAt: FieldValue.serverTimestamp(),
           },
           { merge: true },
@@ -216,8 +240,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         transaction.set(jobDocument.collection("statusHistory").doc(), {
           fromStatus: readText(jobSnapshot.get("overallStatus")) || "open",
           toStatus: nextOverallStatus,
+          status: nextOverallStatus,
           changedByRole: "customer",
-          note: `Customer hired contractor for ${selectedTaskSnapshots.length} task(s)`,
+          changedByUid: decodedToken.uid,
+          note: `Customer selected contractor for ${selectedTaskSnapshots.length} task(s); contractor confirmation pending`,
           selectedTaskIds: taskIds,
           changedAt: FieldValue.serverTimestamp(),
         });
@@ -228,16 +254,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       transaction.set(
         jobDocument,
         {
-          status: "hired",
-          overallStatus: "hired",
+          status: "hired_pending_contractor",
+          overallStatus: "hired_pending_contractor",
           matchingStatus: "closed",
           hiredContractorId: contractorId,
           hiredContractorAuthUid,
-          hiredContractorName: readText(
-            interestedContractor.get("contractorName"),
-          ),
-          hiredBusinessName: readText(interestedContractor.get("businessName")),
+          hiredContractorName,
+          hiredBusinessName,
           hiredAt: FieldValue.serverTimestamp(),
+          contractorDecisionStatus: "pending",
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },
@@ -245,18 +270,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       transaction.set(jobDocument.collection("statusHistory").doc(), {
         fromStatus: "open",
-        toStatus: "hired",
+        toStatus: "hired_pending_contractor",
+        status: "hired_pending_contractor",
         changedByRole: "customer",
-        note: "Customer hired contractor",
+        changedByUid: decodedToken.uid,
+        note: "Customer selected contractor; awaiting contractor decision",
         changedAt: FieldValue.serverTimestamp(),
       });
     });
     await createNotification({
       recipientAuthUid: hiredContractorAuthUid,
       recipientRole: "contractor",
-      type: "contractor_hired",
-      title: "You were hired",
-      message: `You were hired for job ${jobId}.`,
+      type: "contractor_selected",
+      title: "You were selected",
+      message: "You have been selected for a job. Please accept or decline.",
       jobId,
     });
 

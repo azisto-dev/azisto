@@ -7,7 +7,16 @@ import {
 
 export const runtime = "nodejs";
 
-const activeStatuses = new Set(["hired", "in_progress", "completed"]);
+const activeStatuses = new Set([
+  "hired_pending_contractor",
+  "accepted",
+  "hired",
+  "on_the_way",
+  "in_progress",
+  "cancel_requested",
+  "disputed",
+  "completed",
+]);
 
 function getBearerToken(authorizationHeader: string | null) {
   return authorizationHeader?.startsWith("Bearer ")

@@ -7,11 +7,14 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import { getJobStatusLabel } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type ActiveJob = {
   jobId: string;
+  parentJobId?: string;
+  taskId?: string;
   customerId: string;
   selectedServiceCategory: string;
   selectedSubcategories: string[];
@@ -54,25 +57,6 @@ async function fetchActiveJobs(user: User) {
   }
 
   return Array.isArray(body?.jobs) ? (body.jobs as ActiveJob[]) : [];
-}
-
-async function updateStatus(user: User, jobId: string) {
-  const token = await user.getIdToken();
-  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ status: "in_progress" }),
-  });
-  const body = (await response.json().catch(() => null)) as {
-    message?: unknown;
-  } | null;
-
-  if (!response.ok) {
-    throw new Error(typeof body?.message === "string" ? body.message : "Unable to update job.");
-  }
 }
 
 async function openThread(user: User, jobId: string) {
@@ -144,19 +128,6 @@ export default function ContractorActiveJobsPage() {
     }
   }
 
-  async function handleInProgress(jobId: string) {
-    if (!user) return;
-    try {
-      setActiveJobId(jobId);
-      await updateStatus(user, jobId);
-      await loadJobs(user);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to update job.");
-    } finally {
-      setActiveJobId("");
-    }
-  }
-
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
@@ -183,20 +154,32 @@ export default function ContractorActiveJobsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">{job.jobId}</p>
+                    {job.parentJobId ? (
+                      <p className="mt-1 text-xs font-semibold text-[var(--azisto-contractor-muted)]">
+                        Parent job: {job.parentJobId}
+                      </p>
+                    ) : null}
                     <h2 className="mt-1 text-lg font-normal text-[var(--azisto-contractor-text)]">{job.selectedServiceCategory || "Service request"}</h2>
                   </div>
-                  <span className={getStatusChipClass(job.status)}>{job.status}</span>
+                  <span className={getStatusChipClass(job.status)}>
+                    {getJobStatusLabel(job.status)}
+                  </span>
                 </div>
                 <p className="mt-3 text-sm text-[var(--azisto-contractor-muted)]">Customer: {job.customerId}</p>
                 <p className="mt-1 text-sm text-[var(--azisto-contractor-muted)]">{[job.city, job.province].filter(Boolean).join(", ")}</p>
                 <p className="mt-1 text-sm text-[var(--azisto-contractor-muted)]">{formatScheduleLabel(job)}</p>
                 <div className="mt-4 grid gap-2">
-                  <button type="button" onClick={() => handleMessage(job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-contractor flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold">
+                  <button type="button" onClick={() => handleMessage(job.parentJobId || job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-contractor flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold">
                     <MessageCircle className="h-4 w-4" /> Message customer
                   </button>
-                  {job.status === "hired" ? (
-                    <button type="button" onClick={() => handleInProgress(job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold">Mark in progress</button>
-                  ) : null}
+                  <Link
+                    href={`/contractor/jobs/${encodeURIComponent(
+                      job.parentJobId || job.jobId,
+                    )}${job.taskId ? `?taskId=${encodeURIComponent(job.taskId)}` : ""}`}
+                    className="az-btn-contractor-outline flex h-12 items-center justify-center rounded-full text-sm font-bold"
+                  >
+                    Manage job
+                  </Link>
                 </div>
               </article>
             ))}

@@ -8,6 +8,10 @@ import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import {
+  getJobStatusLabel,
+  isContractorActiveStatus,
+} from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -79,33 +83,6 @@ async function fetchContractorJobs(user: User) {
     : [];
 }
 
-async function updateJobStatus(user: User, jobId: string, status: string) {
-  const token = await user.getIdToken();
-  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ status }),
-  });
-  const responseBody = (await response.json().catch(() => null)) as {
-    code?: unknown;
-    message?: unknown;
-  } | null;
-
-  if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
-      typeof responseBody?.message === "string"
-        ? responseBody.message
-        : response.statusText,
-    );
-  }
-}
-
 async function createMessageThread(user: User, jobId: string) {
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
@@ -142,12 +119,10 @@ function JobCard({
   job,
   activeJobId,
   onMessage,
-  onMarkInProgress,
 }: {
   job: ContractorJob;
   activeJobId: string;
   onMessage: (jobId: string) => void;
-  onMarkInProgress: (jobId: string) => void;
 }) {
   return (
     <article className="az-contractor-card-compact p-4">
@@ -161,7 +136,7 @@ function JobCard({
           </h3>
         </div>
         <span className={getStatusChipClass(job.status || "open")}>
-          {job.status || "open"}
+          {getJobStatusLabel(job.status || "open")}
         </span>
       </div>
 
@@ -203,16 +178,6 @@ function JobCard({
           <MessageCircle aria-hidden="true" className="h-4 w-4" />
           Message customer
         </button>
-        {job.status === "hired" ? (
-          <button
-            type="button"
-            onClick={() => onMarkInProgress(job.jobId)}
-            disabled={activeJobId === job.jobId}
-            className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
-          >
-            Mark in progress
-          </button>
-        ) : null}
       </div>
     </article>
   );
@@ -232,7 +197,7 @@ export default function ContractorMyJobsPage() {
         (job) => job.relationship === "interested" && job.status === "open",
       ),
       active: jobs.filter((job) =>
-        ["hired", "in_progress"].includes(job.status),
+        isContractorActiveStatus(job.status),
       ),
       completed: jobs.filter((job) => job.status === "completed"),
     }),
@@ -294,23 +259,6 @@ export default function ContractorMyJobsPage() {
       setErrorMessage("");
       const threadId = await createMessageThread(currentUser, jobId);
       router.push(`/messages/${encodeURIComponent(threadId)}`);
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setActiveJobId("");
-    }
-  }
-
-  async function handleMarkInProgress(jobId: string) {
-    if (!currentUser || activeJobId) {
-      return;
-    }
-
-    try {
-      setActiveJobId(jobId);
-      setErrorMessage("");
-      await updateJobStatus(currentUser, jobId, "in_progress");
-      await loadJobs(currentUser);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -404,11 +352,10 @@ export default function ContractorMyJobsPage() {
                     {section.jobs.map((job) => (
                       <JobCard
                         key={job.jobId}
-                        job={job}
-                        activeJobId={activeJobId}
-                        onMessage={handleMessage}
-                        onMarkInProgress={handleMarkInProgress}
-                      />
+                      job={job}
+                      activeJobId={activeJobId}
+                      onMessage={handleMessage}
+                    />
                     ))}
                   </div>
                 </section>

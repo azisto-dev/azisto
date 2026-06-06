@@ -137,6 +137,7 @@ async function serializeJob(data: Record<string, unknown>, relationship: string)
     urgency: readText(data.urgency),
     schedule: readSchedule(data.schedule),
     status: readText(data.status),
+    contractorDecisionStatus: readText(data.contractorDecisionStatus),
     matchingStatus: readText(data.matchingStatus),
     hiredContractorId: readText(data.hiredContractorId),
     hiredBusinessName: readText(data.hiredBusinessName),
@@ -181,6 +182,9 @@ async function serializeTaskJob(
         readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
       schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
       status: readText(taskData.status) || readText(parentData.status),
+      contractorDecisionStatus:
+        readText(taskData.contractorDecisionStatus) ||
+        readText(parentData.contractorDecisionStatus),
       hiredContractorId: readText(taskData.hiredContractorId),
       createdAt: taskData.createdAt ?? parentData.createdAt,
       updatedAt: taskData.updatedAt ?? parentData.updatedAt,
@@ -270,8 +274,14 @@ export async function GET(request: NextRequest) {
       }
 
       const jobStatus = readText(jobSnapshot.get("status"));
+      const rejectedContractorIds = readStringList(
+        jobSnapshot.get("rejectedContractorIds"),
+      );
 
-      if (jobStatus !== "open") {
+      if (
+        jobStatus !== "open" ||
+        rejectedContractorIds.includes(contractorId)
+      ) {
         continue;
       }
 

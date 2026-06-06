@@ -597,7 +597,7 @@ export default function MessageThreadPage() {
       );
       setIsHirePromptOpen(false);
       setHireStatusMessage(
-        "Contractor hired. Your phone no. was shared in this conversation.",
+        "Contractor selected. Your phone no. was shared while you wait for their decision.",
       );
       await loadMessages(currentUser);
     } catch (error) {
