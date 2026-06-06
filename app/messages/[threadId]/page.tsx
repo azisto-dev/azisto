@@ -322,6 +322,53 @@ export default function MessageThreadPage() {
     (thread.jobStatus === "open" ||
       thread.jobStatus === "partially_hired" ||
       !thread.jobStatus);
+  const isCustomerThread = thread?.currentUserRole !== "contractor";
+  const shellClass = isCustomerThread
+    ? "az-customer-shell min-h-screen md:px-6 md:py-8"
+    : "az-contractor-shell min-h-screen md:px-6 md:py-8";
+  const frameClass = isCustomerThread
+    ? "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border"
+    : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
+  const heroClass = isCustomerThread
+    ? "az-customer-card mt-5 bg-gradient-to-br from-white via-blue-50 to-white p-4"
+    : "az-contractor-soft-hero mt-5 p-4";
+  const compactCardClass = isCustomerThread
+    ? "az-customer-card"
+    : "az-contractor-card-compact";
+  const modalCardClass = isCustomerThread
+    ? "az-customer-card"
+    : "az-contractor-card";
+  const primaryTextClass = isCustomerThread
+    ? "text-[#0F172A]"
+    : "text-[var(--azisto-contractor-text)]";
+  const mutedTextClass = isCustomerThread
+    ? "text-[#64748B]"
+    : "text-[var(--azisto-contractor-muted)]";
+  const accentTextClass = isCustomerThread
+    ? "text-azisto-accent"
+    : "text-[var(--azisto-contractor-burgundy)]";
+  const detailPanelClass = isCustomerThread
+    ? "border-azisto-border bg-white/80 text-[#64748B]"
+    : "border-[var(--azisto-contractor-border)] bg-white/70 text-[var(--azisto-contractor-muted)]";
+  const composerClass = isCustomerThread
+    ? "relative flex items-center gap-2 rounded-[22px] border border-azisto-border bg-white/90 p-2 shadow-[0_-4px_18px_rgba(15,23,42,0.06)] backdrop-blur"
+    : "az-contractor-action-bar relative flex items-center gap-2 rounded-[22px] p-2";
+  const attachAccentClass = isCustomerThread
+    ? "text-azisto-accent"
+    : "text-[var(--azisto-contractor-burgundy)]";
+  const attachButtonClass = isCustomerThread
+    ? "flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-azisto-border bg-white text-azisto-accent"
+    : "flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-burgundy)]";
+  const inputClass = isCustomerThread
+    ? "h-12 min-w-0 flex-1 rounded-[18px] border border-azisto-border bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-blue-100"
+    : "h-12 min-w-0 flex-1 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]";
+  const activeSendClass = isCustomerThread
+    ? "border-azisto-accent bg-azisto-accent text-white shadow-sm shadow-blue-200"
+    : "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white shadow-sm shadow-[rgb(138_15_77_/_0.18)]";
+  const outlineButtonClass = isCustomerThread
+    ? "border-azisto-accent bg-white text-azisto-accent"
+    : "border-[var(--azisto-contractor-burgundy)] bg-white text-[var(--azisto-contractor-burgundy)]";
+  const primaryButtonClass = isCustomerThread ? "az-btn-primary" : "az-btn-contractor";
 
   async function loadMessages(user: User) {
     if (
@@ -561,8 +608,8 @@ export default function MessageThreadPage() {
   }
 
   return (
-    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+    <main className={shellClass}>
+      <div className={frameClass}>
         <div className="flex min-h-screen flex-1 flex-col px-5 pb-5 pt-5 md:min-h-[780px]">
           <StatusBar />
 
@@ -586,26 +633,26 @@ export default function MessageThreadPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="az-contractor-soft-hero mt-5 p-4">
+          <section className={heroClass}>
             <div className="relative z-10 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[var(--azisto-contractor-muted)]">Messages</p>
-                <h1 className="mt-1 text-2xl font-normal leading-7 text-[var(--azisto-contractor-text)]">
+                <p className={`text-sm font-semibold ${mutedTextClass}`}>Messages</p>
+                <h1 className={`mt-1 text-2xl font-normal leading-7 ${primaryTextClass}`}>
                   {thread?.displayName || "Messages"}
                 </h1>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+                <p className={`mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold ${mutedTextClass}`}>
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                   Active recently
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 text-[var(--azisto-contractor-text)]">
+              <span className={`shrink-0 rounded-full border bg-white/80 px-2 py-0.5 text-right text-[13px] font-bold capitalize leading-5 ${isCustomerThread ? "border-azisto-border text-[#0F172A]" : "border-[var(--azisto-contractor-border)] text-[var(--azisto-contractor-text)]"}`}>
                 {thread?.jobStatus
                   ? thread.jobStatus.replaceAll("_", " ")
                   : thread?.status || "Open"}
               </span>
             </div>
-            <div className="relative z-10 mt-4 rounded-xl border border-[var(--azisto-contractor-border)] bg-white/70 px-3 py-2 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
-              <p className="truncate text-[var(--azisto-contractor-text)]">
+            <div className={`relative z-10 mt-4 rounded-xl border px-3 py-2 text-[11px] font-semibold ${detailPanelClass}`}>
+              <p className={`truncate ${primaryTextClass}`}>
                 {thread?.jobTitle || "Service request"}
               </p>
               <p className="mt-1 truncate">
@@ -613,7 +660,7 @@ export default function MessageThreadPage() {
               </p>
               {thread?.selectedTaskLabels &&
               thread.selectedTaskLabels.length > 0 ? (
-                <p className="mt-1 truncate text-[var(--azisto-contractor-muted)]">
+                <p className={`mt-1 truncate ${mutedTextClass}`}>
                   Tasks: {thread.selectedTaskLabels.join(", ")}
                 </p>
               ) : null}
@@ -627,7 +674,7 @@ export default function MessageThreadPage() {
                 type="button"
                 onClick={handleMarkCompleted}
                 disabled={isUpdatingStatus}
-                className="relative z-10 mt-3 flex h-10 w-full items-center justify-center rounded-full border border-[var(--azisto-contractor-burgundy)] bg-white text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
+                className={`relative z-10 mt-3 flex h-10 w-full items-center justify-center rounded-full border text-xs font-bold ${outlineButtonClass}`}
               >
                 {isUpdatingStatus ? "Completing..." : "Mark job completed"}
               </button>
@@ -635,7 +682,7 @@ export default function MessageThreadPage() {
           </section>
 
           {isLoading ? (
-            <p className="az-contractor-card-compact mt-5 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+            <p className={`${compactCardClass} mt-5 px-4 py-3 text-sm leading-6 ${mutedTextClass}`}>
               Loading conversation...
             </p>
           ) : null}
@@ -648,7 +695,7 @@ export default function MessageThreadPage() {
 
           <section className="mt-5 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
             {!isLoading && messages.length === 0 ? (
-              <p className="az-contractor-card-compact px-4 py-3 text-center text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+              <p className={`${compactCardClass} px-4 py-3 text-center text-sm leading-6 ${mutedTextClass}`}>
                 No messages yet. Send the first note.
               </p>
             ) : null}
@@ -666,8 +713,12 @@ export default function MessageThreadPage() {
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                       isOwnMessage
-                        ? "az-message-bubble-outgoing rounded-br-md"
-                        : "az-message-bubble-incoming rounded-bl-md"
+                        ? isCustomerThread
+                          ? "rounded-br-md border border-blue-700 bg-azisto-accent text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]"
+                          : "az-message-bubble-outgoing rounded-br-md"
+                        : isCustomerThread
+                          ? "rounded-bl-md border border-azisto-border bg-white text-[#0F172A] shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
+                          : "az-message-bubble-incoming rounded-bl-md"
                     }`}
                   >
                     {message.text ? <p>{message.text}</p> : null}
@@ -710,7 +761,7 @@ export default function MessageThreadPage() {
           </section>
 
           {selectedPhoto ? (
-            <div className="mb-2 flex items-center gap-3 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-2">
+            <div className={`mb-2 flex items-center gap-3 rounded-[18px] border bg-white p-2 ${isCustomerThread ? "border-azisto-border" : "border-[var(--azisto-contractor-border)]"}`}>
               {selectedPhotoPreviewUrl ? (
                 <img
                   src={selectedPhotoPreviewUrl}
@@ -739,7 +790,7 @@ export default function MessageThreadPage() {
 
           <form
             onSubmit={handleSend}
-            className="az-contractor-action-bar relative flex items-center gap-2 rounded-[22px] p-2"
+            className={composerClass}
           >
             <input
               ref={takePhotoInputRef}
@@ -760,13 +811,13 @@ export default function MessageThreadPage() {
             />
             <div className="relative">
               {isAttachMenuOpen ? (
-                <div className="absolute bottom-14 left-0 z-20 w-44 rounded-2xl border border-[var(--azisto-contractor-border)] bg-white p-2 shadow-xl">
+                <div className={`absolute bottom-14 left-0 z-20 w-44 rounded-2xl border bg-white p-2 shadow-xl ${isCustomerThread ? "border-azisto-border" : "border-[var(--azisto-contractor-border)]"}`}>
                   <button
                     type="button"
                     onClick={() => takePhotoInputRef.current?.click()}
                     className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-800 hover:bg-slate-50"
                   >
-                    <Camera aria-hidden="true" className="h-4 w-4 text-[var(--azisto-contractor-burgundy)]" />
+                    <Camera aria-hidden="true" className={`h-4 w-4 ${attachAccentClass}`} />
                     Take photo
                   </button>
                   <button
@@ -776,7 +827,7 @@ export default function MessageThreadPage() {
                   >
                     <ImageIcon
                       aria-hidden="true"
-                      className="h-4 w-4 text-[var(--azisto-contractor-burgundy)]"
+                      className={`h-4 w-4 ${attachAccentClass}`}
                     />
                     Upload photo
                   </button>
@@ -787,7 +838,7 @@ export default function MessageThreadPage() {
                 onClick={() =>
                   setIsAttachMenuOpen((currentValue) => !currentValue)
                 }
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-burgundy)]"
+                className={attachButtonClass}
                 aria-label="Attach photo"
                 aria-expanded={isAttachMenuOpen}
               >
@@ -798,14 +849,14 @@ export default function MessageThreadPage() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Write a message..."
-              className="h-12 min-w-0 flex-1 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-4 text-sm outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]"
+              className={inputClass}
             />
             <button
               type="submit"
               disabled={isSending || !hasComposerContent}
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition ${
                 hasComposerContent && !isSending
-                  ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white shadow-sm shadow-[rgb(138_15_77_/_0.18)]"
+                  ? activeSendClass
                   : "border-slate-200 bg-slate-100 text-slate-400"
               }`}
               aria-label="Send message"
@@ -818,7 +869,7 @@ export default function MessageThreadPage() {
             <button
               type="button"
               onClick={handleOpenHirePrompt}
-              className="az-btn-contractor mt-2 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
+              className={`${primaryButtonClass} mt-2 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold`}
             >
               Hire Contractor
             </button>
@@ -841,10 +892,10 @@ export default function MessageThreadPage() {
       </div>
       {isHirePromptOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-5">
-          <div className="az-contractor-card w-full max-w-[340px] p-4">
+          <div className={`${modalCardClass} w-full max-w-[340px] p-4`}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-[var(--azisto-contractor-burgundy)]">
+                <h2 className={`text-base font-bold ${accentTextClass}`}>
                   Share phone no.
                 </h2>
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
@@ -862,7 +913,7 @@ export default function MessageThreadPage() {
             </div>
 
             {customerPhoneNumber && !isUsingAlternatePhone ? (
-              <div className="mt-4 rounded-[18px] border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] p-3">
+              <div className={`mt-4 rounded-[18px] border p-3 ${isCustomerThread ? "border-azisto-border bg-slate-50" : "border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)]"}`}>
                 <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                   Profile phone no.
                 </p>
@@ -876,7 +927,7 @@ export default function MessageThreadPage() {
                     setHirePhoneNumber("");
                     setHireStatusMessage("");
                   }}
-                  className="mt-2 text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
+                  className={`mt-2 text-xs font-bold ${accentTextClass}`}
                 >
                   Use another phone no.
                 </button>
@@ -893,7 +944,7 @@ export default function MessageThreadPage() {
                     setHireStatusMessage("");
                   }}
                   placeholder="Enter phone no."
-                  className="mt-2 h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]"
+                  className={isCustomerThread ? "mt-2 h-12 w-full rounded-[18px] border border-azisto-border bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-blue-100" : "mt-2 h-12 w-full rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white px-3 text-sm font-semibold outline-none placeholder:text-slate-400 focus:ring-4 focus:ring-[rgb(138_15_77_/_0.14)]"}
                 />
               </label>
             )}
@@ -908,7 +959,7 @@ export default function MessageThreadPage() {
               type="button"
               onClick={handleHireContractor}
               disabled={isHiringContractor || !hirePhoneNumber.trim()}
-              className="az-btn-contractor mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
+              className={`${primaryButtonClass} mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold`}
             >
               {isHiringContractor ? "Hiring..." : "Share phone no. & hire"}
             </button>

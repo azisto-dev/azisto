@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ComponentType } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOut } from "firebase/auth";
@@ -59,6 +59,17 @@ export default function AppMenu({ role }: { role: UserRole }) {
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState<Language>("EN");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isContractor = role === "contractor";
+  const menuThemeStyle = {
+    "--azisto-contractor-bg": isContractor ? "#F7F4F1" : "#F7F7F9",
+    "--azisto-contractor-card": "#FFFFFF",
+    "--azisto-contractor-border": isContractor ? "#E8E2DC" : "#E5E7EB",
+    "--azisto-contractor-text": isContractor ? "#111827" : "#0F172A",
+    "--azisto-contractor-muted": "#64748B",
+    "--azisto-contractor-burgundy": isContractor ? "#7A003C" : "#2563EB",
+    "--azisto-contractor-burgundy-soft": isContractor ? "#8A0F45" : "#EFF6FF",
+    "--azisto-contractor-burgundy-hover": isContractor ? "#5C0032" : "#1D4ED8",
+  } as CSSProperties;
 
   useEffect(() => {
     const storedLanguage = window.localStorage.getItem("preferredLanguage");
@@ -189,7 +200,8 @@ export default function AppMenu({ role }: { role: UserRole }) {
         <div className="fixed inset-0 z-[100] overflow-hidden bg-black/5 md:left-1/2 md:right-auto md:top-8 md:h-[min(780px,calc(100vh-4rem))] md:w-full md:max-w-[390px] md:-translate-x-1/2 md:rounded-[28px]">
           <aside
             ref={panelRef}
-            className="az-app-menu-panel az-contractor-shell flex h-fit w-[50%] min-w-[190px] max-w-[220px] flex-col rounded-r-3xl border border-l-0 border-[var(--azisto-contractor-border)] bg-[var(--azisto-contractor-bg)] p-3 text-[var(--azisto-contractor-text)] shadow-[0_16px_40px_rgba(92,0,50,0.18)]"
+            style={menuThemeStyle}
+            className="az-app-menu-panel az-contractor-shell flex h-fit w-[50%] min-w-[190px] max-w-[220px] flex-col rounded-r-3xl border border-l-0 border-[var(--azisto-contractor-border)] bg-[var(--azisto-contractor-bg)] p-3 text-[var(--azisto-contractor-text)] shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
           >
             <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/80 p-3 shadow-lg shadow-black/5">
               <div className="flex items-center justify-between gap-3">
@@ -303,7 +315,11 @@ export default function AppMenu({ role }: { role: UserRole }) {
                 type="button"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="az-btn-contractor mt-3 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60"
+                className={`mt-3 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
+                  isContractor
+                    ? "az-btn-contractor"
+                    : "border border-red-100 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100"
+                }`}
               >
                 <LogOut aria-hidden="true" className="h-4 w-4" />
                 {isLoggingOut ? "Logging out..." : "Logout"}

@@ -111,10 +111,10 @@ export default function BottomNav({ role }: { role: UserRole }) {
 
   return (
     <nav
-      className={`border-t px-3 py-2 ${
+      className={`sticky bottom-0 z-40 border-t px-3 py-2 ${
         isContractor
           ? "az-contractor-floating-nav border-[var(--azisto-contractor-border)]"
-          : "border-azisto-border bg-white"
+          : "az-customer-floating-nav border-azisto-border"
       }`}
     >
       <div className="grid grid-cols-4">

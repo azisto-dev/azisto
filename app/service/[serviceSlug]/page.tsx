@@ -2,10 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronLeft } from "lucide-react";
+import {
+  serviceCatalog,
+  type ServiceCatalogItem,
+} from "@/lib/serviceCatalog";
+import BottomNav from "@/app/components/BottomNav";
 
-const services = [
+type ServiceDisplayDetails = {
+  name: string;
+  slug: string;
+  aliases?: string[];
+  image: string;
+  imageAlt: string;
+  imageClassName?: string;
+  description: string;
+};
+
+type ServicePageItem = ServiceCatalogItem & ServiceDisplayDetails;
+
+const serviceDisplayDetails: ServiceDisplayDetails[] = [
   {
     name: "Home Care",
     slug: "home-care",
@@ -14,24 +31,6 @@ const services = [
     imageClassName: "rounded-[18px]",
     description:
       "Choose the home tasks you need help with, from quick repairs to larger maintenance projects.",
-    subcategories: [
-      "Handyman",
-      "General Cleaning",
-      "Painter",
-      "Pest Control",
-      "Electrical",
-      "Plumbing",
-      "HVAC Services",
-      "Junk Removal",
-      "Roofing Services",
-      "Drywall Repair & Installation",
-      "Fencing",
-      "Deck Building & Repair",
-      "Glass & Shower Doors",
-      "Gutter Installation & Cleaning",
-      "Garage Door Repair & Installation",
-      "Tile Installation",
-    ],
   },
   {
     name: "Car Care",
@@ -41,14 +40,6 @@ const services = [
     imageClassName: "rounded-[18px]",
     description:
       "Select the vehicle services you need, whether it is a clean, a check, or help with tires.",
-    subcategories: [
-      "Mobile Car Servicing",
-      "Diagnostic Check",
-      "Car Washing & Detailing",
-      "Tire Replacement",
-      "Puncture Repair",
-      "Alloy Wheel Repair",
-    ],
   },
   {
     name: "Pet Care",
@@ -58,15 +49,6 @@ const services = [
     imageClassName: "rounded-[18px]",
     description:
       "Pick the pet care support that fits your day, from visits and walks to grooming tasks.",
-    subcategories: [
-      "In-home Pet Sitting",
-      "Pet Walking",
-      "Grooming",
-      "Washing & Cleaning",
-      "Nail Trimming",
-      "Ear Cleaning",
-      "Pet Training",
-    ],
   },
   {
     name: "Garden Care",
@@ -75,35 +57,6 @@ const services = [
     imageAlt: "Premium garden care icon",
     description:
       "Build a custom outdoor request for routine care, seasonal cleanup, or bigger garden projects.",
-    subcategories: [
-      "Lawn Mowing & Edging",
-      "Weeding",
-      "Pruning & Trimming",
-      "Leaf Blowing & Cleanup",
-      "Mulching",
-      "Garden Design & Landscaping",
-      "Seasonal Planting",
-      "Turf Laying / Seeding",
-      "Raised Bed Installation",
-      "Tree Trimming & Shaping",
-      "Tree Removal",
-      "Stump Grinding",
-      "Storm Damage Cleanup",
-      "Sprinkler Installation & Repair",
-      "Drip Irrigation Setup",
-      "Drainage Solutions",
-      "Soil Fertilizing",
-      "Aeration & Scarification",
-      "Weed & Pest Control",
-      "Composting Services",
-      "Patio & Pathway Installation",
-      "Retaining Walls",
-      "Outdoor Lighting Installation",
-      "Organic Gardening",
-      "Water Feature Installation",
-      "Greenhouse Setup",
-      "Winter Prep & Snow Removal",
-    ],
   },
   {
     name: "Moving",
@@ -112,20 +65,6 @@ const services = [
     imageAlt: "Premium moving icon",
     description:
       "Tell us what kind of moving help you need, from packing to transport and setup.",
-    subcategories: [
-      "Local Moves",
-      "Long-distance Moves",
-      "Loading & Unloading",
-      "Furniture Rearranging",
-      "Piano & Heavy Item Moving",
-      "Full Packing Service",
-      "Partial Packing",
-      "Unpacking & Setup",
-      "Office & Commercial Moves",
-      "Apartment Moves",
-      "Senior Moving",
-      "Art & Fine Item Transport",
-    ],
   },
   {
     name: "Roadside & Emergency",
@@ -135,27 +74,23 @@ const services = [
     imageAlt: "Tow truck carrying a car icon",
     description:
       "Choose the roadside help you need so assistance can be matched to the situation.",
-    subcategories: [
-      "Emergency Towing",
-      "Battery Jump-start",
-      "Flat Tire Change",
-      "Fuel Delivery",
-      "Lockout Service",
-      "Flatbed Towing",
-      "Wheel-lift Towing",
-      "Hook & Chain Towing",
-      "Dolly Towing",
-      "Motorcycle Towing",
-      "Heavy-duty Truck & RV Towing",
-      "Bus & Commercial Vehicle Towing",
-      "Off-road Recovery",
-      "Winching & Vehicle Extraction",
-      "Mud / Ditch / Rollover Recovery",
-      "Water / Flood Recovery",
-      "Boat & Trailer Towing",
-    ],
   },
 ];
+
+const services: ServicePageItem[] = serviceCatalog.map((service) => {
+  const displayDetails = serviceDisplayDetails.find(
+    (details) => details.slug === service.slug,
+  );
+
+  if (!displayDetails) {
+    throw new Error(`Missing display details for service ${service.slug}`);
+  }
+
+  return {
+    ...service,
+    ...displayDetails,
+  };
+});
 
 const iconBadgeStyles = {
   amber:
@@ -205,6 +140,15 @@ const subcategoryVisuals: Record<string, SubcategoryVisual> = {
   Plumbing: { symbol: "💧", theme: "blue" },
   "HVAC Services": { symbol: "🌬️", theme: "indigo" },
   "Junk Removal": { symbol: "🗑️", theme: "slate" },
+  "Pressure Washing": { symbol: "💦", theme: "blue" },
+  "Gutter Cleaning": { symbol: "🫧", theme: "cyan" },
+  "Garbage Bin Cleaning": { symbol: "🗑️", theme: "green" },
+  "Duct and Furnace Cleaning": { symbol: "🌬️", theme: "indigo" },
+  "Mold Removal": { symbol: "🧼", theme: "rose" },
+  "Carpet Cleaning": { symbol: "🧽", theme: "purple" },
+  "Window Cleaning": { symbol: "🪟", theme: "cyan" },
+  "Move-In / Move-Out Cleaning": { symbol: "📦", theme: "orange" },
+  "Roof Cleaning": { symbol: "🏠", theme: "blue" },
   "Roofing Services": { symbol: "🏠", theme: "orange" },
   "Drywall Repair & Installation": { symbol: "🔨", theme: "amber" },
   Fencing: {
@@ -218,7 +162,7 @@ const subcategoryVisuals: Record<string, SubcategoryVisual> = {
     theme: "cyan",
     image: "/subcategory-icons/glass-shower-door.svg",
   },
-  "Gutter Installation & Cleaning": { symbol: "💦", theme: "blue" },
+  "Gutter Installation": { symbol: "💦", theme: "blue" },
   "Garage Door Repair & Installation": {
     symbol: "🏘️",
     theme: "slate",
@@ -339,8 +283,16 @@ function getCurrentSlug(pathname: string) {
 
 function findService(slug: string) {
   return services.find(
-    (service) => service.slug === slug || service.aliases?.includes(slug),
+    (service) =>
+      service.slug === slug ||
+      ("aliases" in service &&
+        Array.isArray(service.aliases) &&
+        service.aliases.includes(slug)),
   );
+}
+
+function getServiceGroupStorageKey(slug: string) {
+  return `azisto-service-group:${slug}`;
 }
 
 function SubcategoryIcon({
@@ -389,6 +341,43 @@ export default function ServiceDetailPage() {
   const slug = getCurrentSlug(pathname);
   const service = findService(slug);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const groupEntries = service?.groups
+    ? Object.entries(service.groups)
+    : [];
+  const [selectedGroupKey, setSelectedGroupKey] = useState(
+    groupEntries[0]?.[0] ?? "",
+  );
+  const activeGroup =
+    groupEntries.find(([groupKey]) => groupKey === selectedGroupKey) ??
+    groupEntries[0];
+  const visibleSubcategories = activeGroup
+    ? activeGroup[1].subcategories
+    : service?.subcategories ?? [];
+  const subcategoryGroupLabels = new Map(
+    groupEntries.flatMap(([, group]) =>
+      group.subcategories.map((subcategory) => [subcategory, group.label]),
+    ),
+  );
+
+  useEffect(() => {
+    const defaultGroupKey = groupEntries[0]?.[0] ?? "";
+
+    if (!defaultGroupKey) {
+      setSelectedGroupKey("");
+      return;
+    }
+
+    const savedGroupKey =
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem(getServiceGroupStorageKey(slug))
+        : "";
+    const nextGroupKey =
+      savedGroupKey && groupEntries.some(([groupKey]) => groupKey === savedGroupKey)
+        ? savedGroupKey
+        : defaultGroupKey;
+
+    setSelectedGroupKey(nextGroupKey);
+  }, [slug]);
 
   if (!service) {
     return (
@@ -439,6 +428,11 @@ export default function ServiceDetailPage() {
   requestParams.set("service", service.name);
   selectedItems.forEach((item) => {
     requestParams.append("item", item);
+    const groupLabel = subcategoryGroupLabels.get(item);
+
+    if (groupLabel) {
+      requestParams.append("itemGroup", `${item}|||${groupLabel}`);
+    }
   });
 
   return (
@@ -498,8 +492,37 @@ export default function ServiceDetailPage() {
             </p>
           </section>
 
+          {groupEntries.length > 0 ? (
+            <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-azisto-border bg-[#F7F4F1] p-1.5 shadow-[0_8px_22px_rgba(15,23,42,0.08)]">
+              {groupEntries.map(([groupKey, group]) => {
+                const isSelected = activeGroup?.[0] === groupKey;
+
+                return (
+                  <button
+                    key={groupKey}
+                    type="button"
+                    onClick={() => {
+                      setSelectedGroupKey(groupKey);
+                      window.sessionStorage.setItem(
+                        getServiceGroupStorageKey(slug),
+                        groupKey,
+                      );
+                    }}
+                    className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold shadow-sm transition duration-200 ${
+                      isSelected
+                        ? "border-azisto-gold bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.08)]"
+                        : "border-azisto-border bg-white/45 text-slate-600"
+                    }`}
+                  >
+                    {group.label} ({group.subcategories.length})
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
           <section className="mt-6 space-y-3">
-            {service.subcategories.map((subcategory) => {
+            {visibleSubcategories.map((subcategory) => {
               const isSelected = selectedItems.includes(subcategory);
 
               return (
@@ -546,6 +569,7 @@ export default function ServiceDetailPage() {
             {continueLabel}
           </Link>
         </div>
+        <BottomNav role="customer" />
       </div>
     </main>
   );

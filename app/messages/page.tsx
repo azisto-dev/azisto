@@ -112,6 +112,38 @@ export default function MessagesPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const isCustomer = role !== "contractor";
+  const shellClass = isCustomer
+    ? "az-customer-shell min-h-screen md:px-6 md:py-8"
+    : "az-contractor-shell min-h-screen md:px-6 md:py-8";
+  const frameClass = isCustomer
+    ? "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border"
+    : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
+  const heroClass = isCustomer
+    ? "az-customer-card mt-8 bg-gradient-to-br from-white via-blue-50 to-white p-5"
+    : "az-contractor-soft-hero mt-8 p-5";
+  const cardClass = isCustomer ? "az-customer-card" : "az-contractor-card";
+  const compactCardClass = isCustomer
+    ? "az-customer-card"
+    : "az-contractor-card-compact";
+  const primaryTextClass = isCustomer
+    ? "text-[#0F172A]"
+    : "text-[var(--azisto-contractor-text)]";
+  const mutedTextClass = isCustomer
+    ? "text-[#64748B]"
+    : "text-[var(--azisto-contractor-muted)]";
+  const accentTextClass = isCustomer
+    ? "text-azisto-accent"
+    : "text-[var(--azisto-contractor-burgundy)]";
+  const softChipClass = isCustomer
+    ? "border-blue-100 bg-blue-50 text-azisto-accent"
+    : "border-[var(--azisto-contractor-border)] bg-white/80 text-[var(--azisto-contractor-burgundy)]";
+  const mutedChipClass = isCustomer
+    ? "bg-slate-100 text-slate-500"
+    : "bg-[rgb(248_247_252_/_0.9)] text-[var(--azisto-contractor-muted)]";
+  const unreadChipClass = isCustomer
+    ? "bg-blue-50 text-azisto-accent"
+    : "bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -138,8 +170,8 @@ export default function MessagesPage() {
   }, [router]);
 
   return (
-    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+    <main className={shellClass}>
+      <div className={frameClass}>
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -163,25 +195,31 @@ export default function MessagesPage() {
             <span aria-hidden="true" />
           </header>
 
-          <section className="az-contractor-soft-hero mt-8 p-5">
+          <section className={heroClass}>
             <div className="relative z-10">
-              <p className="text-lg font-normal leading-6 text-[var(--azisto-contractor-muted)]">
+              <p className={`text-lg font-normal leading-6 ${mutedTextClass}`}>
                 AZISTO inbox
               </p>
-              <h1 className="mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] text-[var(--azisto-contractor-text)]">
+              <h1
+                className={`mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] ${primaryTextClass}`}
+              >
                 Messages
               </h1>
-              <p className="mt-12 text-sm font-semibold leading-6 text-[var(--azisto-contractor-muted)]">
+              <p className={`mt-12 text-sm font-semibold leading-6 ${mutedTextClass}`}>
                 Conversations about your AZISTO job requests will appear here.
               </p>
-              <span className="mt-4 inline-flex rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-burgundy)]">
+              <span
+                className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${softChipClass}`}
+              >
                 {threads.length} thread{threads.length === 1 ? "" : "s"}
               </span>
             </div>
           </section>
 
           {isLoading ? (
-            <p className="az-contractor-card-compact mt-6 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+            <p
+              className={`${compactCardClass} mt-6 px-4 py-3 text-sm leading-6 ${mutedTextClass}`}
+            >
               Loading messages...
             </p>
           ) : null}
@@ -193,14 +231,20 @@ export default function MessagesPage() {
           ) : null}
 
           {!isLoading && !errorMessage && threads.length === 0 ? (
-            <section className="az-contractor-card mt-6 p-5 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]">
+            <section className={`${cardClass} mt-6 p-5 text-center`}>
+              <div
+                className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
+                  isCustomer
+                    ? "bg-blue-50 text-azisto-accent"
+                    : "bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]"
+                }`}
+              >
                 <MessageCircle aria-hidden="true" className="h-6 w-6" />
               </div>
-              <p className="mt-4 text-sm font-bold text-[var(--azisto-contractor-text)]">
+              <p className={`mt-4 text-sm font-bold ${primaryTextClass}`}>
                 No messages yet
               </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+              <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>
                 Start a conversation from an interested contractor or job page.
               </p>
             </section>
@@ -211,21 +255,21 @@ export default function MessagesPage() {
               <Link
                 key={thread.threadId}
                 href={`/messages/${encodeURIComponent(thread.threadId)}`}
-                className="az-contractor-card-compact block p-4"
+                className={`${compactCardClass} block p-4`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">
+                    <p className={`text-xs font-bold uppercase tracking-[0.12em] ${accentTextClass}`}>
                       {thread.jobId}
                     </p>
-                    <h2 className="mt-1 text-base font-semibold text-[var(--azisto-contractor-text)]">
+                    <h2 className={`mt-1 text-base font-semibold ${primaryTextClass}`}>
                       {thread.displayName ||
                         thread.businessName ||
                         thread.contractorName ||
                         thread.contractorId ||
                         "Conversation"}
                     </h2>
-                    <p className="mt-1 text-xs font-bold text-[var(--azisto-contractor-text)]">
+                    <p className={`mt-1 text-xs font-bold ${primaryTextClass}`}>
                       {thread.jobTitle || "Service request"}
                     </p>
                   </div>
@@ -242,28 +286,32 @@ export default function MessagesPage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-2.5 py-1 text-[11px] font-bold text-[var(--azisto-contractor-burgundy)]">
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${softChipClass}`}
+                  >
                     {formatTaskSummary(thread.selectedTaskLabels ?? [])}
                   </span>
-                  <span className="rounded-full bg-[rgb(248_247_252_/_0.9)] px-2.5 py-1 text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${mutedChipClass}`}
+                  >
                     {thread.jobId}
                   </span>
                 </div>
 
-                <p className="mt-3 line-clamp-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+                <p className={`mt-3 line-clamp-2 text-sm leading-6 ${mutedTextClass}`}>
                   {thread.lastMessage || "No messages yet."}
                 </p>
 
                 <div className="mt-2 flex items-center justify-between gap-3">
                   {thread.lastMessageAt ? (
-                    <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]/70">
+                    <p className={`text-xs font-semibold ${mutedTextClass}`}>
                       {formatDateTime(thread.lastMessageAt)}
                     </p>
                   ) : (
                     <span />
                   )}
 
-                  <span className="rounded-full bg-[rgb(138_15_77_/_0.07)] px-2.5 py-1 text-[11px] font-bold text-[var(--azisto-contractor-burgundy)]">
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${unreadChipClass}`}>
                     {thread.unreadCount || 0} unread
                   </span>
                 </div>

@@ -132,6 +132,29 @@ export default function NotificationsPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const isCustomer = role !== "contractor";
+  const shellClass = isCustomer
+    ? "az-customer-shell min-h-screen md:px-6 md:py-8"
+    : "az-contractor-shell min-h-screen md:px-6 md:py-8";
+  const frameClass = isCustomer
+    ? "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border"
+    : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
+  const cardClass = isCustomer ? "az-customer-card" : "az-contractor-card";
+  const compactCardClass = isCustomer
+    ? "az-customer-card"
+    : "az-contractor-card-compact";
+  const primaryTextClass = isCustomer
+    ? "text-[#0F172A]"
+    : "text-[var(--azisto-contractor-text)]";
+  const mutedTextClass = isCustomer
+    ? "text-[#64748B]"
+    : "text-[var(--azisto-contractor-muted)]";
+  const accentTextClass = isCustomer
+    ? "text-azisto-accent"
+    : "text-[var(--azisto-contractor-burgundy)]";
+  const notificationChipClass = isCustomer
+    ? "border-blue-100 bg-blue-50 text-azisto-accent"
+    : "border-[rgb(138_15_77_/_0.14)] bg-[rgb(138_15_77_/_0.08)] text-[var(--azisto-contractor-burgundy)]";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -198,8 +221,8 @@ export default function NotificationsPage() {
   }
 
   return (
-    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+    <main className={shellClass}>
+      <div className={frameClass}>
         <div className="flex-1 px-5 pb-6 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -221,15 +244,15 @@ export default function NotificationsPage() {
             <span aria-hidden="true" />
           </header>
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
+            <p className={`text-xs font-bold uppercase tracking-[0.14em] ${accentTextClass}`}>
               Notifications
             </p>
-            <h1 className="mt-1 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
+            <h1 className={`mt-1 text-3xl font-normal leading-tight ${primaryTextClass}`}>
               Updates
             </h1>
           </section>
           {isLoading ? (
-            <p className="az-contractor-card-compact mt-6 px-4 py-3 text-sm text-[var(--azisto-contractor-muted)]">
+            <p className={`${compactCardClass} mt-6 px-4 py-3 text-sm ${mutedTextClass}`}>
               Loading notifications...
             </p>
           ) : null}
@@ -239,9 +262,9 @@ export default function NotificationsPage() {
             </p>
           ) : null}
           {!isLoading && notifications.length === 0 ? (
-            <section className="az-contractor-card mt-6 p-5 text-center">
-              <Bell aria-hidden="true" className="mx-auto h-8 w-8 text-[var(--azisto-contractor-burgundy)]" />
-              <p className="mt-3 text-sm font-bold text-[var(--azisto-contractor-text)]">No notifications yet</p>
+            <section className={`${cardClass} mt-6 p-5 text-center`}>
+              <Bell aria-hidden="true" className={`mx-auto h-8 w-8 ${accentTextClass}`} />
+              <p className={`mt-3 text-sm font-bold ${primaryTextClass}`}>No notifications yet</p>
             </section>
           ) : null}
           <section className="mt-6 space-y-3">
@@ -250,21 +273,23 @@ export default function NotificationsPage() {
                 key={notification.notificationId}
                 type="button"
                 onClick={() => void handleNotificationClick(notification)}
-                className="az-contractor-card-compact block w-full p-4 text-left transition hover:-translate-y-0.5"
+                className={`${compactCardClass} block w-full p-4 text-left transition hover:-translate-y-0.5`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-sm font-bold text-[var(--azisto-contractor-text)]">
+                  <h2 className={`text-sm font-bold ${primaryTextClass}`}>
                     {notification.title}
                   </h2>
-                  <span className="rounded-full border border-[rgb(138_15_77_/_0.14)] bg-[rgb(138_15_77_/_0.08)] px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-burgundy)]">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-bold ${notificationChipClass}`}
+                  >
                     {notification.read ? "Read" : "Unread"}
                   </span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+                <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>
                   {notification.message}
                 </p>
-                <p className="mt-2 text-xs font-semibold text-[var(--azisto-contractor-muted)]">
-                  <span className="text-[var(--azisto-contractor-burgundy)]">{notification.jobId}</span> ·{" "}
+                <p className={`mt-2 text-xs font-semibold ${mutedTextClass}`}>
+                  <span className={accentTextClass}>{notification.jobId}</span> ·{" "}
                   {formatDate(notification.createdAt)}
                 </p>
               </button>

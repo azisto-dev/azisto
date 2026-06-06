@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -17,8 +18,12 @@ type ActiveJob = {
   hiredBusinessName: string;
   hiredContractorName: string;
   status: string;
+  scheduleMode: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
+  urgency: string;
+  schedule: JobSchedule | null;
 };
 
 function StatusBar() {
@@ -184,6 +189,7 @@ export default function CustomerActiveJobsPage() {
                   <span className={getStatusChipClass(job.status)}>{job.status}</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">Contractor: {job.hiredBusinessName || job.hiredContractorName || job.hiredContractorId}</p>
+                <p className="mt-1 text-sm text-slate-600">{formatScheduleLabel(job)}</p>
                 {job.selectedSubcategories.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {job.selectedSubcategories.slice(0, 3).map((item) => (

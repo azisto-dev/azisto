@@ -47,6 +47,21 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readSchedule(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    mode: readText(data.mode),
+    date: readText(data.date),
+    timeWindow: readText(data.timeWindow),
+    urgency: readText(data.urgency),
+  };
+}
+
 function readBoolean(value: unknown) {
   return value === true;
 }
@@ -262,9 +277,12 @@ async function serializeAvailableJob(
     selectedSubcategories: readStringList(data.selectedSubcategories),
     city: readText(data.city),
     province: readText(data.province),
+    scheduleMode: readText(data.scheduleMode),
     preferredDate: readText(data.preferredDate),
     preferredTime: readText(data.preferredTime),
+    preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: readText(data.urgency),
+    schedule: readSchedule(data.schedule),
     status: readText(data.status),
     matchingStatus: readText(data.matchingStatus),
     createdAt: serializeTimestamp(data.createdAt),
@@ -297,7 +315,13 @@ async function serializeAvailableTask(
         readText(taskData.preferredDate) || readText(parentData.preferredDate),
       preferredTime:
         readText(taskData.preferredTime) || readText(parentData.preferredTime),
+      preferredTimeWindow:
+        readText(taskData.preferredTimeWindow) ||
+        readText(parentData.preferredTimeWindow),
       urgency: readText(taskData.urgency) || readText(parentData.urgency),
+      scheduleMode:
+        readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
+      schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
       status: readText(taskData.status) || readText(parentData.status),
       createdAt: taskData.createdAt ?? parentData.createdAt,
       updatedAt: taskData.updatedAt ?? parentData.updatedAt,

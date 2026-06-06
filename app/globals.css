@@ -117,11 +117,40 @@ body {
 
 @layer components {
   .az-btn-primary {
-    @apply border border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10 transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+    @apply border border-azisto-accent bg-azisto-accent text-white shadow-sm shadow-blue-200/70 transition duration-200 hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
   }
 
   .az-btn-secondary {
-    @apply border border-azisto-gold bg-white text-azisto-text shadow-sm transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400;
+    @apply border border-azisto-accent bg-white text-azisto-accent shadow-sm transition duration-200 hover:bg-blue-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400;
+  }
+
+  .az-customer-shell {
+    background: #F7F7F9;
+    color: #0F172A;
+  }
+
+  .az-customer-card {
+    border: 1px solid #E5E7EB;
+    border-radius: 22px;
+    background: #FFFFFF;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
+    transition: box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .az-customer-card:hover {
+    box-shadow: 0 10px 28px rgb(15 23 42 / 0.09);
+    transform: translateY(-1px);
+  }
+
+  .az-customer-page {
+    background: #FAFAF8;
+  }
+
+  .az-customer-floating-nav {
+    border-radius: 22px 22px 0 0;
+    background: rgb(255 255 255 / 0.94);
+    box-shadow: 0 -8px 24px rgb(15 23 42 / 0.08);
+    backdrop-filter: blur(12px);
   }
 
   .az-btn-royal-blue {
@@ -401,7 +430,7 @@ body {
   }
 
   .az-focus-field {
-    @apply focus:border-azisto-gold focus:ring-4 focus:ring-azisto-gold/20;
+    @apply focus:border-azisto-accent focus:ring-4 focus:ring-blue-100;
   }
 
   .az-kicker {

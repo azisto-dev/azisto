@@ -30,6 +30,21 @@ function readStringList(value: unknown) {
     .filter(Boolean);
 }
 
+function readSchedule(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    mode: readText(data.mode),
+    date: readText(data.date),
+    timeWindow: readText(data.timeWindow),
+    urgency: readText(data.urgency),
+  };
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -92,9 +107,12 @@ function serializeJob(data: Record<string, unknown>) {
     selectedSubcategories: readStringList(data.selectedSubcategories),
     city: readText(data.city),
     province: readText(data.province),
+    scheduleMode: readText(data.scheduleMode),
     preferredDate: readText(data.preferredDate),
     preferredTime: readText(data.preferredTime),
+    preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: readText(data.urgency),
+    schedule: readSchedule(data.schedule),
     status: readText(data.status),
     matchingStatus: readText(data.matchingStatus),
     hiredContractorId: readText(data.hiredContractorId),

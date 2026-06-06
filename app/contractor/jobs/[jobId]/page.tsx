@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { Check, ChevronDown, ChevronLeft, Flag, MapPin, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -34,9 +35,17 @@ type ContractorJobDetail = {
   city: string;
   province: string;
   postalCode: string;
+  locationMode: string;
+  location: null | {
+    lat: number;
+    lng: number;
+  };
+  scheduleMode: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
   urgency: string;
+  schedule: JobSchedule | null;
   status: string;
   matchingStatus: string;
   hiredContractorId: string;
@@ -245,14 +254,6 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
         : response.statusText,
     );
   }
-}
-
-function formatWhen(date: string, time: string) {
-  if (!date && !time) {
-    return "Flexible timing";
-  }
-
-  return [date, time].filter(Boolean).join(" at ");
 }
 
 export default function ContractorJobDetailPage() {
@@ -487,15 +488,12 @@ export default function ContractorJobDetailPage() {
                     <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold capitalize text-[var(--azisto-contractor-text)]">
                       {job.status || "open"}
                     </span>
-                    <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold text-[var(--azisto-contractor-text)]">
-                      {job.urgency || "Flexible"}
-                    </span>
                   </div>
                   <div className="mt-5 grid grid-cols-2 gap-3 text-sm leading-5">
                     <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">When</p>
+                      <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">Schedule</p>
                       <p className="mt-1 font-semibold text-[var(--azisto-contractor-text)]">
-                        {formatWhen(job.preferredDate, job.preferredTime)}
+                        {formatScheduleLabel(job)}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
@@ -592,9 +590,13 @@ export default function ContractorJobDetailPage() {
               <section className="az-contractor-card mt-5 p-4">
                 <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Service address</p>
                 <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
-                  {[job.address, job.city, job.province, job.postalCode]
-                    .filter(Boolean)
-                    .join(", ") || "Address not provided."}
+                  {job.locationMode === "live" && job.location
+                    ? `Live location captured · ${job.location.lat.toFixed(
+                        5,
+                      )}, ${job.location.lng.toFixed(5)}`
+                    : [job.address, job.city, job.province, job.postalCode]
+                        .filter(Boolean)
+                        .join(", ") || "Address not provided."}
                 </p>
               </section>
 

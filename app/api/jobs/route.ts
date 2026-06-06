@@ -13,6 +13,7 @@ export const runtime = "nodejs";
 type JobRequestBody = {
   selectedServiceCategory?: unknown;
   selectedSubcategories?: unknown;
+  selectedSubcategoryGroups?: unknown;
   jobDescription?: unknown;
   photos?: unknown;
   photoPlaceholders?: unknown;
@@ -20,9 +21,14 @@ type JobRequestBody = {
   city?: unknown;
   province?: unknown;
   postalCode?: unknown;
+  locationMode?: unknown;
+  location?: unknown;
+  scheduleMode?: unknown;
   preferredDate?: unknown;
   preferredTime?: unknown;
+  preferredTimeWindow?: unknown;
   urgency?: unknown;
+  schedule?: unknown;
 };
 
 function getBearerToken(authorizationHeader: string | null) {
@@ -56,6 +62,27 @@ function readStringList(value: unknown) {
     .filter(Boolean);
 }
 
+function readSubcategoryGroups(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      const data =
+        typeof item === "object" && item !== null
+          ? (item as Record<string, unknown>)
+          : {};
+      const subcategory = readText(data.subcategory);
+      const group = readText(data.group);
+
+      return subcategory && group ? { subcategory, group } : null;
+    })
+    .filter((item): item is { subcategory: string; group: string } =>
+      Boolean(item),
+    );
+}
+
 function readPhotoList(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -70,6 +97,30 @@ function getTodayDateString() {
 
 function isPastDate(dateValue: string) {
   return Boolean(dateValue) && dateValue < getTodayDateString();
+}
+
+function readScheduleMode(value: unknown) {
+  return value === "specific" ? "specific" : "urgency";
+}
+
+function readLocationMode(value: unknown) {
+  return value === "live" ? "live" : "manual";
+}
+
+function readLiveLocation(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const lat = typeof data.lat === "number" ? data.lat : Number(data.lat);
+  const lng = typeof data.lng === "number" ? data.lng : Number(data.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
 }
 
 function getFirstName(name: string) {
@@ -200,14 +251,35 @@ export async function POST(request: NextRequest) {
     const city = readText(body.city);
     const province = readText(body.province);
     const postalCode = readText(body.postalCode);
-    const preferredDate = readText(body.preferredDate);
+    const locationMode = readLocationMode(body.locationMode);
+    const liveLocation = readLiveLocation(body.location);
+    const scheduleMode = readScheduleMode(body.scheduleMode);
+    const preferredDate =
+      scheduleMode === "specific" ? readText(body.preferredDate) : "";
+    const preferredTimeWindow =
+      scheduleMode === "specific" ? readText(body.preferredTimeWindow) : "";
+    const urgency =
+      scheduleMode === "urgency" ? readText(body.urgency) || "Flexible" : "";
 
-    if (!address || !city || !province || !postalCode) {
+    if (
+      locationMode === "manual" &&
+      (!address || !city || !province || !postalCode)
+    ) {
       return NextResponse.json(
         {
           code: "service-address-required",
           message:
             "Please enter the service address, city, province, and postal code.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (locationMode === "live" && !liveLocation) {
+      return NextResponse.json(
+        {
+          code: "live-location-required",
+          message: "Please capture your live location before submitting.",
         },
         { status: 400 },
       );
@@ -238,7 +310,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (isPastDate(preferredDate)) {
+    if (scheduleMode === "specific" && !preferredDate) {
+      return NextResponse.json(
+        {
+          code: "preferred-date-required",
+          message: "Please choose a preferred date.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (scheduleMode === "specific" && !preferredTimeWindow) {
+      return NextResponse.json(
+        {
+          code: "preferred-time-window-required",
+          message: "Please choose a preferred time window.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (scheduleMode === "specific" && isPastDate(preferredDate)) {
       return NextResponse.json(
         {
           code: "past-date-not-allowed",
@@ -262,12 +354,27 @@ export async function POST(request: NextRequest) {
 
     const selectedServiceCategory = readText(body.selectedServiceCategory);
     const selectedSubcategories = readStringList(body.selectedSubcategories);
+    const selectedSubcategoryGroups = readSubcategoryGroups(
+      body.selectedSubcategoryGroups,
+    );
     const taskSubcategories =
       selectedSubcategories.length > 0
         ? selectedSubcategories
         : [selectedServiceCategory || "General task"];
-    const preferredTime = readText(body.preferredTime);
-    const urgency = readText(body.urgency) || "Flexible";
+    const preferredTime = "";
+    const locationCapturedAt =
+      locationMode === "live" ? FieldValue.serverTimestamp() : null;
+    const schedule =
+      scheduleMode === "specific"
+        ? {
+            mode: "specific",
+            date: preferredDate,
+            timeWindow: preferredTimeWindow,
+          }
+        : {
+            mode: "urgency",
+            urgency,
+          };
     const jobRequest = {
       jobId,
       customerAuthUid: decodedToken.uid,
@@ -279,16 +386,24 @@ export async function POST(request: NextRequest) {
       customerReportsCount,
       selectedServiceCategory,
       selectedSubcategories,
+      selectedSubcategoryGroups,
       jobDescription,
       photos: readPhotoList(body.photos),
       photoPlaceholders: readStringList(body.photoPlaceholders),
-      address,
-      city,
-      province,
-      postalCode,
-      preferredDate,
+      address: locationMode === "manual" ? address : null,
+      city: locationMode === "manual" ? city : null,
+      province: locationMode === "manual" ? province : null,
+      postalCode: locationMode === "manual" ? postalCode : null,
+      locationMode,
+      location: locationMode === "live" ? liveLocation : null,
+      locationCapturedAt,
+      scheduleMode,
+      preferredDate: scheduleMode === "specific" ? preferredDate : null,
       preferredTime,
-      urgency,
+      preferredTimeWindow:
+        scheduleMode === "specific" ? preferredTimeWindow : null,
+      urgency: scheduleMode === "urgency" ? urgency : null,
+      schedule,
       riskScore,
       riskReasons,
       reportsCount: 0,
@@ -306,19 +421,31 @@ export async function POST(request: NextRequest) {
     batch.set(jobDocument, jobRequest);
     taskSubcategories.forEach((subcategory, index) => {
       const taskId = `${jobId}-${index + 1}`;
+      const subcategoryGroup =
+        selectedSubcategoryGroups.find((item) => item.subcategory === subcategory)
+          ?.group ?? "";
 
       batch.set(jobDocument.collection("tasks").doc(taskId), {
         taskId,
         parentJobId: jobId,
         category: selectedServiceCategory,
         subcategory,
+        subcategoryGroup,
         jobDescription,
-        city,
-        province,
-        postalCode,
-        preferredDate,
+        address: locationMode === "manual" ? address : null,
+        city: locationMode === "manual" ? city : null,
+        province: locationMode === "manual" ? province : null,
+        postalCode: locationMode === "manual" ? postalCode : null,
+        locationMode,
+        location: locationMode === "live" ? liveLocation : null,
+        locationCapturedAt,
+        scheduleMode,
+        preferredDate: scheduleMode === "specific" ? preferredDate : null,
         preferredTime,
-        urgency,
+        preferredTimeWindow:
+          scheduleMode === "specific" ? preferredTimeWindow : null,
+        urgency: scheduleMode === "urgency" ? urgency : null,
+        schedule,
         status: "open",
         interestedContractorIds: [],
         interestedContractorAuthUids: [],

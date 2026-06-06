@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import BottomNav from "@/app/components/BottomNav";
 
 const safetyItems = [
   "Keep communication inside AZISTO until booking is confirmed.",
@@ -12,7 +13,7 @@ const safetyItems = [
 export default function HelpSafetyPage() {
   return (
     <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 py-5 shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 pb-0 pt-5 shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <header className="mt-8 flex justify-center">
           <img
             src="/azisto-logo-cropped.png"
@@ -49,12 +50,15 @@ export default function HelpSafetyPage() {
           ))}
         </section>
 
-        <Link
-          href="/home"
-          className="az-btn-primary mt-auto flex h-12 items-center justify-center rounded-xl text-sm font-bold"
-        >
-          Back to Home
-        </Link>
+        <div className="mt-auto pb-24">
+          <Link
+            href="/home"
+            className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+          >
+            Back to Home
+          </Link>
+        </div>
+        <BottomNav role="customer" />
       </div>
     </main>
   );

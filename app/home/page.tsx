@@ -23,6 +23,7 @@ import {
   authenticatedFetch,
   throwApiResponseError,
 } from "@/lib/authenticatedFetch";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import BottomNav from "@/app/components/BottomNav";
 import AppMenu from "@/app/components/AppMenu";
 import ContractorJobFilters, {
@@ -96,9 +97,12 @@ type ContractorHomeJob = {
   selectedSubcategories: string[];
   city: string;
   province: string;
+  scheduleMode: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
   urgency: string;
+  schedule: JobSchedule | null;
   createdAt: string;
 };
 
@@ -357,9 +361,15 @@ function readContractorHomeData(value: unknown): ContractorHomeData {
             selectedSubcategories: readStringList(jobData.selectedSubcategories),
             city: readString(jobData.city),
             province: readString(jobData.province),
+            scheduleMode: readString(jobData.scheduleMode),
             preferredDate: readString(jobData.preferredDate),
             preferredTime: readString(jobData.preferredTime),
+            preferredTimeWindow: readString(jobData.preferredTimeWindow),
             urgency: readString(jobData.urgency),
+            schedule:
+              typeof jobData.schedule === "object" && jobData.schedule !== null
+                ? (jobData.schedule as JobSchedule)
+                : null,
             createdAt: readString(jobData.createdAt),
           };
         })
@@ -466,14 +476,6 @@ function formatWorkspaceUpdateTime(value: number | null) {
   }
 
   return `Updated ${minutesAgo} min ago`;
-}
-
-function formatDateTime(date: string, time: string) {
-  if (!date && !time) {
-    return "Flexible timing";
-  }
-
-  return [date, time].filter(Boolean).join(" at ");
 }
 
 async function fetchContractorFilterPreferences(user: User) {
@@ -1362,16 +1364,13 @@ export default function HomePage() {
                         <p className="min-w-0 truncate">
                           Customer: {job.customerFirstName || "Customer"}
                         </p>
-                        <p className="shrink-0 text-right capitalize">
-                          {job.urgency || "Flexible"}
+                        <p className="shrink-0 text-right">
+                          {formatScheduleLabel(job)}
                         </p>
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <p className="min-w-0 truncate">
                           {formatRelativeTime(job.createdAt)}
-                        </p>
-                        <p className="shrink-0 text-right">
-                          {formatDateTime(job.preferredDate, job.preferredTime)}
                         </p>
                       </div>
                     </div>

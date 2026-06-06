@@ -1011,9 +1011,16 @@ export default function ContractorOnboardingPage() {
                   onChange={(event) =>
                     updateField("servicesOffered", event.target.value)
                   }
-                  placeholder="Handyman, plumbing, moving..."
+                  placeholder="Handyman, General Cleaning, Window Cleaning..."
                   className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
                 />
+                <p className="text-xs leading-5 text-slate-500">
+                  Home Care examples: Handyman, Painter, Plumbing, Gutter
+                  Installation, General Cleaning, Pressure Washing, Gutter
+                  Cleaning, Junk Removal, Garbage Bin Cleaning, Duct and
+                  Furnace Cleaning, Mold Removal, Carpet Cleaning, Window
+                  Cleaning, Move-In / Move-Out Cleaning, Roof Cleaning.
+                </p>
               </div>
 
               <div className="space-y-2">

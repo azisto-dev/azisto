@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -17,9 +18,12 @@ type ContractorJob = {
   selectedSubcategories: string[];
   city: string;
   province: string;
+  scheduleMode: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
   urgency: string;
+  schedule: JobSchedule | null;
   status: string;
   relationship: string;
   createdAt: string;
@@ -134,14 +138,6 @@ async function createMessageThread(user: User, jobId: string) {
     : "";
 }
 
-function formatWhen(date: string, time: string) {
-  if (!date && !time) {
-    return "Flexible timing";
-  }
-
-  return [date, time].filter(Boolean).join(" at ");
-}
-
 function JobCard({
   job,
   activeJobId,
@@ -185,12 +181,9 @@ function JobCard({
       <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
         <p>{[job.city, job.province].filter(Boolean).join(", ")}</p>
         <p>
-          <span className="font-bold text-[var(--azisto-contractor-text)]">When:</span>{" "}
-          {formatWhen(job.preferredDate, job.preferredTime)}
-        </p>
-        <p>
-          <span className="font-bold text-[var(--azisto-contractor-text)]">Urgency:</span>{" "}
-          {job.urgency || "Flexible"}
+          <span className="font-bold text-[var(--azisto-contractor-text)]">
+            {formatScheduleLabel(job)}
+          </span>
         </p>
       </div>
 

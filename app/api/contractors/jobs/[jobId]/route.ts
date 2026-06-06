@@ -44,6 +44,37 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readSchedule(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    mode: readText(data.mode),
+    date: readText(data.date),
+    timeWindow: readText(data.timeWindow),
+    urgency: readText(data.urgency),
+  };
+}
+
+function readLocation(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const lat = typeof data.lat === "number" ? data.lat : Number(data.lat);
+  const lng = typeof data.lng === "number" ? data.lng : Number(data.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -142,11 +173,16 @@ async function serializeJob(data: Record<string, unknown>) {
     city: typeof data.city === "string" ? data.city : "",
     province: typeof data.province === "string" ? data.province : "",
     postalCode: typeof data.postalCode === "string" ? data.postalCode : "",
+    locationMode: readText(data.locationMode),
+    location: readLocation(data.location),
+    scheduleMode: readText(data.scheduleMode),
     preferredDate:
       typeof data.preferredDate === "string" ? data.preferredDate : "",
     preferredTime:
       typeof data.preferredTime === "string" ? data.preferredTime : "",
+    preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: typeof data.urgency === "string" ? data.urgency : "",
+    schedule: readSchedule(data.schedule),
     status: typeof data.status === "string" ? data.status : "",
     matchingStatus:
       typeof data.matchingStatus === "string" ? data.matchingStatus : "",

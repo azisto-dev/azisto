@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -19,6 +20,12 @@ type CustomerJob = {
   selectedSubcategories: string[];
   city: string;
   province: string;
+  scheduleMode: string;
+  preferredDate: string;
+  preferredTime: string;
+  preferredTimeWindow: string;
+  urgency: string;
+  schedule: JobSchedule | null;
   status: string;
   hiredContractorId: string;
   hiredContractorName: string;
@@ -372,6 +379,7 @@ export default function CustomerJobsPage() {
 
                 <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
                   <p>{[job.city, job.province].filter(Boolean).join(", ")}</p>
+                  <p>{formatScheduleLabel(job)}</p>
                   <p>
                     <span className="font-bold text-slate-800">Created:</span>{" "}
                     {formatDate(job.createdAt)}

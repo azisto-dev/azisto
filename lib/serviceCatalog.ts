@@ -2,29 +2,82 @@ export type ServiceCatalogItem = {
   name: string;
   slug: string;
   subcategories: string[];
+  groups?: Record<
+    string,
+    {
+      label: string;
+      subcategories: string[];
+    }
+  >;
 };
 
 export const serviceCatalog: ServiceCatalogItem[] = [
   {
     name: "Home Care",
     slug: "home-care",
+    groups: {
+      maintenance: {
+        label: "Maintenance",
+        subcategories: [
+          "Handyman",
+          "Painter",
+          "Pest Control",
+          "Electrical",
+          "Plumbing",
+          "HVAC Services",
+          "Roofing Services",
+          "Drywall Repair & Installation",
+          "Fencing",
+          "Deck Building & Repair",
+          "Glass & Shower Doors",
+          "Garage Door Repair & Installation",
+          "Tile Installation",
+          "Gutter Installation",
+        ],
+      },
+      cleaning: {
+        label: "Cleaning",
+        subcategories: [
+          "General Cleaning",
+          "Pressure Washing",
+          "Gutter Cleaning",
+          "Junk Removal",
+          "Garbage Bin Cleaning",
+          "Duct and Furnace Cleaning",
+          "Mold Removal",
+          "Carpet Cleaning",
+          "Window Cleaning",
+          "Move-In / Move-Out Cleaning",
+          "Roof Cleaning",
+        ],
+      },
+    },
     subcategories: [
       "Handyman",
-      "General Cleaning",
       "Painter",
       "Pest Control",
       "Electrical",
       "Plumbing",
       "HVAC Services",
-      "Junk Removal",
       "Roofing Services",
       "Drywall Repair & Installation",
       "Fencing",
       "Deck Building & Repair",
       "Glass & Shower Doors",
-      "Gutter Installation & Cleaning",
       "Garage Door Repair & Installation",
       "Tile Installation",
+      "Gutter Installation",
+      "General Cleaning",
+      "Pressure Washing",
+      "Gutter Cleaning",
+      "Junk Removal",
+      "Garbage Bin Cleaning",
+      "Duct and Furnace Cleaning",
+      "Mold Removal",
+      "Carpet Cleaning",
+      "Window Cleaning",
+      "Move-In / Move-Out Cleaning",
+      "Roof Cleaning",
     ],
   },
   {

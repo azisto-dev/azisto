@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -17,6 +18,12 @@ type ActiveJob = {
   city: string;
   province: string;
   status: string;
+  scheduleMode: string;
+  preferredDate: string;
+  preferredTime: string;
+  preferredTimeWindow: string;
+  urgency: string;
+  schedule: JobSchedule | null;
 };
 
 function StatusBar() {
@@ -182,6 +189,7 @@ export default function ContractorActiveJobsPage() {
                 </div>
                 <p className="mt-3 text-sm text-[var(--azisto-contractor-muted)]">Customer: {job.customerId}</p>
                 <p className="mt-1 text-sm text-[var(--azisto-contractor-muted)]">{[job.city, job.province].filter(Boolean).join(", ")}</p>
+                <p className="mt-1 text-sm text-[var(--azisto-contractor-muted)]">{formatScheduleLabel(job)}</p>
                 <div className="mt-4 grid gap-2">
                   <button type="button" onClick={() => handleMessage(job.jobId)} disabled={activeJobId === job.jobId} className="az-btn-contractor flex h-12 items-center justify-center gap-2 rounded-full text-sm font-bold">
                     <MessageCircle className="h-4 w-4" /> Message customer

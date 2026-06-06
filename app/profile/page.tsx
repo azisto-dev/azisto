@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -105,21 +112,30 @@ const contractorServiceCatalog = [
     name: "Home Care",
     subcategories: [
       "Handyman",
-      "General Cleaning",
       "Painter",
       "Pest Control",
       "Electrical",
       "Plumbing",
       "HVAC Services",
-      "Junk Removal",
       "Roofing Services",
       "Drywall Repair & Installation",
       "Fencing",
       "Deck Building & Repair",
       "Glass & Shower Doors",
-      "Gutter Installation & Cleaning",
       "Garage Door Repair & Installation",
       "Tile Installation",
+      "Gutter Installation",
+      "General Cleaning",
+      "Pressure Washing",
+      "Gutter Cleaning",
+      "Junk Removal",
+      "Garbage Bin Cleaning",
+      "Duct and Furnace Cleaning",
+      "Mold Removal",
+      "Carpet Cleaning",
+      "Window Cleaning",
+      "Move-In / Move-Out Cleaning",
+      "Roof Cleaning",
     ],
   },
   {
@@ -739,10 +755,39 @@ export default function ProfilePage() {
   const displayName = getDisplayName(profile);
   const readableId =
     profile?.role === "contractor" ? profile.contractorId : profile?.customerId;
+  const isCustomerProfile = profile?.role !== "contractor";
+  const profileThemeStyle = isCustomerProfile
+    ? ({
+        "--azisto-contractor-bg": "#FAFAF8",
+        "--azisto-contractor-card": "#FFFFFF",
+        "--azisto-contractor-border": "#E5E7EB",
+        "--azisto-contractor-text": "#0F172A",
+        "--azisto-contractor-muted": "#64748B",
+        "--azisto-contractor-burgundy": "#2563EB",
+        "--azisto-contractor-burgundy-soft": "#EFF6FF",
+        "--azisto-contractor-burgundy-hover": "#1D4ED8",
+      } as CSSProperties)
+    : undefined;
+  const shellClass = isCustomerProfile
+    ? "az-customer-shell min-h-screen md:px-6 md:py-8"
+    : "az-contractor-shell min-h-screen md:px-6 md:py-8";
+  const frameClass = isCustomerProfile
+    ? "mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border"
+    : "mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
+  const cardClass = isCustomerProfile ? "az-customer-card" : "az-contractor-card";
+  const compactCardClass = isCustomerProfile
+    ? "az-customer-card"
+    : "az-contractor-card-compact";
+  const profileButtonClass = isCustomerProfile
+    ? "az-btn-primary"
+    : "az-btn-contractor";
+  const profileOutlineButtonClass = isCustomerProfile
+    ? "az-btn-secondary"
+    : "az-btn-contractor-outline";
 
   return (
-    <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+    <main className={shellClass} style={profileThemeStyle}>
+      <div className={frameClass}>
         <div className="flex-1 overflow-y-auto px-5 pb-6 pt-5">
           <StatusBar />
 
@@ -768,23 +813,41 @@ export default function ProfilePage() {
           </header>
 
           {isLoading ? (
-            <p className="az-contractor-card-compact mt-8 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+            <p className={`${compactCardClass} mt-8 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]`}>
               Loading profile...
             </p>
           ) : null}
 
           {profile ? (
             <>
-              <section className="az-contractor-hero-card mt-6 p-4">
+              <section
+                className={
+                  isCustomerProfile
+                    ? "az-customer-card mt-6 bg-gradient-to-br from-white via-blue-50 to-white p-4"
+                    : "az-contractor-hero-card mt-6 p-4"
+                }
+              >
                 <div className="relative z-10 flex items-start justify-between gap-3">
                   <div className="min-w-0 text-left">
-                    <p className="truncate text-2xl font-normal leading-tight text-[#C8A96B]">
+                    <p
+                      className={`truncate text-2xl font-normal leading-tight ${
+                        isCustomerProfile ? "text-azisto-accent" : "text-[#C8A96B]"
+                      }`}
+                    >
                       {displayName}
                     </p>
-                    <h1 className="mt-1 text-base font-normal uppercase leading-none tracking-[0.08em] text-white">
+                    <h1
+                      className={`mt-1 text-base font-normal uppercase leading-none tracking-[0.08em] ${
+                        isCustomerProfile ? "text-[#0F172A]" : "text-white"
+                      }`}
+                    >
                       {profile.role}
                     </h1>
-                    <p className="mt-2 truncate text-xs font-semibold text-white/80">
+                    <p
+                      className={`mt-2 truncate text-xs font-semibold ${
+                        isCustomerProfile ? "text-[#64748B]" : "text-white/80"
+                      }`}
+                    >
                       {readableId || "ID pending"}
                     </p>
                   </div>
@@ -792,10 +855,18 @@ export default function ProfilePage() {
                     <img
                       src={profile.profilePhotoUrl}
                       alt={`${displayName} profile photo`}
-                      className="h-14 w-14 shrink-0 rounded-full border border-white/30 object-cover shadow-lg"
+                      className={`h-14 w-14 shrink-0 rounded-full object-cover shadow-lg ${
+                        isCustomerProfile ? "border border-blue-100" : "border border-white/30"
+                      }`}
                     />
                   ) : (
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15 text-lg font-black text-white shadow-lg">
+                    <div
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border text-lg font-black shadow-lg ${
+                        isCustomerProfile
+                          ? "border-blue-100 bg-blue-50 text-azisto-accent"
+                          : "border-white/25 bg-white/15 text-white"
+                      }`}
+                    >
                       {getInitials(displayName)}
                     </div>
                   )}
@@ -806,7 +877,11 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={isUploadingPhoto}
-                    className="rounded-full border border-white/35 bg-white/15 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm disabled:opacity-60"
+                    className={`rounded-full border px-4 py-2 text-xs font-bold backdrop-blur-sm disabled:opacity-60 ${
+                      isCustomerProfile
+                        ? "border-azisto-accent bg-white text-azisto-accent"
+                        : "border-white/35 bg-white/15 text-white"
+                    }`}
                   >
                     {isUploadingPhoto
                       ? "Uploading photo..."
@@ -821,17 +896,33 @@ export default function ProfilePage() {
                     onChange={handlePhotoChange}
                     className="hidden"
                   />
-                  <p className="mt-2 text-[11px] font-semibold text-white/65">
+                  <p
+                    className={`mt-2 text-[11px] font-semibold ${
+                      isCustomerProfile ? "text-[#64748B]" : "text-white/65"
+                    }`}
+                  >
                     JPG, PNG, or WEBP. Max 5 MB.
                   </p>
                 </div>
 
                 <div className="relative z-10 mt-3 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold capitalize text-white">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold capitalize ${
+                      isCustomerProfile
+                        ? "border-blue-100 bg-blue-50 text-azisto-accent"
+                        : "border-white/20 bg-white/15 text-white"
+                    }`}
+                  >
                     <UserRound aria-hidden="true" className="h-3.5 w-3.5" />
                     {profile.role}
                   </span>
-                  <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-bold text-white">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                      isCustomerProfile
+                        ? "border-slate-200 bg-white text-[#0F172A]"
+                        : "border-white/20 bg-white/15 text-white"
+                    }`}
+                  >
                     {readableId || "ID pending"}
                   </span>
                   {profile.role === "contractor" ? (
@@ -858,7 +949,7 @@ export default function ProfilePage() {
                 </p>
               ) : null}
 
-              <section className="az-contractor-card mt-6 p-4">
+              <section className={`${cardClass} mt-6 p-4`}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">
                     Profile details
@@ -867,7 +958,7 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       onClick={() => setIsEditing(true)}
-                      className="az-btn-contractor-outline rounded-full px-4 py-2 text-xs font-bold"
+                      className={`${profileOutlineButtonClass} rounded-full px-4 py-2 text-xs font-bold`}
                     >
                       Edit Profile
                     </button>
@@ -1050,7 +1141,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={handleCancel}
                           disabled={isSaving}
-                          className="az-btn-contractor-outline flex h-12 items-center justify-center rounded-full text-sm font-bold"
+                          className={`${profileOutlineButtonClass} flex h-12 items-center justify-center rounded-full text-sm font-bold`}
                         >
                           Cancel
                         </button>
@@ -1058,7 +1149,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={handleSave}
                           disabled={isSaving}
-                          className="az-btn-contractor flex h-12 items-center justify-center rounded-full text-sm font-bold"
+                          className={`${profileButtonClass} flex h-12 items-center justify-center rounded-full text-sm font-bold`}
                         >
                           {isSaving ? "Saving..." : "Save Changes"}
                         </button>
@@ -1278,7 +1369,7 @@ export default function ProfilePage() {
 	                </section>
               ) : null}
 
-              <section className="az-contractor-card mt-5 p-4">
+              <section className={`${cardClass} mt-5 p-4`}>
                 <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">Security</h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
                   We’ll email a secure password reset link to your account
@@ -1287,7 +1378,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={handlePasswordReset}
-                  className="az-btn-contractor-outline mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold"
+                  className={`${profileOutlineButtonClass} mt-4 flex h-12 w-full items-center justify-center rounded-full text-sm font-bold`}
                 >
                   Change password
                 </button>

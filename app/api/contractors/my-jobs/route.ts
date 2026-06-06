@@ -30,6 +30,21 @@ function readStringList(value: unknown) {
     .filter(Boolean);
 }
 
+function readSchedule(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    mode: readText(data.mode),
+    date: readText(data.date),
+    timeWindow: readText(data.timeWindow),
+    urgency: readText(data.urgency),
+  };
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -115,9 +130,12 @@ async function serializeJob(data: Record<string, unknown>, relationship: string)
     selectedSubcategories: readStringList(data.selectedSubcategories),
     city: readText(data.city),
     province: readText(data.province),
+    scheduleMode: readText(data.scheduleMode),
     preferredDate: readText(data.preferredDate),
     preferredTime: readText(data.preferredTime),
+    preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: readText(data.urgency),
+    schedule: readSchedule(data.schedule),
     status: readText(data.status),
     matchingStatus: readText(data.matchingStatus),
     hiredContractorId: readText(data.hiredContractorId),
@@ -155,7 +173,13 @@ async function serializeTaskJob(
         readText(taskData.preferredDate) || readText(parentData.preferredDate),
       preferredTime:
         readText(taskData.preferredTime) || readText(parentData.preferredTime),
+      preferredTimeWindow:
+        readText(taskData.preferredTimeWindow) ||
+        readText(parentData.preferredTimeWindow),
       urgency: readText(taskData.urgency) || readText(parentData.urgency),
+      scheduleMode:
+        readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
+      schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
       status: readText(taskData.status) || readText(parentData.status),
       hiredContractorId: readText(taskData.hiredContractorId),
       createdAt: taskData.createdAt ?? parentData.createdAt,

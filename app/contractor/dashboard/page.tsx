@@ -10,6 +10,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import BottomNav from "@/app/components/BottomNav";
 
 type DashboardTab = "active" | "available" | "past";
@@ -27,9 +28,12 @@ type AvailableJob = {
   selectedSubcategories: string[];
   city: string;
   province: string;
+  scheduleMode: string;
   urgency: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
+  schedule: JobSchedule | null;
   status: string;
   matchingStatus: string;
 };
@@ -56,9 +60,12 @@ type ContractorJob = {
   selectedSubcategories: string[];
   city: string;
   province: string;
+  scheduleMode: string;
   preferredDate: string;
   preferredTime: string;
+  preferredTimeWindow: string;
   urgency: string;
+  schedule: JobSchedule | null;
   status: string;
   matchingStatus: string;
   hiredContractorId: string;
@@ -132,14 +139,6 @@ function createApiError(_code: string, message: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to load dashboard.";
-}
-
-function formatWhen(date: string, time: string) {
-  if (!date && !time) {
-    return "Flexible timing";
-  }
-
-  return [date, time].filter(Boolean).join(" at ");
 }
 
 function formatDate(value: string) {
@@ -550,10 +549,7 @@ export default function ContractorDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <p className="min-w-0 truncate">
-                        {job.urgency || "Flexible"}
-                      </p>
-                      <p className="shrink-0 text-right">
-                        {formatWhen(job.preferredDate, job.preferredTime)}
+                        {formatScheduleLabel(job)}
                       </p>
                     </div>
                   </div>
@@ -648,11 +644,11 @@ export default function ContractorDashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="min-w-0 truncate capitalize">
-                        {job.status || "open"}
+                      <p className="min-w-0 truncate">
+                        {formatScheduleLabel(job)}
                       </p>
-                      <p className="shrink-0 text-right">
-                        {formatWhen(job.preferredDate, job.preferredTime)}
+                      <p className="shrink-0 text-right capitalize">
+                        {job.status || "open"}
                       </p>
                     </div>
                   </div>

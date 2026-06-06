@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
+import BottomNav from "@/app/components/BottomNav";
 
 function StatusBar() {
   return (
@@ -27,7 +28,7 @@ function SubmittedContent() {
   return (
     <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
-        <div className="flex flex-1 flex-col px-5 pb-6 pt-5">
+        <div className="flex flex-1 flex-col px-5 pb-28 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -95,6 +96,7 @@ function SubmittedContent() {
             View My Jobs
           </Link>
         </div>
+        <BottomNav role="customer" />
       </div>
     </main>
   );

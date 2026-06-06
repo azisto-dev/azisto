@@ -38,6 +38,21 @@ function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readSchedule(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    mode: readText(data.mode),
+    date: readText(data.date),
+    timeWindow: readText(data.timeWindow),
+    urgency: readText(data.urgency),
+  };
+}
+
 function serializeTimestamp(value: unknown) {
   if (
     typeof value === "object" &&
@@ -137,12 +152,15 @@ async function serializeJob(data: Record<string, unknown>) {
     address: typeof data.address === "string" ? data.address : "",
     city: typeof data.city === "string" ? data.city : "",
     province: typeof data.province === "string" ? data.province : "",
+    scheduleMode: readText(data.scheduleMode),
     postalCode: typeof data.postalCode === "string" ? data.postalCode : "",
     preferredDate:
       typeof data.preferredDate === "string" ? data.preferredDate : "",
     preferredTime:
       typeof data.preferredTime === "string" ? data.preferredTime : "",
+    preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: typeof data.urgency === "string" ? data.urgency : "",
+    schedule: readSchedule(data.schedule),
     status: typeof data.status === "string" ? data.status : "",
     matchingStatus:
       typeof data.matchingStatus === "string" ? data.matchingStatus : "",
@@ -178,7 +196,12 @@ async function serializeTaskCard(
       readText(taskData.preferredDate) || readText(parentData.preferredDate),
     preferredTime:
       readText(taskData.preferredTime) || readText(parentData.preferredTime),
+    preferredTimeWindow:
+      readText(taskData.preferredTimeWindow) ||
+      readText(parentData.preferredTimeWindow),
     urgency: readText(taskData.urgency) || readText(parentData.urgency),
+    scheduleMode: readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
+    schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
     status: readText(taskData.status) || readText(parentData.status),
     hiredContractorId: readText(taskData.hiredContractorId),
     createdAt: taskData.createdAt ?? parentData.createdAt,
