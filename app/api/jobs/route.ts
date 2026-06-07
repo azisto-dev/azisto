@@ -62,6 +62,130 @@ function readStringList(value: unknown) {
     .filter(Boolean);
 }
 
+function readStringRecord(value: unknown) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {} as Record<string, unknown>;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getContractorAuthUid(data: Record<string, unknown>) {
+  return readText(data.authUid) || readText(data.firebaseUid);
+}
+
+function isApprovedContractor(data: Record<string, unknown>) {
+  const verificationStatus = readText(data.verificationStatus).toLowerCase();
+  const accountStatus = readText(data.accountStatus).toLowerCase();
+
+  return (
+    ["approved", "verified", "active"].includes(verificationStatus) &&
+    (!accountStatus || accountStatus === "active")
+  );
+}
+
+function getContractorServices(data: Record<string, unknown>) {
+  const selectedServices = readStringList(data.selectedServices);
+  const legacyServices = Array.isArray(data.servicesOffered)
+    ? readStringList(data.servicesOffered)
+    : readText(data.servicesOffered)
+        .split(",")
+        .map((service) => service.trim())
+        .filter(Boolean);
+
+  return new Set([...selectedServices, ...legacyServices]);
+}
+
+function getMatchingSubcategories(
+  data: Record<string, unknown>,
+  category: string,
+  subcategories: string[],
+) {
+  const selectedServices = getContractorServices(data);
+  const savedByService = readStringRecord(
+    data.selectedSubcategoriesByService ?? data.serviceSubcategories,
+  );
+  const savedSubcategories = readStringList(savedByService[category]);
+  const directlySelectedSubcategories = subcategories.filter((subcategory) =>
+    selectedServices.has(subcategory),
+  );
+
+  if (!selectedServices.has(category) && directlySelectedSubcategories.length === 0) {
+    return [];
+  }
+
+  if (savedSubcategories.length === 0) {
+    return selectedServices.has(category)
+      ? subcategories
+      : directlySelectedSubcategories;
+  }
+
+  return subcategories.filter((subcategory) =>
+    savedSubcategories.includes(subcategory),
+  );
+}
+
+async function notifyMatchingContractors(input: {
+  jobId: string;
+  serviceCategory: string;
+  taskSubcategories: string[];
+}) {
+  const contractorsSnapshot = await adminDb
+    .collection("contractors")
+    .limit(100)
+    .get();
+  const notificationBatch = adminDb.batch();
+  let notificationCount = 0;
+
+  contractorsSnapshot.docs.forEach((contractorSnapshot) => {
+    const contractorData = contractorSnapshot.data() ?? {};
+    const recipientAuthUid = getContractorAuthUid(contractorData);
+    const matchingSubcategories = getMatchingSubcategories(
+      contractorData,
+      input.serviceCategory,
+      input.taskSubcategories,
+    );
+
+    if (
+      !recipientAuthUid ||
+      !isApprovedContractor(contractorData) ||
+      matchingSubcategories.length === 0
+    ) {
+      return;
+    }
+
+    const matchingTaskIds = input.taskSubcategories.flatMap(
+      (subcategory, index) =>
+        matchingSubcategories.includes(subcategory)
+          ? [`${input.jobId}-${index + 1}`]
+          : [],
+    );
+    const notificationDocument = adminDb.collection("notifications").doc();
+
+    notificationBatch.set(notificationDocument, {
+      notificationId: notificationDocument.id,
+      recipientAuthUid,
+      recipientRole: "contractor",
+      type: "new_matching_job",
+      title: "New matching job",
+      message: `${input.serviceCategory} job posted near your service area.`,
+      jobId: input.jobId,
+      taskIds: matchingTaskIds,
+      serviceCategory: input.serviceCategory,
+      subcategories: matchingSubcategories,
+      threadId: "",
+      read: false,
+      clearedAt: null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    notificationCount += 1;
+  });
+
+  if (notificationCount > 0) {
+    await notificationBatch.commit();
+  }
+}
+
 function readSubcategoryGroups(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -466,6 +590,21 @@ export async function POST(request: NextRequest) {
       },
       { merge: true },
     );
+
+    if (!needsReview && selectedServiceCategory) {
+      try {
+        await notifyMatchingContractors({
+          jobId,
+          serviceCategory: selectedServiceCategory,
+          taskSubcategories,
+        });
+      } catch (notificationError) {
+        console.error("Matching contractor notifications failed:", {
+          jobId,
+          notificationError,
+        });
+      }
+    }
 
     return NextResponse.json({
       ok: true,

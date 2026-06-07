@@ -3,7 +3,6 @@ export const contractorActiveStatuses = new Set([
   "accepted",
   "on_the_way",
   "in_progress",
-  "cancel_requested",
   "hired",
 ]);
 
@@ -11,7 +10,6 @@ export const contractorPastStatuses = new Set([
   "completed",
   "cancelled",
   "rejected",
-  "disputed",
 ]);
 
 export const unavailableJobStatuses = new Set([
@@ -21,8 +19,6 @@ export const unavailableJobStatuses = new Set([
   "in_progress",
   "completed",
   "cancelled",
-  "cancel_requested",
-  "disputed",
   "hired",
 ]);
 
@@ -30,20 +26,24 @@ const statusLabels: Record<string, string> = {
   open: "Open",
   interest_submitted: "Interest submitted",
   hired_pending_contractor: "Pending contractor acceptance",
+  pending_contractor_acceptance: "Pending contractor acceptance",
   accepted: "Accepted",
   hired: "Accepted",
   on_the_way: "Contractor on the way",
   in_progress: "In progress",
   completed: "Completed",
   cancelled: "Cancelled",
-  cancel_requested: "Cancellation requested",
-  disputed: "Under review",
   rejected: "Rejected",
   partially_hired: "Partially hired",
+  partially_active: "Partially active",
+  partially_in_progress: "Partially in progress",
+  expired: "Expired",
 };
 
 export function getJobStatusLabel(status: string) {
-  const normalizedStatus = status.trim().toLowerCase();
+  const normalizedStatus = getCompatibleLifecycleStatus(
+    status.trim().toLowerCase(),
+  );
 
   return (
     statusLabels[normalizedStatus] ||
@@ -53,13 +53,22 @@ export function getJobStatusLabel(status: string) {
 }
 
 export function getCompatibleLifecycleStatus(status: string) {
-  return status === "hired" ? "accepted" : status;
+  if (
+    status === "hired" ||
+    status === "cancel_requested" ||
+    status === "disputed" ||
+    status === "under_review"
+  ) {
+    return "accepted";
+  }
+
+  return status;
 }
 
 export function isContractorActiveStatus(status: string) {
-  return contractorActiveStatuses.has(status);
+  return contractorActiveStatuses.has(getCompatibleLifecycleStatus(status));
 }
 
 export function isContractorPastStatus(status: string) {
-  return contractorPastStatuses.has(status);
+  return contractorPastStatuses.has(getCompatibleLifecycleStatus(status));
 }

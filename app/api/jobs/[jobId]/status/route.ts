@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -17,7 +17,6 @@ type RouteContext = {
 type StatusRequestBody = {
   status?: unknown;
   taskId?: unknown;
-  cancelReason?: unknown;
 };
 
 const lifecycleStatuses = new Set([
@@ -28,10 +27,19 @@ const lifecycleStatuses = new Set([
   "in_progress",
   "completed",
   "cancelled",
-  "cancel_requested",
-  "disputed",
   "hired",
 ]);
+
+const acceptedStatuses = new Set([
+  "accepted",
+  "hired",
+  "on_the_way",
+  "in_progress",
+  "completed",
+]);
+
+const acceptedCancellationMessage =
+  "This contractor has already accepted your job. Please contact the contractor directly to discuss cancellation.";
 
 function getBearerToken(authorizationHeader: string | null) {
   return authorizationHeader?.startsWith("Bearer ")
@@ -55,37 +63,22 @@ function getErrorDetails(error: unknown) {
   };
 }
 
-function resolveCustomerCancellationStatus(currentStatus: string) {
-  const compatibleStatus = getCompatibleLifecycleStatus(currentStatus);
+function isAcceptedStatus(status: string) {
+  return acceptedStatuses.has(getCompatibleLifecycleStatus(status));
+}
 
-  if (compatibleStatus === "completed") {
-    throw Object.assign(
-      new Error(
-        "Completed jobs cannot be cancelled. You can leave a review or contact support.",
-      ),
-      { code: "completed-job-cannot-cancel" },
-    );
+function ensureCustomerCanCancel(status: string) {
+  if (isAcceptedStatus(status)) {
+    throw Object.assign(new Error(acceptedCancellationMessage), {
+      code: "contractor-already-accepted",
+    });
   }
 
-  if (compatibleStatus === "on_the_way") {
-    return "cancel_requested";
+  if (!["open", "hired_pending_contractor"].includes(status)) {
+    throw Object.assign(new Error("This job can no longer be cancelled."), {
+      code: "invalid-status-transition",
+    });
   }
-
-  if (compatibleStatus === "in_progress") {
-    return "disputed";
-  }
-
-  if (
-    ["open", "hired_pending_contractor", "accepted"].includes(
-      compatibleStatus,
-    )
-  ) {
-    return "cancelled";
-  }
-
-  throw Object.assign(new Error("This job can no longer be cancelled."), {
-    code: "invalid-status-transition",
-  });
 }
 
 function isAllowedContractorTransition(fromStatus: string, toStatus: string) {
@@ -98,13 +91,7 @@ function isAllowedContractorTransition(fromStatus: string, toStatus: string) {
   );
 }
 
-function isTerminalCancellationStatus(status: string) {
-  return ["completed", "cancelled", "cancel_requested", "disputed"].includes(
-    getCompatibleLifecycleStatus(status),
-  );
-}
-
-function getStatusUpdate(status: string, changedByUid: string, reason: string) {
+function getStatusUpdate(status: string, changedByUid: string) {
   const update: Record<string, unknown> = {
     status,
     updatedAt: FieldValue.serverTimestamp(),
@@ -125,25 +112,94 @@ function getStatusUpdate(status: string, changedByUid: string, reason: string) {
 
   if (status === "cancelled") {
     update.cancelledAt = FieldValue.serverTimestamp();
-    update.cancelReason = reason;
     update.cancelledByUid = changedByUid;
     update.matchingStatus = "closed";
   }
 
-  if (status === "cancel_requested") {
-    update.cancelRequestedAt = FieldValue.serverTimestamp();
-    update.cancelRequestedBy = "customer";
-    update.cancelReason = reason;
-  }
-
-  if (status === "disputed") {
-    update.cancelRequestedAt = FieldValue.serverTimestamp();
-    update.cancelRequestedBy = "customer";
-    update.disputeReason = reason;
-    update.matchingStatus = "closed";
-  }
-
   return update;
+}
+
+function getParentStatus(taskStatuses: string[]) {
+  if (taskStatuses.length === 0) {
+    return { status: "open", overallStatus: "open", matchingStatus: "open" };
+  }
+
+  if (taskStatuses.every((status) => status === "cancelled")) {
+    return {
+      status: "cancelled",
+      overallStatus: "cancelled",
+      matchingStatus: "closed",
+    };
+  }
+
+  if (
+    taskStatuses.every(
+      (status) => status === "completed" || status === "cancelled",
+    )
+  ) {
+    return {
+      status: "completed",
+      overallStatus: "completed",
+      matchingStatus: "closed",
+    };
+  }
+
+  if (taskStatuses.includes("open")) {
+    const hasAssignedTask = taskStatuses.some(
+      (status) => status !== "open" && status !== "cancelled",
+    );
+
+    return {
+      status: "open",
+      overallStatus: hasAssignedTask ? "partially_hired" : "open",
+      matchingStatus: "open",
+    };
+  }
+
+  if (taskStatuses.includes("in_progress")) {
+    return {
+      status: "in_progress",
+      overallStatus: "in_progress",
+      matchingStatus: "closed",
+    };
+  }
+
+  if (taskStatuses.includes("on_the_way")) {
+    return {
+      status: "on_the_way",
+      overallStatus: "on_the_way",
+      matchingStatus: "closed",
+    };
+  }
+
+  if (
+    taskStatuses.some(
+      (status) => status === "accepted" || status === "hired",
+    )
+  ) {
+    return {
+      status: "accepted",
+      overallStatus: "accepted",
+      matchingStatus: "closed",
+    };
+  }
+
+  if (taskStatuses.includes("hired_pending_contractor")) {
+    return {
+      status: "hired_pending_contractor",
+      overallStatus: "hired_pending_contractor",
+      matchingStatus: "closed",
+    };
+  }
+
+  return { status: "open", overallStatus: "open", matchingStatus: "open" };
+}
+
+function getTaskStatus(
+  taskSnapshot: QueryDocumentSnapshot,
+  fallbackStatus: string,
+) {
+  return readText(taskSnapshot.get("status")) || fallbackStatus;
 }
 
 function getNotificationCopy(status: string, jobId: string) {
@@ -168,22 +224,6 @@ function getNotificationCopy(status: string, jobId: string) {
       type: "job_completed",
       title: "Job completed",
       message: `Job ${jobId} was marked completed.`,
-    };
-  }
-
-  if (status === "cancel_requested") {
-    return {
-      type: "customer_cancellation_requested",
-      title: "Cancellation requested",
-      message: "Customer requested cancellation while you were on the way.",
-    };
-  }
-
-  if (status === "disputed") {
-    return {
-      type: "job_disputed",
-      title: "Job under review",
-      message: "Customer requested cancellation during an active job.",
     };
   }
 
@@ -219,7 +259,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = (await request.json()) as StatusRequestBody;
     const requestedStatus = readText(body.status);
     const taskId = readText(body.taskId);
-    const cancelReason = readText(body.cancelReason);
 
     if (!lifecycleStatuses.has(requestedStatus)) {
       return NextResponse.json(
@@ -279,126 +318,132 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       if (callerIsCustomer) {
         if (requestedStatus === "cancelled") {
-          const taskStatuses = allTasks.map(
-            (taskSnapshot) =>
-              readText(taskSnapshot.get("status")) || currentStatus,
-          );
-
-          if (
-            getCompatibleLifecycleStatus(currentStatus) === "completed" ||
-            (taskStatuses.length > 0 &&
-              taskStatuses.every(
-                (status) =>
-                  getCompatibleLifecycleStatus(status) === "completed",
-              ))
-          ) {
-            resolveCustomerCancellationStatus("completed");
+          if (taskId && !selectedTask) {
+            throw Object.assign(new Error("This task could not be found."), {
+              code: "task-not-found",
+            });
           }
 
-          appliedStatus = taskStatuses.some(
-            (status) =>
-              getCompatibleLifecycleStatus(status) === "in_progress",
-          )
-            ? "disputed"
-            : taskStatuses.some(
-                  (status) =>
-                    getCompatibleLifecycleStatus(status) === "on_the_way",
-                )
-              ? "cancel_requested"
-              : resolveCustomerCancellationStatus(currentStatus);
+          const cancellationTargets = selectedTask ? [selectedTask] : allTasks;
 
-          if (
-            ["cancel_requested", "disputed"].includes(appliedStatus) &&
-            !cancelReason
-          ) {
-            throw Object.assign(
-              new Error("Please provide a reason for this cancellation request."),
-              { code: "missing-cancel-reason" },
+          if (cancellationTargets.length > 0) {
+            cancellationTargets.forEach((taskSnapshot) => {
+              ensureCustomerCanCancel(
+                getTaskStatus(taskSnapshot, currentStatus),
+              );
+            });
+
+            cancellationTargets.forEach((taskSnapshot) => {
+              transaction.set(
+                taskSnapshot.ref,
+                getStatusUpdate("cancelled", decodedToken.uid),
+                { merge: true },
+              );
+            });
+
+            const targetIds = new Set(
+              cancellationTargets.map((taskSnapshot) => taskSnapshot.id),
             );
+            const updatedTaskStatuses = allTasks.map((taskSnapshot) =>
+              targetIds.has(taskSnapshot.id)
+                ? "cancelled"
+                : getTaskStatus(taskSnapshot, currentStatus),
+            );
+            const parentStatus = getParentStatus(updatedTaskStatuses);
+
+            transaction.set(
+              jobDocument,
+              {
+                ...parentStatus,
+                ...(parentStatus.status === "cancelled"
+                  ? getStatusUpdate("cancelled", decodedToken.uid)
+                  : { updatedAt: FieldValue.serverTimestamp() }),
+              },
+              { merge: true },
+            );
+
+            notificationRecipientAuthUids = Array.from(
+              new Set(
+                cancellationTargets
+                  .map((taskSnapshot) =>
+                    readText(taskSnapshot.get("hiredContractorAuthUid")),
+                  )
+                  .filter(Boolean),
+              ),
+            );
+          } else {
+            ensureCustomerCanCancel(currentStatus);
+            transaction.set(
+              jobDocument,
+              {
+                ...getStatusUpdate("cancelled", decodedToken.uid),
+                overallStatus: "cancelled",
+              },
+              { merge: true },
+            );
+            notificationRecipientAuthUids = [
+              readText(jobSnapshot.get("hiredContractorAuthUid")),
+            ].filter(Boolean);
           }
+
+          historyFromStatus = selectedTask
+            ? getTaskStatus(selectedTask, currentStatus)
+            : currentStatus;
+          appliedStatus = "cancelled";
+          notificationRecipientRole = "contractor";
         } else if (
-          !(
-            requestedStatus === "completed" &&
-            getCompatibleLifecycleStatus(currentStatus) === "in_progress"
-          )
+          requestedStatus === "completed" &&
+          getCompatibleLifecycleStatus(currentStatus) === "in_progress"
         ) {
+          historyFromStatus = currentStatus;
+          appliedStatus = "completed";
+          transaction.set(
+            jobDocument,
+            {
+              ...getStatusUpdate("completed", decodedToken.uid),
+              overallStatus: "completed",
+            },
+            { merge: true },
+          );
+          allTasks
+            .filter(
+              (taskSnapshot) =>
+                getTaskStatus(taskSnapshot, currentStatus) === "in_progress",
+            )
+            .forEach((taskSnapshot) => {
+              transaction.set(
+                taskSnapshot.ref,
+                getStatusUpdate("completed", decodedToken.uid),
+                { merge: true },
+              );
+            });
+          notificationRecipientAuthUids = Array.from(
+            new Set(
+              [
+                readText(jobSnapshot.get("hiredContractorAuthUid")),
+                ...allTasks.map((taskSnapshot) =>
+                  readText(taskSnapshot.get("hiredContractorAuthUid")),
+                ),
+              ].filter(Boolean),
+            ),
+          );
+          notificationRecipientRole = "contractor";
+          completedParentJob = true;
+        } else {
           throw Object.assign(
             new Error("That job status change is not allowed."),
             { code: "invalid-status-transition" },
           );
         }
-
-        historyFromStatus = currentStatus;
-        transaction.set(
-          jobDocument,
-          {
-            ...getStatusUpdate(appliedStatus, decodedToken.uid, cancelReason),
-            previousStatus:
-              appliedStatus === "cancel_requested" ||
-              appliedStatus === "disputed"
-                ? currentStatus
-                : FieldValue.delete(),
-            overallStatus: appliedStatus,
-          },
-          { merge: true },
-        );
-
-        allTasks.forEach((taskSnapshot) => {
-            const taskCurrentStatus =
-              readText(taskSnapshot.get("status")) || currentStatus;
-            if (
-              requestedStatus === "cancelled" &&
-              isTerminalCancellationStatus(taskCurrentStatus)
-            ) {
-              return;
-            }
-
-            const taskStatus =
-              requestedStatus === "cancelled"
-                ? resolveCustomerCancellationStatus(taskCurrentStatus)
-                : appliedStatus;
-
-            transaction.set(
-              taskSnapshot.ref,
-              {
-                ...getStatusUpdate(
-                  taskStatus,
-                  decodedToken.uid,
-                  cancelReason,
-                ),
-                previousStatus:
-                  taskStatus === "cancel_requested" ||
-                  taskStatus === "disputed"
-                    ? taskCurrentStatus
-                    : FieldValue.delete(),
-              },
-              { merge: true },
-            );
-          });
-
-        notificationRecipientAuthUids = Array.from(
-          new Set(
-            [
-              readText(jobSnapshot.get("hiredContractorAuthUid")),
-              ...allTasks.map((taskSnapshot) =>
-                readText(taskSnapshot.get("hiredContractorAuthUid")),
-              ),
-            ].filter(Boolean),
-          ),
-        );
-        notificationRecipientRole = "contractor";
       } else {
-        const targetTasks = selectedTask
-          ? [selectedTask]
-          : hiredTasksForCaller;
+        const targetTasks = selectedTask ? [selectedTask] : hiredTasksForCaller;
         const includesUnassignedTask = targetTasks.some(
           (taskSnapshot) =>
             taskSnapshot.get("hiredContractorAuthUid") !== decodedToken.uid,
         );
         const isLegacyParentAssignment =
           allTasks.length === 0 &&
-          (jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
-            callerIsHiredContractor);
+          jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid;
 
         if (
           (targetTasks.length === 0 && !isLegacyParentAssignment) ||
@@ -432,39 +477,44 @@ export async function POST(request: NextRequest, context: RouteContext) {
         targetTasks.forEach((taskSnapshot) => {
           transaction.set(
             taskSnapshot.ref,
-            getStatusUpdate(requestedStatus, decodedToken.uid, ""),
+            getStatusUpdate(requestedStatus, decodedToken.uid),
             { merge: true },
           );
         });
 
-        const updatedTaskStatuses = allTasks.map((taskSnapshot) =>
-          targetTasks.some((targetTask) => targetTask.id === taskSnapshot.id)
-            ? requestedStatus
-            : readText(taskSnapshot.get("status")),
-        );
-        const hasOpenTasks = updatedTaskStatuses.some(
-          (status) => status === "open",
-        );
-        const allCompleted =
-          updatedTaskStatuses.length > 0 &&
-          updatedTaskStatuses.every(
-            (status) => status === "completed" || status === "cancelled",
+        if (allTasks.length > 0) {
+          const targetIds = new Set(
+            targetTasks.map((taskSnapshot) => taskSnapshot.id),
           );
-        const parentStatus = hasOpenTasks
-          ? "open"
-          : allCompleted
-            ? "completed"
-            : requestedStatus;
-        completedParentJob = parentStatus === "completed";
+          const updatedTaskStatuses = allTasks.map((taskSnapshot) =>
+            targetIds.has(taskSnapshot.id)
+              ? requestedStatus
+              : getTaskStatus(taskSnapshot, currentStatus),
+          );
+          const parentStatus = getParentStatus(updatedTaskStatuses);
+          completedParentJob = parentStatus.status === "completed";
 
-        transaction.set(
-          jobDocument,
-          {
-            ...getStatusUpdate(parentStatus, decodedToken.uid, ""),
-            overallStatus: hasOpenTasks ? "partially_hired" : parentStatus,
-          },
-          { merge: true },
-        );
+          transaction.set(
+            jobDocument,
+            {
+              ...parentStatus,
+              ...(completedParentJob
+                ? getStatusUpdate("completed", decodedToken.uid)
+                : { updatedAt: FieldValue.serverTimestamp() }),
+            },
+            { merge: true },
+          );
+        } else {
+          completedParentJob = requestedStatus === "completed";
+          transaction.set(
+            jobDocument,
+            {
+              ...getStatusUpdate(requestedStatus, decodedToken.uid),
+              overallStatus: requestedStatus,
+            },
+            { merge: true },
+          );
+        }
 
         notificationRecipientAuthUids = [
           readText(jobSnapshot.get("customerAuthUid")),
@@ -472,10 +522,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         notificationRecipientRole = "customer";
       }
 
-      if (
-        appliedStatus === "completed" &&
-        (changedByRole === "customer" || completedParentJob)
-      ) {
+      if (appliedStatus === "completed" && completedParentJob) {
         const customerId = readText(jobSnapshot.get("customerId"));
         const hiredContractorId =
           completionContractorId ||
@@ -511,12 +558,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
         changedAt: FieldValue.serverTimestamp(),
         changedByRole,
         changedByUid: decodedToken.uid,
-        note:
-          appliedStatus === "cancel_requested"
-            ? `Customer requested cancellation${cancelReason ? `: ${cancelReason}` : ""}`
-            : appliedStatus === "disputed"
-              ? `Customer requested cancellation during active work${cancelReason ? `: ${cancelReason}` : ""}`
-              : `Status changed to ${appliedStatus}`,
+        note: taskId
+          ? `Task ${taskId} status changed to ${appliedStatus}`
+          : `Status changed to ${appliedStatus}`,
         ...(taskId ? { taskId } : {}),
       });
     });
@@ -539,7 +583,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ok: true,
       status: appliedStatus,
       changedByRole,
-      underReview: appliedStatus === "disputed",
+      taskId: taskId || null,
     });
   } catch (error) {
     const { code, message } = getErrorDetails(error);
@@ -552,13 +596,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         status:
           code === "missing-token"
             ? 401
-            : code === "job-not-found"
+            : code === "job-not-found" || code === "task-not-found"
               ? 404
-                : code === "job-access-denied"
-                  ? 403
-                  : code === "missing-cancel-reason"
-                    ? 400
-                : code === "completed-job-cannot-cancel" ||
+              : code === "job-access-denied"
+                ? 403
+                : code === "contractor-already-accepted" ||
                     code === "invalid-status-transition"
                   ? 409
                   : 500,

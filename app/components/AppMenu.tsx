@@ -61,7 +61,7 @@ export default function AppMenu({ role }: { role: UserRole }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isContractor = role === "contractor";
   const menuThemeStyle = {
-    "--azisto-contractor-bg": isContractor ? "#F7F4F1" : "#F7F7F9",
+    "--azisto-contractor-bg": isContractor ? "#FFFFFF" : "#F7F7F9",
     "--azisto-contractor-card": "#FFFFFF",
     "--azisto-contractor-border": isContractor ? "#E8E2DC" : "#E5E7EB",
     "--azisto-contractor-text": isContractor ? "#111827" : "#0F172A",

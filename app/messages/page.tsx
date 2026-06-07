@@ -171,8 +171,13 @@ export default function MessagesPage() {
 
   return (
     <main className={shellClass}>
-      <div className={frameClass}>
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div
+        className={frameClass.replace(
+          "min-h-screen",
+          "h-screen min-h-0 md:h-[780px]",
+        )}
+      >
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">

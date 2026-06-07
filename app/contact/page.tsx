@@ -4,7 +4,7 @@ import BottomNav from "@/app/components/BottomNav";
 
 const supportSections = [
   {
-    title: "Customer support",
+    title: "User support",
     text: "Help with bookings, messages, job status, and account access.",
     icon: UserRound,
   },

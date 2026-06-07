@@ -758,7 +758,7 @@ export default function ProfilePage() {
   const isCustomerProfile = profile?.role !== "contractor";
   const profileThemeStyle = isCustomerProfile
     ? ({
-        "--azisto-contractor-bg": "#FAFAF8",
+        "--azisto-contractor-bg": "#FFFFFF",
         "--azisto-contractor-card": "#FFFFFF",
         "--azisto-contractor-border": "#E5E7EB",
         "--azisto-contractor-text": "#0F172A",
@@ -788,7 +788,7 @@ export default function ProfilePage() {
   return (
     <main className={shellClass} style={profileThemeStyle}>
       <div className={frameClass}>
-        <div className="flex-1 overflow-y-auto px-5 pb-6 pt-5">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -841,7 +841,7 @@ export default function ProfilePage() {
                         isCustomerProfile ? "text-[#0F172A]" : "text-white"
                       }`}
                     >
-                      {profile.role}
+                      {profile.role === "customer" ? "User" : profile.role}
                     </h1>
                     <p
                       className={`mt-2 truncate text-xs font-semibold ${
@@ -914,7 +914,7 @@ export default function ProfilePage() {
                     }`}
                   >
                     <UserRound aria-hidden="true" className="h-3.5 w-3.5" />
-                    {profile.role}
+                    {profile.role === "customer" ? "User" : profile.role}
                   </span>
                   <span
                     className={`rounded-full border px-3 py-1 text-xs font-bold ${

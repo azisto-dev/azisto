@@ -115,8 +115,6 @@ function serializeJob(data: Record<string, unknown>) {
     schedule: readSchedule(data.schedule),
     status: readText(data.status),
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
-    cancelReason: readText(data.cancelReason),
-    previousStatus: readText(data.previousStatus),
     matchingStatus: readText(data.matchingStatus),
     hiredContractorId: readText(data.hiredContractorId),
     hiredContractorName: readText(data.hiredContractorName),

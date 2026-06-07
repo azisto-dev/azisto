@@ -2,13 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Briefcase, ChevronLeft, MessageCircle } from "lucide-react";
+import {
+  Briefcase,
+  ChevronLeft,
+  MessageCircle,
+  RefreshCw,
+} from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
-import { getJobStatusLabel } from "@/lib/jobStatus";
+import {
+  getCompatibleLifecycleStatus,
+  getJobStatusLabel,
+} from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
@@ -29,8 +37,6 @@ type CustomerJob = {
   schedule: JobSchedule | null;
   status: string;
   contractorDecisionStatus?: string;
-  cancelReason?: string;
-  previousStatus?: string;
   hiredContractorId: string;
   hiredContractorName: string;
   hiredBusinessName: string;
@@ -49,6 +55,31 @@ type CustomerJobTask = {
   hiredContractorAuthUid: string;
   createdAt: string;
 };
+
+type JobTab = "active" | "open" | "past";
+
+const activeJobStatuses = new Set([
+  "accepted",
+  "hired",
+  "on_the_way",
+  "in_progress",
+  "partially_active",
+  "partially_in_progress",
+]);
+
+const openJobStatuses = new Set([
+  "open",
+  "partially_hired",
+  "hired_pending_contractor",
+  "pending_contractor_acceptance",
+]);
+
+const pastJobStatuses = new Set([
+  "completed",
+  "cancelled",
+  "rejected",
+  "expired",
+]);
 
 function StatusBar() {
   return (
@@ -84,13 +115,11 @@ function formatDate(value: string) {
 function getCustomerLifecycleStatus(job: CustomerJob) {
   const taskStatuses = job.tasks?.map((task) => task.status) ?? [];
   const priority = [
-    "disputed",
     "in_progress",
     "on_the_way",
     "accepted",
     "hired",
     "hired_pending_contractor",
-    "cancel_requested",
   ];
 
   return (
@@ -98,6 +127,47 @@ function getCustomerLifecycleStatus(job: CustomerJob) {
     job.status ||
     "open"
   );
+}
+
+function isAcceptedStatus(status: string) {
+  const compatibleStatus = getCompatibleLifecycleStatus(status);
+
+  return ["accepted", "hired", "on_the_way", "in_progress"].includes(
+    compatibleStatus,
+  );
+}
+
+function canCancelStatus(status: string) {
+  const compatibleStatus = getCompatibleLifecycleStatus(status);
+
+  return (
+    compatibleStatus === "open" ||
+    compatibleStatus === "hired_pending_contractor"
+  );
+}
+
+function getJobTab(job: CustomerJob): JobTab {
+  const statuses = [
+    ...(job.tasks?.map((task) => task.status) ?? []),
+    job.overallStatus,
+    job.status,
+  ]
+    .filter((status): status is string => Boolean(status))
+    .map((status) => getCompatibleLifecycleStatus(status));
+
+  if (statuses.some((status) => activeJobStatuses.has(status))) {
+    return "active";
+  }
+
+  if (statuses.some((status) => openJobStatuses.has(status))) {
+    return "open";
+  }
+
+  if (statuses.some((status) => pastJobStatuses.has(status))) {
+    return "past";
+  }
+
+  return "open";
 }
 
 async function fetchCustomerJobs(user: User) {
@@ -133,7 +203,7 @@ async function updateJobStatus(
   user: User,
   jobId: string,
   status: string,
-  cancelReason?: string,
+  taskId?: string,
 ) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
@@ -142,7 +212,7 @@ async function updateJobStatus(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status, cancelReason }),
+    body: JSON.stringify({ status, taskId }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
@@ -207,10 +277,41 @@ export default function CustomerJobsPage() {
   const [activeJobId, setActiveJobId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [refreshWarning, setRefreshWarning] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<JobTab>("active");
+  const isJobsRequestInFlightRef = useRef(false);
+  const hasSelectedInitialTabRef = useRef(false);
 
-  async function loadJobs(user: User) {
-    const customerJobs = await fetchCustomerJobs(user);
-    setJobs(customerJobs);
+  async function loadJobs(user: User, isBackgroundRefresh = false) {
+    if (isJobsRequestInFlightRef.current) {
+      return;
+    }
+
+    isJobsRequestInFlightRef.current = true;
+
+    try {
+      const customerJobs = await fetchCustomerJobs(user);
+      setJobs(customerJobs);
+      setRefreshWarning("");
+
+      if (!hasSelectedInitialTabRef.current) {
+        const hasActiveJobs = customerJobs.some(
+          (job) => getJobTab(job) === "active",
+        );
+        setSelectedTab(hasActiveJobs ? "active" : "open");
+        hasSelectedInitialTabRef.current = true;
+      }
+    } catch (error) {
+      if (isBackgroundRefresh) {
+        setRefreshWarning("Status updates paused. Retrying soon.");
+        return;
+      }
+
+      throw error;
+    } finally {
+      isJobsRequestInFlightRef.current = false;
+    }
   }
 
   useEffect(() => {
@@ -233,7 +334,7 @@ export default function CustomerJobsPage() {
 
         if (profile.role !== "customer") {
           console.log("Customer jobs redirect reason:", `role:${profile.role}`);
-          setErrorMessage("Please use a customer account to view customer jobs.");
+          setErrorMessage("Please use a user account to view your jobs.");
           return;
         }
 
@@ -248,67 +349,71 @@ export default function CustomerJobsPage() {
     return unsubscribe;
   }, [router]);
 
-  async function handleCancelJob(job: CustomerJob) {
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const refreshVisibleJobs = () => {
+      if (document.visibilityState === "visible") {
+        void loadJobs(currentUser, true);
+      }
+    };
+    const intervalId = window.setInterval(refreshVisibleJobs, 60000);
+
+    window.addEventListener("focus", refreshVisibleJobs);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshVisibleJobs);
+    };
+  }, [currentUser]);
+
+  async function handleManualRefresh() {
+    if (!currentUser || isRefreshing) {
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      setRefreshWarning("");
+      await loadJobs(currentUser);
+    } catch (error) {
+      setRefreshWarning("Status updates paused. Retrying soon.");
+      console.error("Customer job refresh failed:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  async function handleCancelJob(job: CustomerJob, task?: CustomerJobTask) {
     if (!currentUser || activeJobId) {
       return;
     }
 
-    const lifecycleStatus = getCustomerLifecycleStatus(job);
+    const lifecycleStatus = task?.status || getCustomerLifecycleStatus(job);
     const compatibleStatus =
       lifecycleStatus === "hired" ? "accepted" : lifecycleStatus;
-    let cancelReason = "";
 
-    if (compatibleStatus === "accepted") {
-      const confirmed = window.confirm(
-        "Your contractor has accepted this job. Cancelling now may affect your account reliability.",
+    if (isAcceptedStatus(compatibleStatus)) {
+      setErrorMessage(
+        "This contractor has already accepted your job. Please contact the contractor directly to discuss cancellation.",
       );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    if (
-      compatibleStatus === "on_the_way" ||
-      compatibleStatus === "in_progress"
-    ) {
-      const enteredReason = window.prompt(
-        compatibleStatus === "on_the_way"
-          ? "Please tell us why you need to request cancellation."
-          : "Please tell us why you need to stop this active job.",
-      );
-
-      if (enteredReason === null) {
-        return;
-      }
-
-      cancelReason = enteredReason.trim();
-      if (!cancelReason) {
-        setErrorMessage("Please add a reason for this cancellation request.");
-        return;
-      }
+      return;
     }
 
     try {
-      setActiveJobId(job.jobId);
+      setActiveJobId(task?.taskId || job.jobId);
       setErrorMessage("");
       setSuccessMessage("");
-      const responseBody = await updateJobStatus(
+      await updateJobStatus(
         currentUser,
         job.jobId,
         "cancelled",
-        cancelReason,
+        task?.taskId,
       );
       await loadJobs(currentUser);
-      const nextStatus =
-        typeof responseBody?.status === "string" ? responseBody.status : "";
-      setSuccessMessage(
-        nextStatus === "disputed"
-          ? "This job is now under review."
-          : nextStatus === "cancel_requested"
-            ? "Cancellation requested. The contractor has been notified."
-            : "Job cancelled.",
-      );
+      setSuccessMessage(task ? "Task cancelled." : "Job cancelled.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -338,10 +443,24 @@ export default function CustomerJobsPage() {
     }
   }
 
+  const tabCounts = jobs.reduce(
+    (counts, job) => {
+      counts[getJobTab(job)] += 1;
+      return counts;
+    },
+    { active: 0, open: 0, past: 0 } as Record<JobTab, number>,
+  );
+  const visibleJobs = jobs.filter((job) => getJobTab(job) === selectedTab);
+  const tabs: Array<{ key: JobTab; label: string }> = [
+    { key: "active", label: "Active" },
+    { key: "open", label: "Open" },
+    { key: "past", label: "Past" },
+  ];
+
   return (
     <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -367,7 +486,7 @@ export default function CustomerJobsPage() {
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
-              Customer jobs
+              User jobs
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
               My jobs
@@ -375,12 +494,46 @@ export default function CustomerJobsPage() {
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Track requests, hire contractors, message, and manage job status.
             </p>
-            <Link
-              href="/customer/active-jobs"
-              className="az-btn-secondary mt-4 inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
+          </section>
+
+          <section className="mt-5">
+            <div className="grid grid-cols-3 gap-1 rounded-2xl border border-blue-100 bg-blue-50/70 p-1.5 shadow-sm">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setSelectedTab(tab.key)}
+                  className={`flex h-11 items-center justify-center gap-1 rounded-xl text-xs font-bold transition duration-200 ${
+                    selectedTab === tab.key
+                      ? "bg-azisto-accent text-white shadow-md shadow-blue-200"
+                      : "bg-white text-slate-700"
+                  }`}
+                >
+                  {tab.label}
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      selectedTab === tab.key
+                        ? "bg-white/20 text-white"
+                        : "bg-blue-50 text-azisto-accent"
+                    }`}
+                  >
+                    {tabCounts[tab.key]}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleManualRefresh()}
+              disabled={isRefreshing}
+              className="az-btn-secondary mt-3 flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold"
             >
-              View active jobs
-            </Link>
+              <RefreshCw
+                aria-hidden="true"
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              {isRefreshing ? "Refreshing..." : "Refresh status"}
+            </button>
           </section>
 
           {isLoading ? (
@@ -401,6 +554,12 @@ export default function CustomerJobsPage() {
             </p>
           ) : null}
 
+          {refreshWarning ? (
+            <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+              {refreshWarning}
+            </p>
+          ) : null}
+
           {!isLoading && !errorMessage && jobs.length === 0 ? (
             <section className="mt-6 rounded-xl border border-azisto-border bg-white p-5 text-center shadow-sm">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-azisto-text">
@@ -413,8 +572,19 @@ export default function CustomerJobsPage() {
             </section>
           ) : null}
 
+          {!isLoading && !errorMessage && jobs.length > 0 && visibleJobs.length === 0 ? (
+            <section className="mt-6 rounded-xl border border-blue-100 bg-blue-50/40 p-5 text-center">
+              <p className="text-sm font-bold text-slate-900">
+                No {selectedTab} jobs
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Jobs will appear here when their status changes.
+              </p>
+            </section>
+          ) : null}
+
           <section className="mt-6 space-y-4">
-            {jobs.map((job) => (
+            {visibleJobs.map((job) => (
               <article
                 key={job.jobId}
                 className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
@@ -428,7 +598,11 @@ export default function CustomerJobsPage() {
                       {job.selectedServiceCategory || "Service request"}
                     </h2>
                   </div>
-                  <span className={getStatusChipClass(job.status || "open")}>
+                  <span
+                    className={getStatusChipClass(
+                      job.overallStatus || job.status || "open",
+                    )}
+                  >
                     {getJobStatusLabel(
                       job.overallStatus || job.status || "open",
                     )}
@@ -436,23 +610,37 @@ export default function CustomerJobsPage() {
                 </div>
 
                 {job.tasks && job.tasks.length > 0 ? (
-                  <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                  <div className="mt-3 space-y-2">
                     {job.tasks.map((task) => (
                       <div
                         key={task.taskId}
-                        className="flex items-center justify-between gap-3 text-sm"
+                        className="rounded-xl border border-[#D8E6FF] bg-[#F8FAFF] p-3 text-sm"
                       >
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.1em] az-job-id">
-                            {task.taskId}
-                          </p>
-                          <p className="font-bold text-slate-800">
-                            {task.subcategory || task.category || "Task"}
-                          </p>
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-[0.1em] text-azisto-accent">
+                              {task.taskId}
+                            </p>
+                            <p className="font-bold text-slate-800">
+                              {task.subcategory || task.category || "Task"}
+                            </p>
+                          </div>
+                          <span
+                            className={getStatusChipClass(task.status || "open")}
+                          >
+                            {getJobStatusLabel(task.status || "open")}
+                          </span>
                         </div>
-                        <span className={getStatusChipClass(task.status || "open")}>
-                          {getJobStatusLabel(task.status || "open")}
-                        </span>
+                        {canCancelStatus(task.status) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelJob(job, task)}
+                            disabled={activeJobId === task.taskId}
+                            className="az-btn-danger-soft mt-3 flex h-9 w-full items-center justify-center rounded-lg text-xs font-bold"
+                          >
+                            Cancel task
+                          </button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -511,39 +699,32 @@ export default function CustomerJobsPage() {
                     View messages
                   </button>
 
-                  {[
-                    "open",
-                    "hired_pending_contractor",
-                    "accepted",
-                    "hired",
-                    "on_the_way",
-                    "in_progress",
-                  ].includes(getCustomerLifecycleStatus(job)) ||
-                  job.overallStatus === "partially_hired" ? (
+                  {(!job.tasks || job.tasks.length === 0) &&
+                  canCancelStatus(getCustomerLifecycleStatus(job)) ? (
                     <button
                       type="button"
                       onClick={() => handleCancelJob(job)}
                       disabled={activeJobId === job.jobId}
                       className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold"
                     >
-                      {getCustomerLifecycleStatus(job) === "on_the_way" ||
-                      getCustomerLifecycleStatus(job) === "in_progress"
-                        ? "Request cancellation"
-                        : "Cancel job"}
+                      Cancel job
                     </button>
                   ) : null}
 
-                  {job.status === "cancel_requested" ? (
-                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                      Cancellation requested. AZISTO and the contractor have
-                      been notified.
-                    </p>
-                  ) : null}
-
-                  {job.status === "disputed" ? (
-                    <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                      This job is now under review.
-                    </p>
+                  {isAcceptedStatus(getCustomerLifecycleStatus(job)) ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled
+                        className="flex h-12 cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold text-slate-400"
+                      >
+                        Cancel job
+                      </button>
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+                        This contractor has already accepted your job. Please
+                        contact the contractor directly to discuss cancellation.
+                      </p>
+                    </>
                   ) : null}
 
                   {job.status === "completed" ? (

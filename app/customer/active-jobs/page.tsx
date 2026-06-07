@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
-import { getJobStatusLabel } from "@/lib/jobStatus";
+import {
+  getCompatibleLifecycleStatus,
+  getJobStatusLabel,
+} from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 
 type ActiveJob = {
   jobId: string;
+  overallStatus?: string;
   selectedServiceCategory: string;
   selectedSubcategories: string[];
   hiredContractorId: string;
@@ -25,6 +29,7 @@ type ActiveJob = {
   preferredTimeWindow: string;
   urgency: string;
   schedule: JobSchedule | null;
+  tasks?: Array<{ status: string }>;
 };
 
 function StatusBar() {
@@ -42,7 +47,7 @@ function StatusBar() {
 
 async function fetchActiveJobs(user: User) {
   const token = await user.getIdToken();
-  const response = await fetch("/api/customer/active-jobs", {
+  const response = await fetch("/api/customers/jobs", {
     headers: { Authorization: `Bearer ${token}` },
   });
   const body = (await response.json().catch(() => null)) as {
@@ -54,14 +59,36 @@ async function fetchActiveJobs(user: User) {
     throw new Error(typeof body?.message === "string" ? body.message : "Unable to load jobs.");
   }
 
-  return Array.isArray(body?.jobs) ? (body.jobs as ActiveJob[]) : [];
+  if (!Array.isArray(body?.jobs)) {
+    return [];
+  }
+
+  return (body.jobs as ActiveJob[]).filter((job) => {
+    const statuses = [
+      ...(job.tasks?.map((task) => task.status) ?? []),
+      job.overallStatus,
+      job.status,
+    ]
+      .filter((status): status is string => Boolean(status))
+      .map((status) => getCompatibleLifecycleStatus(status));
+
+    return statuses.some((status) =>
+      [
+        "accepted",
+        "hired",
+        "on_the_way",
+        "in_progress",
+        "partially_active",
+        "partially_in_progress",
+      ].includes(status),
+    );
+  });
 }
 
 async function updateStatus(
   user: User,
   jobId: string,
   status: string,
-  cancelReason?: string,
 ) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
@@ -70,7 +97,7 @@ async function updateStatus(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status, cancelReason }),
+    body: JSON.stringify({ status }),
   });
   const body = (await response.json().catch(() => null)) as {
     message?: unknown;
@@ -112,9 +139,29 @@ export default function CustomerActiveJobsPage() {
   const [activeJobId, setActiveJobId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [refreshWarning, setRefreshWarning] = useState("");
+  const isJobsRequestInFlightRef = useRef(false);
 
-  async function loadJobs(currentUser: User) {
-    setJobs(await fetchActiveJobs(currentUser));
+  async function loadJobs(currentUser: User, isBackgroundRefresh = false) {
+    if (isJobsRequestInFlightRef.current) {
+      return;
+    }
+
+    isJobsRequestInFlightRef.current = true;
+
+    try {
+      setJobs(await fetchActiveJobs(currentUser));
+      setRefreshWarning("");
+    } catch (error) {
+      if (isBackgroundRefresh) {
+        setRefreshWarning("Status updates paused. Retrying soon.");
+        return;
+      }
+
+      throw error;
+    } finally {
+      isJobsRequestInFlightRef.current = false;
+    }
   }
 
   useEffect(() => {
@@ -140,53 +187,43 @@ export default function CustomerActiveJobsPage() {
     return unsubscribe;
   }, [router]);
 
-  async function handleStatus(jobId: string, status: string) {
-    if (!user) return;
-    try {
-      setActiveJobId(jobId);
-      await updateStatus(user, jobId, status);
-      await loadJobs(user);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to update job.");
-    } finally {
-      setActiveJobId("");
-    }
-  }
-
-  async function handleCancel(job: ActiveJob) {
-    if (!user) return;
-    const compatibleStatus = job.status === "hired" ? "accepted" : job.status;
-    let cancelReason = "";
-
-    if (
-      compatibleStatus === "accepted" &&
-      !window.confirm(
-        "Your contractor has accepted this job. Cancelling now may affect your account reliability.",
-      )
-    ) {
+  useEffect(() => {
+    if (!user) {
       return;
     }
 
-    if (
-      compatibleStatus === "on_the_way" ||
-      compatibleStatus === "in_progress"
-    ) {
-      const enteredReason = window.prompt(
-        "Please tell us why you need to request cancellation.",
-      );
-
-      if (enteredReason === null) return;
-      cancelReason = enteredReason.trim();
-      if (!cancelReason) {
-        setErrorMessage("Please add a reason for this cancellation request.");
-        return;
+    const refreshVisibleJobs = () => {
+      if (document.visibilityState === "visible") {
+        void loadJobs(user, true);
       }
+    };
+    const intervalId = window.setInterval(refreshVisibleJobs, 60000);
+
+    window.addEventListener("focus", refreshVisibleJobs);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshVisibleJobs);
+    };
+  }, [user]);
+
+  async function handleCancel(job: ActiveJob) {
+    if (!user) return;
+    const compatibleStatus = getCompatibleLifecycleStatus(job.status);
+
+    if (
+      ["accepted", "on_the_way", "in_progress"].includes(compatibleStatus)
+    ) {
+      setErrorMessage(
+        "This contractor has already accepted your job. Please contact the contractor directly to discuss cancellation.",
+      );
+      return;
     }
 
     try {
       setActiveJobId(job.jobId);
       setErrorMessage("");
-      await updateStatus(user, job.jobId, "cancelled", cancelReason);
+      await updateStatus(user, job.jobId, "cancelled");
       await loadJobs(user);
     } catch (error) {
       setErrorMessage(
@@ -212,8 +249,8 @@ export default function CustomerActiveJobsPage() {
 
   return (
     <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
             <button type="button" onClick={() => router.push("/customer/jobs")} className="flex h-10 w-10 items-center justify-center rounded-full text-black" aria-label="Back to jobs">
@@ -225,11 +262,16 @@ export default function CustomerActiveJobsPage() {
             <span aria-hidden="true" />
           </header>
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">Customer jobs</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">User jobs</p>
             <h1 className="mt-1 text-3xl font-bold leading-tight">Active jobs</h1>
           </section>
           {isLoading ? <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Loading active jobs...</p> : null}
           {errorMessage ? <p className="mt-6 whitespace-pre-line rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
+          {refreshWarning ? (
+            <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+              {refreshWarning}
+            </p>
+          ) : null}
           <section className="mt-6 space-y-4">
             {jobs.map((job) => (
               <article key={job.jobId} className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm">
@@ -257,16 +299,27 @@ export default function CustomerActiveJobsPage() {
                   </button>
                   {[
                     "hired_pending_contractor",
-                    "accepted",
-                    "hired",
-                    "on_the_way",
-                    "in_progress",
                   ].includes(job.status) ? (
                     <button type="button" onClick={() => handleCancel(job)} disabled={activeJobId === job.jobId} className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold">
-                      {["on_the_way", "in_progress"].includes(job.status)
-                        ? "Request cancellation"
-                        : "Cancel job"}
+                      Cancel job
                     </button>
+                  ) : null}
+                  {["accepted", "on_the_way", "in_progress"].includes(
+                    getCompatibleLifecycleStatus(job.status),
+                  ) ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled
+                        className="flex h-12 cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold text-slate-400"
+                      >
+                        Cancel job
+                      </button>
+                      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+                        This contractor has already accepted your job. Please
+                        contact the contractor directly to discuss cancellation.
+                      </p>
+                    </>
                   ) : null}
                   {job.status === "completed" ? (
                     <>
@@ -276,16 +329,6 @@ export default function CustomerActiveJobsPage() {
                       </p>
                       <Link href={`/customer/jobs/${encodeURIComponent(job.jobId)}/review`} className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold">Review contractor</Link>
                     </>
-                  ) : null}
-                  {job.status === "cancel_requested" ? (
-                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-                      Cancellation requested. The contractor has been notified.
-                    </p>
-                  ) : null}
-                  {job.status === "disputed" ? (
-                    <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                      This job is now under review.
-                    </p>
                   ) : null}
                 </div>
               </article>

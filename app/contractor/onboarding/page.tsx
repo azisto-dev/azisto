@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { ChevronLeft, FileText, ShieldCheck, Upload } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { auth, authPersistenceReady, storage } from "@/lib/firebase";
+import { serviceCatalog } from "@/lib/serviceCatalog";
 
 const allowedUploadTypes = [
   "application/pdf",
@@ -84,7 +92,9 @@ type UploadDocumentType =
   | "cargoInsurance"
   | "towingInsurance"
   | "garageKeepersLiability"
-  | "drivingAbstract";
+  | "drivingAbstract"
+  | "backgroundCheck"
+  | "otherSupporting";
 type TradeLicenceUploadKey = `tradeLicence-${string}`;
 type UploadKey = UploadDocumentType | TradeLicenceUploadKey;
 
@@ -97,6 +107,7 @@ type ContractorForm = {
   postalCode: string;
   serviceRadius: string;
   servicesOffered: string;
+  additionalServices: string;
   yearsExperience: string;
   bio: string;
   legalBusinessName: string;
@@ -152,6 +163,7 @@ const initialForm: ContractorForm = {
   postalCode: "",
   serviceRadius: "",
   servicesOffered: "",
+  additionalServices: "",
   yearsExperience: "",
   bio: "",
   legalBusinessName: "",
@@ -344,6 +356,29 @@ function parseServiceRadiusKm(serviceRadius: string) {
   return Number.isFinite(parsedValue) ? parsedValue : 0;
 }
 
+function validateProfileStep(
+  form: ContractorForm,
+  selectedSubcategoriesByService: Record<string, string[]>,
+) {
+  if (!form.displayName.trim()) return "Please enter your full name.";
+  if (!form.phoneNumber.trim()) return "Please enter your phone number.";
+  if (!form.address.trim()) return "Please enter your business address.";
+
+  const selectedServices = Object.keys(selectedSubcategoriesByService).filter(
+    (service) => selectedSubcategoriesByService[service]?.length > 0,
+  );
+
+  if (selectedServices.length === 0) {
+    return "Please choose at least one service category and subcategory.";
+  }
+
+  if (!form.yearsExperience.trim()) {
+    return "Please enter your years of experience.";
+  }
+
+  return "";
+}
+
 function serviceTextIncludes(selectedServices: string[], keywords: string[]) {
   const serviceText = selectedServices.join(" ").toLowerCase();
 
@@ -480,6 +515,14 @@ function buildContractorDocuments(
   const drivingAbstractUpload = getUploadedFile(
     uploadStates,
     "drivingAbstract",
+  );
+  const backgroundCheckUpload = getUploadedFile(
+    uploadStates,
+    "backgroundCheck",
+  );
+  const otherSupportingUpload = getUploadedFile(
+    uploadStates,
+    "otherSupporting",
   );
   const hasVehicleUpload = Boolean(
     driverLicenceUpload ||
@@ -647,6 +690,24 @@ function buildContractorDocuments(
       rejectionReason: "",
       confirmedDrivingRecord: documentForm.drivingRecordConfirmed,
     },
+    backgroundCheck: {
+      status: getUploadStatus(backgroundCheckUpload),
+      fileName: backgroundCheckUpload?.fileName ?? "",
+      fileUrl: backgroundCheckUpload?.fileUrl ?? "",
+      storagePath: backgroundCheckUpload?.storagePath ?? "",
+      contentType: backgroundCheckUpload?.contentType ?? "",
+      size: backgroundCheckUpload?.size ?? 0,
+      uploadedAt: backgroundCheckUpload?.uploadedAt ?? "",
+    },
+    otherSupporting: {
+      status: getUploadStatus(otherSupportingUpload),
+      fileName: otherSupportingUpload?.fileName ?? "",
+      fileUrl: otherSupportingUpload?.fileUrl ?? "",
+      storagePath: otherSupportingUpload?.storagePath ?? "",
+      contentType: otherSupportingUpload?.contentType ?? "",
+      size: otherSupportingUpload?.size ?? 0,
+      uploadedAt: otherSupportingUpload?.uploadedAt ?? "",
+    },
   };
 }
 
@@ -655,13 +716,20 @@ async function saveContractorProfileWithApi(
   form: ContractorForm,
   documentForm: DocumentForm,
   uploadStates: UploadStates,
+  selectedSubcategoriesByService: Record<string, string[]>,
 ) {
   const token = await user.getIdToken();
-  const selectedServices = parseSelectedServices(form.servicesOffered);
+  const selectedServices = Object.keys(selectedSubcategoriesByService).filter(
+    (service) => selectedSubcategoriesByService[service]?.length > 0,
+  );
+  const selectedServiceKeywords = [
+    ...selectedServices,
+    ...Object.values(selectedSubcategoriesByService).flat(),
+  ];
   const documents = buildContractorDocuments(
     form,
     documentForm,
-    selectedServices,
+    selectedServiceKeywords,
     uploadStates,
   );
 
@@ -681,6 +749,10 @@ async function saveContractorProfileWithApi(
       province: form.province,
       postalCode: form.postalCode,
       selectedServices,
+      selectedSubcategoriesByService,
+      additionalServices: form.additionalServices,
+      yearsOfExperience: form.yearsExperience,
+      aboutYourself: form.bio,
       serviceRadiusKm: parseServiceRadiusKm(form.serviceRadius),
       insuranceProvider: form.insuranceProviderName,
       insurancePolicyNumber: form.insurancePolicyNumber,
@@ -715,16 +787,25 @@ export default function ContractorOnboardingPage() {
   const [activeDocumentTab, setActiveDocumentTab] =
     useState<DocumentTabId>("required");
   const [verificationStatus, setVerificationStatus] = useState("Not submitted");
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [selectedSubcategoriesByService, setSelectedSubcategoriesByService] =
+    useState<Record<string, string[]>>({});
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [uploadStates, setUploadStates] = useState<UploadStates>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const selectedServices = parseSelectedServices(form.servicesOffered);
-  const vehicleDocumentsRequired = needsVehicleDocuments(selectedServices);
-  const drivingAbstractRequired = needsDrivingAbstract(selectedServices);
+  const selectedServices = Object.keys(selectedSubcategoriesByService).filter(
+    (service) => selectedSubcategoriesByService[service]?.length > 0,
+  );
+  const selectedServiceKeywords = [
+    ...selectedServices,
+    ...Object.values(selectedSubcategoriesByService).flat(),
+  ];
+  const vehicleDocumentsRequired = needsVehicleDocuments(selectedServiceKeywords);
+  const drivingAbstractRequired = needsDrivingAbstract(selectedServiceKeywords);
   const visibleTradeLicenceOptions =
-    getVisibleTradeLicenceOptions(selectedServices);
+    getVisibleTradeLicenceOptions(selectedServiceKeywords);
   const isUploadingDocument = Object.values(uploadStates).some(
     (uploadState) => uploadState?.isUploading,
   );
@@ -733,6 +814,13 @@ export default function ContractorOnboardingPage() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log("Contractor onboarding: auth state loaded");
       if (user) {
+        if (!user.emailVerified) {
+          setCurrentUser(null);
+          setAuthLoading(false);
+          router.replace("/signup?role=contractor");
+          return;
+        }
+
         console.log("Contractor onboarding current uid:", user.uid);
         setCurrentUser(user);
       } else {
@@ -754,6 +842,29 @@ export default function ContractorOnboardingPage() {
       ...currentForm,
       [field]: value,
     }));
+  }
+
+  function toggleServiceCategory(serviceName: string) {
+    setSelectedSubcategoriesByService((current) => {
+      if (serviceName in current) {
+        const next = { ...current };
+        delete next[serviceName];
+        return next;
+      }
+
+      return { ...current, [serviceName]: [] };
+    });
+  }
+
+  function toggleServiceSubcategory(serviceName: string, subcategory: string) {
+    setSelectedSubcategoriesByService((current) => {
+      const selected = current[serviceName] ?? [];
+      const nextSelected = selected.includes(subcategory)
+        ? selected.filter((item) => item !== subcategory)
+        : [...selected, subcategory];
+
+      return { ...current, [serviceName]: nextSelected };
+    });
   }
 
   function updateDocumentField(
@@ -788,6 +899,11 @@ export default function ContractorOnboardingPage() {
           error: "Please sign in before uploading documents.",
         },
       }));
+      return;
+    }
+
+    if (!user.emailVerified) {
+      router.push("/signup?role=contractor");
       return;
     }
 
@@ -838,12 +954,45 @@ export default function ContractorOnboardingPage() {
       return;
     }
 
+    if (!user.emailVerified) {
+      router.push("/signup?role=contractor");
+      return;
+    }
+
+    if (currentStep === 1) {
+      const validationMessage = validateProfileStep(
+        form,
+        selectedSubcategoriesByService,
+      );
+
+      if (validationMessage) {
+        setErrorMessage(validationMessage);
+        return;
+      }
+
+      setErrorMessage("");
+      setCurrentStep(2);
+      return;
+    }
+
+    if (currentStep === 2) {
+      setErrorMessage("");
+      setCurrentStep(3);
+      return;
+    }
+
     try {
       setIsSaving(true);
       setErrorMessage("");
       await authPersistenceReady;
 
-      await saveContractorProfileWithApi(user, form, documentForm, uploadStates);
+      await saveContractorProfileWithApi(
+        user,
+        form,
+        documentForm,
+        uploadStates,
+        selectedSubcategoriesByService,
+      );
 
       setVerificationStatus("Pending review");
       console.log(
@@ -859,8 +1008,8 @@ export default function ContractorOnboardingPage() {
 
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -883,19 +1032,67 @@ export default function ContractorOnboardingPage() {
             <span aria-hidden="true" />
           </header>
 
+          <nav className="mt-7 flex items-center justify-between gap-1" aria-label="Contractor onboarding steps">
+            {[
+              { step: 1, label: "Contractor Profile" },
+              { step: 2, label: "Business Profile" },
+              { step: 3, label: "Upload Documents" },
+            ].map((item, index) => (
+              <div key={item.step} className="contents">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (item.step <= currentStep) {
+                      setCurrentStep(item.step as 1 | 2 | 3);
+                      setErrorMessage("");
+                    }
+                  }}
+                  className={`min-h-10 flex-1 rounded-full border px-2 text-[10px] font-bold leading-tight transition ${
+                    currentStep === item.step
+                      ? "border-[#7A003C] bg-[#7A003C] text-white shadow-[0_6px_18px_rgba(122,0,60,0.2)]"
+                      : item.step < currentStep
+                        ? "border-[#C8A96B] bg-white text-[#5C0032]"
+                        : "border-azisto-border bg-white text-slate-500"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    {item.step < currentStep ? (
+                      <Check aria-hidden="true" className="h-3 w-3" />
+                    ) : null}
+                    {item.label}
+                  </span>
+                </button>
+                {index < 2 ? (
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 shrink-0 text-[#C8A96B]"
+                  />
+                ) : null}
+              </div>
+            ))}
+          </nav>
+
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
-              Contractor verification
+              Step {currentStep} of 3
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
-              Verify your business
+              {currentStep === 1
+                ? "Contractor profile"
+                : currentStep === 2
+                  ? "Business profile"
+                  : "Upload documents"}
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Share your licence, insurance, and identity documents so AZISTO
-              can review your contractor profile.
+              {currentStep === 1
+                ? "Tell AZISTO who you are and which services you provide."
+                : currentStep === 2
+                  ? "Add your business, licence, insurance, and service area details."
+                  : "Share relevant documents so AZISTO can review your contractor profile."}
             </p>
           </section>
 
+          {currentStep === 3 ? (
           <section className="mt-6 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-azisto-text">
@@ -911,8 +1108,10 @@ export default function ContractorOnboardingPage() {
               </div>
             </div>
           </section>
+          ) : null}
 
           <form className="mt-6 space-y-5">
+            {currentStep === 1 ? (
             <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
@@ -924,7 +1123,19 @@ export default function ContractorOnboardingPage() {
               </div>
 
               <div className="space-y-2">
-                <FieldLabel>Display name</FieldLabel>
+                <FieldLabel>Verified email</FieldLabel>
+                <div className="flex h-14 items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm">
+                  <span className="min-w-0 truncate font-semibold text-emerald-800">
+                    {currentUser?.email ?? ""}
+                  </span>
+                  <span className="ml-3 rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase text-emerald-700">
+                    Verified
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel>Full name</FieldLabel>
                 <input
                   value={form.displayName}
                   onChange={(event) =>
@@ -947,7 +1158,7 @@ export default function ContractorOnboardingPage() {
               </div>
 
               <div className="space-y-2">
-                <FieldLabel>Address</FieldLabel>
+                <FieldLabel>Business address</FieldLabel>
                 <input
                   value={form.address}
                   onChange={(event) =>
@@ -1006,21 +1217,93 @@ export default function ContractorOnboardingPage() {
 
               <div className="space-y-2">
                 <FieldLabel>Services offered</FieldLabel>
+                <p className="text-xs leading-5 text-slate-500">
+                  Choose a category, then select every subcategory you provide.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {serviceCatalog.map((service) => {
+                    const isSelected =
+                      service.name in selectedSubcategoriesByService;
+
+                    return (
+                      <button
+                        key={service.slug}
+                        type="button"
+                        onClick={() => toggleServiceCategory(service.name)}
+                        className={`min-h-12 rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
+                          isSelected
+                            ? "border-[#7A003C] bg-[rgb(122_0_60_/_0.07)] text-[#5C0032]"
+                            : "border-azisto-border bg-white text-slate-700"
+                        }`}
+                      >
+                        {service.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {serviceCatalog
+                  .filter(
+                    (service) =>
+                      service.name in selectedSubcategoriesByService,
+                  )
+                  .map((service) => (
+                    <div
+                      key={service.slug}
+                      className="rounded-xl border border-azisto-border bg-slate-50 p-3"
+                    >
+                      <p className="text-sm font-bold text-black">
+                        {service.name} subcategories
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-2">
+                        {service.subcategories.map((subcategory) => {
+                          const isSelected = (
+                            selectedSubcategoriesByService[service.name] ?? []
+                          ).includes(subcategory);
+
+                          return (
+                            <button
+                              key={subcategory}
+                              type="button"
+                              onClick={() =>
+                                toggleServiceSubcategory(
+                                  service.name,
+                                  subcategory,
+                                )
+                              }
+                              className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                                isSelected
+                                  ? "border-[#7A003C] bg-white text-[#5C0032]"
+                                  : "border-slate-200 bg-white text-slate-700"
+                              }`}
+                            >
+                              <span
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                                  isSelected
+                                    ? "border-[#7A003C] bg-[#7A003C] text-white"
+                                    : "border-slate-300 text-transparent"
+                                }`}
+                              >
+                                <Check className="h-3 w-3" />
+                              </span>
+                              {subcategory}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel>Additional services</FieldLabel>
                 <input
-                  value={form.servicesOffered}
+                  value={form.additionalServices}
                   onChange={(event) =>
-                    updateField("servicesOffered", event.target.value)
+                    updateField("additionalServices", event.target.value)
                   }
-                  placeholder="Handyman, General Cleaning, Window Cleaning..."
+                  placeholder="Optional services not listed above"
                   className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 az-focus-field"
                 />
-                <p className="text-xs leading-5 text-slate-500">
-                  Home Care examples: Handyman, Painter, Plumbing, Gutter
-                  Installation, General Cleaning, Pressure Washing, Gutter
-                  Cleaning, Junk Removal, Garbage Bin Cleaning, Duct and
-                  Furnace Cleaning, Mold Removal, Carpet Cleaning, Window
-                  Cleaning, Move-In / Move-Out Cleaning, Roof Cleaning.
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -1037,7 +1320,7 @@ export default function ContractorOnboardingPage() {
               </div>
 
               <div className="space-y-2">
-                <FieldLabel>Bio</FieldLabel>
+                <FieldLabel>About yourself</FieldLabel>
                 <textarea
                   value={form.bio}
                   onChange={(event) => updateField("bio", event.target.value)}
@@ -1046,7 +1329,9 @@ export default function ContractorOnboardingPage() {
                 />
               </div>
             </section>
+            ) : null}
 
+            {currentStep === 2 ? (
             <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
@@ -1153,7 +1438,9 @@ export default function ContractorOnboardingPage() {
                 />
               </div>
             </section>
+            ) : null}
 
+            {currentStep === 3 ? (
             <section className="space-y-4 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
               <div>
                 <p className="text-base font-bold text-black">
@@ -1164,6 +1451,13 @@ export default function ContractorOnboardingPage() {
                   contractor account.
                 </p>
               </div>
+
+              <p className="rounded-xl border border-[#E8E2DC] bg-[#F7F4F1] px-4 py-3 text-xs leading-5 text-slate-600">
+                Please upload documents relevant to your selected service
+                categories. Examples may include business licence, insurance,
+                trade certification, safety training, or background check where
+                applicable.
+              </p>
 
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                 {documentTabs.map((tab) => {
@@ -1208,6 +1502,20 @@ export default function ContractorOnboardingPage() {
                     uploadKey="businessLicence"
                     documentType="businessLicence"
                     uploadState={uploadStates.businessLicence}
+                    onUpload={handleDocumentUpload}
+                  />
+                  <UploadCard
+                    label="Background check, where applicable"
+                    uploadKey="backgroundCheck"
+                    documentType="backgroundCheck"
+                    uploadState={uploadStates.backgroundCheck}
+                    onUpload={handleDocumentUpload}
+                  />
+                  <UploadCard
+                    label="Other supporting document"
+                    uploadKey="otherSupporting"
+                    documentType="otherSupporting"
+                    uploadState={uploadStates.otherSupporting}
                     onUpload={handleDocumentUpload}
                   />
                   <TextInput
@@ -1473,6 +1781,7 @@ export default function ContractorOnboardingPage() {
                 </div>
               ) : null}
             </section>
+            ) : null}
 
             {authLoading ? (
               <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
@@ -1486,20 +1795,36 @@ export default function ContractorOnboardingPage() {
               </p>
             ) : null}
 
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={isSaving || authLoading || isUploadingDocument}
-              className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
-            >
-              {authLoading
-                ? "Checking account..."
-                : isUploadingDocument
-                  ? "Uploading documents..."
-                  : isSaving
-                  ? "Saving..."
-                  : "Continue"}
-            </button>
+            <div className={`grid gap-3 ${currentStep > 1 ? "grid-cols-2" : ""}`}>
+              {currentStep > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep((currentStep - 1) as 1 | 2);
+                    setErrorMessage("");
+                  }}
+                  className="az-btn-contractor-outline flex h-14 items-center justify-center rounded-full text-sm font-bold"
+                >
+                  Back
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={isSaving || authLoading || isUploadingDocument}
+                className="az-btn-contractor flex h-14 w-full items-center justify-center rounded-full text-sm font-bold"
+              >
+                {authLoading
+                  ? "Checking account..."
+                  : isUploadingDocument
+                    ? "Uploading documents..."
+                    : isSaving
+                      ? "Saving..."
+                      : currentStep === 3
+                        ? "Submit for review"
+                        : "Continue"}
+              </button>
+            </div>
           </form>
         </div>
       </div>

@@ -62,7 +62,9 @@ export async function GET(request: NextRequest) {
         .get(),
     ]);
     const unreadMessagesCount = threadsSnapshot.size;
-    const unreadNotificationsCount = notificationsSnapshot.size;
+    const unreadNotificationsCount = notificationsSnapshot.docs.filter(
+      (notificationSnapshot) => !notificationSnapshot.get("clearedAt"),
+    ).length;
 
     return NextResponse.json({
       ok: true,

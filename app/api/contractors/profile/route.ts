@@ -19,6 +19,10 @@ type ContractorProfileBody = {
   province?: unknown;
   postalCode?: unknown;
   selectedServices?: unknown;
+  selectedSubcategoriesByService?: unknown;
+  additionalServices?: unknown;
+  yearsOfExperience?: unknown;
+  aboutYourself?: unknown;
   serviceRadiusKm?: unknown;
   insuranceProvider?: unknown;
   insurancePolicyNumber?: unknown;
@@ -71,6 +75,22 @@ function readRecord(value: unknown) {
   return {};
 }
 
+function readSelectedSubcategoriesByService(value: unknown) {
+  const record = readRecord(value);
+  const result: Record<string, string[]> = {};
+
+  Object.entries(record).forEach(([service, subcategories]) => {
+    const cleanService = service.trim();
+    const cleanSubcategories = readStringList(subcategories);
+
+    if (cleanService && cleanSubcategories.length > 0) {
+      result[cleanService] = cleanSubcategories;
+    }
+  });
+
+  return result;
+}
+
 function readBoolean(value: unknown) {
   return typeof value === "boolean" ? value : false;
 }
@@ -87,6 +107,22 @@ function readUploadSize(value: unknown) {
   const size = readNumber(value);
 
   return size > 0 ? size : 0;
+}
+
+function readOptionalDocument(value: unknown) {
+  const document = readRecord(value);
+
+  return {
+    status: readDocumentStatus(document.status, "not_uploaded"),
+    fileName: readText(document.fileName),
+    fileUrl: readText(document.fileUrl),
+    storagePath: readText(document.storagePath),
+    contentType: readText(document.contentType),
+    size: readUploadSize(document.size),
+    uploadedAt: readText(document.uploadedAt),
+    reviewedAt: null,
+    rejectionReason: readText(document.rejectionReason),
+  };
 }
 
 function readTradeLicences(value: unknown) {
@@ -303,6 +339,8 @@ function readContractorDocuments(value: unknown) {
         drivingAbstract.confirmedDrivingRecord,
       ),
     },
+    backgroundCheck: readOptionalDocument(documents.backgroundCheck),
+    otherSupporting: readOptionalDocument(documents.otherSupporting),
   };
 }
 
@@ -360,6 +398,17 @@ export async function POST(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
+
+    if (decodedToken.email_verified !== true) {
+      return NextResponse.json(
+        {
+          code: "email-not-verified",
+          message: "Please verify your email before creating your profile.",
+        },
+        { status: 403 },
+      );
+    }
+
     const body = (await request.json()) as ContractorProfileBody;
     const existingContractorSnapshot = await findExistingContractorProfile(
       decodedToken.uid,
@@ -388,6 +437,12 @@ export async function POST(request: NextRequest) {
       province: readText(body.province),
       postalCode: readText(body.postalCode),
       selectedServices: readStringList(body.selectedServices),
+      selectedSubcategoriesByService: readSelectedSubcategoriesByService(
+        body.selectedSubcategoriesByService,
+      ),
+      additionalServices: readText(body.additionalServices),
+      yearsOfExperience: readText(body.yearsOfExperience),
+      aboutYourself: readText(body.aboutYourself),
       serviceRadiusKm: readNumber(body.serviceRadiusKm),
       insuranceProvider: readText(body.insuranceProvider),
       insurancePolicyNumber: readText(body.insurancePolicyNumber),

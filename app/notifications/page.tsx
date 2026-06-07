@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { ChevronLeft, Bell } from "lucide-react";
+import { ChevronLeft, Bell, Trash2, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import BottomNav from "@/app/components/BottomNav";
@@ -83,6 +83,29 @@ async function markNotificationsRead(user: User, notificationId?: string) {
   });
 }
 
+async function clearNotifications(user: User) {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/notifications", {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "clear-all" }),
+  });
+  const body = (await response.json().catch(() => null)) as {
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof body?.message === "string"
+        ? body.message
+        : "Unable to clear notifications.",
+    );
+  }
+}
+
 async function fetchMessageThreadLinks(user: User) {
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
@@ -140,6 +163,8 @@ export default function NotificationsPage() {
   );
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const isCustomer = role !== "contractor";
   const shellClass = isCustomer
@@ -229,10 +254,38 @@ export default function NotificationsPage() {
     router.push(href);
   }
 
+  async function handleClearAll() {
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      setIsClearing(true);
+      setErrorMessage("");
+      await clearNotifications(currentUser);
+      setNotifications([]);
+      setIsClearModalOpen(false);
+      window.dispatchEvent(new Event("azisto:badges-refresh"));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to clear notifications.",
+      );
+    } finally {
+      setIsClearing(false);
+    }
+  }
+
   return (
     <main className={shellClass}>
-      <div className={frameClass}>
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div
+        className={frameClass.replace(
+          "min-h-screen",
+          "h-screen min-h-0 md:h-[780px]",
+        )}
+      >
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
             <button
@@ -252,13 +305,25 @@ export default function NotificationsPage() {
             </Link>
             <span aria-hidden="true" />
           </header>
-          <section className="mt-8">
-            <p className={`text-xs font-bold uppercase tracking-[0.14em] ${accentTextClass}`}>
-              Notifications
-            </p>
-            <h1 className={`mt-1 text-3xl font-normal leading-tight ${primaryTextClass}`}>
-              Updates
-            </h1>
+          <section className="mt-8 flex items-end justify-between gap-4">
+            <div>
+              <p className={`text-xs font-bold uppercase tracking-[0.14em] ${accentTextClass}`}>
+                Notifications
+              </p>
+              <h1 className={`mt-1 text-3xl font-normal leading-tight ${primaryTextClass}`}>
+                Updates
+              </h1>
+            </div>
+            {notifications.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(true)}
+                className="flex items-center gap-2 rounded-full border border-[var(--azisto-contractor-burgundy)] bg-white px-4 py-2 text-xs font-bold text-[var(--azisto-contractor-burgundy)] shadow-sm"
+              >
+                <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                Clear all
+              </button>
+            ) : null}
           </section>
           {isLoading ? (
             <p className={`${compactCardClass} mt-6 px-4 py-3 text-sm ${mutedTextClass}`}>
@@ -307,6 +372,47 @@ export default function NotificationsPage() {
         </div>
         <BottomNav role={role} />
       </div>
+      {isClearModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-5">
+          <section className="w-full max-w-sm rounded-2xl border border-azisto-border bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-[#111827]">
+                  Clear all notifications?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#64748B]">
+                  These updates will be removed from your notification list.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#64748B]"
+                aria-label="Close"
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                className="h-12 rounded-full border border-azisto-border bg-white text-sm font-bold text-[#111827]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isClearing}
+                onClick={() => void handleClearAll()}
+                className="h-12 rounded-full bg-[linear-gradient(135deg,#5C0032,#8A0F45)] text-sm font-bold text-white shadow-[0_6px_18px_rgba(122,0,60,0.25)] disabled:opacity-60"
+              >
+                {isClearing ? "Clearing..." : "Clear"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

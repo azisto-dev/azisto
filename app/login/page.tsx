@@ -4,7 +4,6 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import {
-  createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   type AuthError,
   signInWithEmailAndPassword,
@@ -186,42 +185,6 @@ function LoginForm() {
     }
   };
 
-  const handleSignup = async () => {
-    const validationMessage = validateForm();
-
-    if (validationMessage) {
-      setMessage(validationMessage);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setMessage("");
-      setSuccessMessage("");
-      await authPersistenceReady;
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password,
-      );
-      console.log("Signup successful user UID:", userCredential.user.uid);
-      await auth.authStateReady();
-
-      if (!auth.currentUser) {
-        throw new Error("auth-state-missing");
-      }
-
-      console.log("Signup auth state ready for UID:", userCredential.user.uid);
-      console.log("Signup redirect reason: new account needs account type");
-      router.push("/account-type");
-    } catch (error) {
-      console.error("Signup failed:", error);
-      setMessage(getErrorMessage(error));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-azisto-background px-5 py-10">
       <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-sm ring-1 ring-azisto-border">
@@ -232,7 +195,7 @@ function LoginForm() {
             className="mx-auto w-full max-w-[250px] object-contain"
           />
           <h1 className="mt-4 text-2xl font-semibold text-slate-900">
-            Login or sign up
+            Login
           </h1>
         </div>
 
@@ -342,9 +305,9 @@ function LoginForm() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="space-y-3 pt-2">
             <button
-              className="az-btn-primary rounded-md px-4 py-3 font-semibold"
+              className="az-btn-primary w-full rounded-md px-4 py-3 font-semibold"
               type="button"
               disabled={isLoading}
               onClick={handleLogin}
@@ -352,10 +315,10 @@ function LoginForm() {
               Login
             </button>
             <button
-              className="az-btn-secondary rounded-md px-4 py-3 font-semibold"
+              className="az-btn-secondary w-full rounded-md px-4 py-3 font-semibold"
               type="button"
               disabled={isLoading}
-              onClick={handleSignup}
+              onClick={() => router.push("/account-type")}
             >
               Sign up
             </button>

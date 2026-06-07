@@ -92,7 +92,7 @@ function createApiError(_code: string, message: string) {
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     if (error.message.includes("customer-profile-required")) {
-      return "Please sign in or create a customer account before posting a job.";
+      return "Please sign in or create a user account before posting a job.";
     }
 
     return error.message;

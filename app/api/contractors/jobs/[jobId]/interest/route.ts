@@ -98,7 +98,6 @@ async function getActiveContractorParentJobIds(contractorId: string) {
         "hired",
         "on_the_way",
         "in_progress",
-        "cancel_requested",
       ].includes(readText(jobSnapshot.get("status")))
     ) {
       parentJobIds.add(readText(jobSnapshot.get("jobId")) || jobSnapshot.id);
@@ -118,7 +117,6 @@ async function getActiveContractorParentJobIds(contractorId: string) {
             "hired",
             "on_the_way",
             "in_progress",
-            "cancel_requested",
           ].includes(readText(taskSnapshot.get("status")))
         ) {
           parentJobIds.add(readText(taskSnapshot.get("parentJobId")) || jobSnapshot.id);

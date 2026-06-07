@@ -247,11 +247,14 @@ export async function GET(request: NextRequest) {
 
     for (const parentSnapshot of hiredTaskParentsSnapshot.docs) {
       const tasksSnapshot = await parentSnapshot.ref.collection("tasks").get();
+      let hasAssignedTask = false;
 
       for (const taskSnapshot of tasksSnapshot.docs) {
         if (readText(taskSnapshot.get("hiredContractorId")) !== contractorId) {
           continue;
         }
+
+        hasAssignedTask = true;
 
         if (jobsById.has(taskSnapshot.id)) {
           continue;
@@ -265,6 +268,13 @@ export async function GET(request: NextRequest) {
             "hired",
           ),
         );
+      }
+
+      if (hasAssignedTask) {
+        const parentJobId =
+          readText(parentSnapshot.get("jobId")) || parentSnapshot.id;
+        jobsById.delete(parentSnapshot.id);
+        jobsById.delete(parentJobId);
       }
     }
 
@@ -285,10 +295,41 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      jobsById.set(
-        jobSnapshot.id,
-        await serializeJob(jobSnapshot.data() ?? {}, "interested"),
-      );
+      const tasksSnapshot = await jobSnapshot.ref.collection("tasks").get();
+      let hasInterestedTask = false;
+
+      for (const taskSnapshot of tasksSnapshot.docs) {
+        const taskContractorIds = readStringList(
+          taskSnapshot.get("interestedContractorIds"),
+        );
+        const taskContractorAuthUids = readStringList(
+          taskSnapshot.get("interestedContractorAuthUids"),
+        );
+
+        if (
+          !taskContractorIds.includes(contractorId) &&
+          !taskContractorAuthUids.includes(decodedToken.uid)
+        ) {
+          continue;
+        }
+
+        hasInterestedTask = true;
+        jobsById.set(
+          taskSnapshot.id,
+          await serializeTaskJob(
+            jobSnapshot.data() ?? {},
+            taskSnapshot.data() ?? {},
+            "interested",
+          ),
+        );
+      }
+
+      if (!hasInterestedTask && tasksSnapshot.empty) {
+        jobsById.set(
+          jobSnapshot.id,
+          await serializeJob(jobSnapshot.data() ?? {}, "interested"),
+        );
+      }
     }
 
     // Older interest records without interestedContractorIds are intentionally not backfilled here.

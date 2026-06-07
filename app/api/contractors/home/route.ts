@@ -569,7 +569,6 @@ export async function GET(request: NextRequest) {
           "hired",
           "on_the_way",
           "in_progress",
-          "cancel_requested",
         ].includes(readText(job.status)),
       );
     let taskActiveJob: Record<string, unknown> | undefined;
@@ -586,7 +585,6 @@ export async function GET(request: NextRequest) {
               "hired",
               "on_the_way",
               "in_progress",
-              "cancel_requested",
             ].includes(readText(taskSnapshot.get("status"))),
         );
 

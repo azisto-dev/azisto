@@ -24,7 +24,15 @@ export const azistoUi = {
 } as const;
 
 export function getStatusChipClass(status: string) {
-  const normalizedStatus = status.toLowerCase().replaceAll("_", " ");
+  const normalizedStatus = (
+    status === "cancel_requested" ||
+    status === "disputed" ||
+    status === "under_review"
+      ? "accepted"
+      : status
+  )
+    .toLowerCase()
+    .replaceAll("_", " ");
 
   if (normalizedStatus === "open" || normalizedStatus === "completed") {
     return "az-status-chip az-status-success";
@@ -33,7 +41,8 @@ export function getStatusChipClass(status: string) {
   if (
     normalizedStatus === "pending" ||
     normalizedStatus === "hired pending contractor" ||
-    normalizedStatus === "cancel requested"
+    normalizedStatus === "pending contractor acceptance" ||
+    normalizedStatus === "partially hired"
   ) {
     return "az-status-chip az-status-warning";
   }
@@ -42,7 +51,9 @@ export function getStatusChipClass(status: string) {
     normalizedStatus === "hired" ||
     normalizedStatus === "accepted" ||
     normalizedStatus === "on the way" ||
-    normalizedStatus === "in progress"
+    normalizedStatus === "in progress" ||
+    normalizedStatus === "partially active" ||
+    normalizedStatus === "partially in progress"
   ) {
     return "az-status-chip az-status-info";
   }
@@ -52,9 +63,8 @@ export function getStatusChipClass(status: string) {
     normalizedStatus === "canceled" ||
     normalizedStatus === "error" ||
     normalizedStatus === "failed" ||
-    normalizedStatus === "disputed" ||
-    normalizedStatus === "under review" ||
-    normalizedStatus === "rejected"
+    normalizedStatus === "rejected" ||
+    normalizedStatus === "expired"
   ) {
     return "az-status-chip az-status-danger";
   }

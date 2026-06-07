@@ -12,18 +12,18 @@ import {
 
 const accountTypes = [
   {
-    title: "Customer",
+    title: "User",
     description:
       "Find trusted help for home, car, pet, garden, moving, and roadside services.",
-    buttonText: "Continue as Customer",
-    href: "/customer/onboarding",
+    buttonText: "Sign up as User",
+    href: "/signup?role=user",
   },
   {
     title: "Contractor",
     description:
       "Offer your services, receive job requests, and manage your AZISTO subscription.",
-    buttonText: "Continue as Contractor",
-    href: "/contractor/onboarding",
+    buttonText: "Sign up as Contractor",
+    href: "/signup?role=contractor",
   },
 ];
 
@@ -50,8 +50,6 @@ export default function AccountTypePage() {
       setAuthLoaded(true);
 
       if (!user) {
-        console.log("Account type redirect reason: no signed-in user");
-        router.replace("/login");
         return;
       }
 
@@ -90,14 +88,14 @@ export default function AccountTypePage() {
 
           <section className="mt-10">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
-              Account type
+              Sign up
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
-              How will you use AZISTO?
+              Create your AZISTO account
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {authLoaded
-                ? "Choose the experience that fits what you want to do next."
+                ? "Choose the account type that fits what you want to do."
                 : "Checking account..."}
             </p>
           </section>
@@ -117,7 +115,7 @@ export default function AccountTypePage() {
                 <Link
                   href={accountType.href}
                   className={`mt-5 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold ${
-                    accountType.title === "Customer"
+                    accountType.title === "User"
                       ? "az-btn-primary"
                       : "az-btn-secondary"
                   }`}

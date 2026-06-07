@@ -14,7 +14,7 @@
   --azisto-success: #10B981;
   --azisto-warning: #F59E0B;
   --azisto-danger: #EF4444;
-  --azisto-contractor-bg: #F7F4F1;
+  --azisto-contractor-bg: #FFFFFF;
   --azisto-contractor-card: #FFFFFF;
   --azisto-contractor-border: #E8E2DC;
   --azisto-contractor-text: #111827;
@@ -52,6 +52,32 @@ body {
   background-clip: content-box;
   border-block: 34px solid transparent;
   border-radius: 999px;
+}
+
+.azisto-scroll {
+  overflow-y: auto;
+  scrollbar-color: #CBD5E1 transparent;
+  scrollbar-width: thin;
+}
+
+.azisto-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.azisto-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 0;
+}
+
+.azisto-scroll::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border: 0;
+  border-radius: 999px;
+}
+
+.azisto-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 @keyframes azisto-ai-glow {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft, Info } from "lucide-react";
 import {
   serviceCatalog,
   type ServiceCatalogItem,
@@ -312,7 +312,7 @@ function SubcategoryIcon({
     <span
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${
         isSelected
-          ? "border-azisto-gold bg-white shadow-azisto-gold/10"
+          ? "border-azisto-accent bg-blue-50 shadow-blue-100"
           : badgeClass
       }`}
     >
@@ -437,8 +437,8 @@ export default function ServiceDetailPage() {
 
   return (
     <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
-        <div className="flex-1 px-5 pb-28 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-5">
           <div className="mb-5 flex items-center justify-between text-xs font-bold">
             <span>9:41</span>
             <div className="flex items-center gap-1">
@@ -510,7 +510,7 @@ export default function ServiceDetailPage() {
                     }}
                     className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold shadow-sm transition duration-200 ${
                       isSelected
-                        ? "border-azisto-gold bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.08)]"
+                        ? "border-azisto-accent bg-azisto-accent text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]"
                         : "border-azisto-border bg-white/45 text-slate-600"
                     }`}
                   >
@@ -532,7 +532,7 @@ export default function ServiceDetailPage() {
                   onClick={() => toggleSubcategory(subcategory)}
                   className={`flex min-h-[60px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left shadow-sm transition ${
                     isSelected
-                      ? "border-azisto-gold bg-white text-black shadow-azisto-gold/10"
+                      ? "border-azisto-accent bg-blue-50 text-black shadow-blue-100"
                       : "border-azisto-gold bg-white text-black"
                   }`}
                 >
@@ -549,7 +549,7 @@ export default function ServiceDetailPage() {
                   <span
                     className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
                       isSelected
-                        ? "border-azisto-gold bg-azisto-gold text-white"
+                        ? "border-azisto-accent bg-azisto-accent text-white"
                         : "border-azisto-gold bg-white text-transparent"
                     }`}
                   >
@@ -562,6 +562,18 @@ export default function ServiceDetailPage() {
         </div>
 
         <div className="sticky bottom-0 border-t border-azisto-border bg-white/95 px-5 py-4 backdrop-blur">
+          {selectedCount > 1 ? (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-semibold leading-5 text-slate-700">
+              <Info
+                aria-hidden="true"
+                className="mt-0.5 h-4 w-4 shrink-0 text-azisto-accent"
+              />
+              <p>
+                Please note: when choosing multiple tasks, more than one
+                contractor may be required to complete them.
+              </p>
+            </div>
+          ) : null}
           <Link
             href={`/request?${requestParams.toString()}`}
             className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"

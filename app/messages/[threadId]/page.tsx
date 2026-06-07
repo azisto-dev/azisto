@@ -61,6 +61,22 @@ type MessageAttachment = {
   size: number;
 };
 
+const userMessageSuggestions = [
+  "Hi, are you available for this job?",
+  "Can you please confirm the estimated arrival time?",
+  "Can you share an approximate quote?",
+  "Please message me before arriving.",
+  "Thank you.",
+];
+
+const contractorMessageSuggestions = [
+  "Hi, I’m available for this job.",
+  "I can come today.",
+  "Can you please share more details?",
+  "I’m on my way.",
+  "I have completed the job.",
+];
+
 function StatusBar() {
   return (
     <div className="mb-5 flex items-center justify-between text-xs font-bold">
@@ -369,6 +385,9 @@ export default function MessageThreadPage() {
     ? "border-azisto-accent bg-white text-azisto-accent"
     : "border-[var(--azisto-contractor-burgundy)] bg-white text-[var(--azisto-contractor-burgundy)]";
   const primaryButtonClass = isCustomerThread ? "az-btn-primary" : "az-btn-contractor";
+  const messageSuggestions = isCustomerThread
+    ? userMessageSuggestions
+    : contractorMessageSuggestions;
 
   async function loadMessages(user: User) {
     if (
@@ -693,7 +712,7 @@ export default function MessageThreadPage() {
             </p>
           ) : null}
 
-          <section className="mt-5 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
+          <section className="azisto-scroll mt-5 flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
             {!isLoading && messages.length === 0 ? (
               <p className={`${compactCardClass} px-4 py-3 text-center text-sm leading-6 ${mutedTextClass}`}>
                 No messages yet. Send the first note.
@@ -787,6 +806,26 @@ export default function MessageThreadPage() {
               </button>
             </div>
           ) : null}
+
+          <div
+            className="mb-2 flex gap-2 overflow-x-auto pb-1"
+            aria-label="Quick message suggestions"
+          >
+            {messageSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setDraft(suggestion)}
+                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                  isCustomerThread
+                    ? "border-blue-200 bg-blue-50 text-azisto-accent hover:bg-blue-100"
+                    : "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-bg)] text-[var(--azisto-contractor-burgundy)] hover:bg-white"
+                }`}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
 
           <form
             onSubmit={handleSend}

@@ -130,8 +130,8 @@ export default function ContractorActiveJobsPage() {
 
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
             <button type="button" onClick={() => router.push("/contractor/my-jobs")} className="flex h-10 w-10 items-center justify-center rounded-full text-black" aria-label="Back to my jobs">

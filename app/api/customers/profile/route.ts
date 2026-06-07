@@ -83,6 +83,17 @@ export async function POST(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
+
+    if (decodedToken.email_verified !== true) {
+      return NextResponse.json(
+        {
+          code: "email-not-verified",
+          message: "Please verify your email before creating your profile.",
+        },
+        { status: 403 },
+      );
+    }
+
     const body = (await request.json()) as CustomerProfileBody;
     const existingCustomerSnapshot = await findExistingCustomerProfile(
       decodedToken.uid,

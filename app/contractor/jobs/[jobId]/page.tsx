@@ -511,8 +511,8 @@ export default function ContractorJobDetailPage() {
 
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
-        <div className="flex-1 px-5 pb-6 pt-5">
+      <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <StatusBar />
 
           <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
@@ -605,13 +605,13 @@ export default function ContractorJobDetailPage() {
                             }
                           }}
                           disabled={!canSelectTask}
-                          className={`flex w-full items-center justify-between gap-3 rounded-[22px] border px-3 py-3 text-left text-sm transition ${
+                          className={`flex w-full flex-col items-stretch gap-3 rounded-[22px] border px-3 py-3 text-left text-sm transition ${
                             isSelected
                               ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-text)]"
                               : "border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] text-[var(--azisto-contractor-muted)]"
                           } disabled:cursor-not-allowed disabled:opacity-60`}
                         >
-                          <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex min-w-0 items-start gap-3">
                             <span
                               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition ${
                                 isSelected
@@ -625,15 +625,15 @@ export default function ContractorJobDetailPage() {
                               <Check className="h-4 w-4" />
                             </span>
                             <span className="min-w-0">
-                              <span className="block text-xs font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-burgundy)]">
+                              <span className="block break-all text-xs font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                                 {task.taskId}
                               </span>
-                              <span className="mt-1 block truncate font-bold">
+                              <span className="mt-1 block font-bold">
                                 {task.subcategory || task.category || "Task"}
                               </span>
                             </span>
                           </span>
-                          <span className={`${getStatusChipClass(task.status || "open")} shrink-0`}>
+                          <span className={`${getStatusChipClass(task.status || "open")} ml-10 self-start whitespace-normal text-left`}>
                             {task.contractorServiceMatch === false
                               ? "Not in profile"
                               : getJobStatusLabel(task.status || "open")}

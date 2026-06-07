@@ -4,6 +4,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
 
 export const runtime = "nodejs";
 
@@ -208,6 +209,9 @@ function serializeTask(data: Record<string, unknown>) {
     hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
     interestedContractorIds: readStringList(data.interestedContractorIds),
+    interestedContractorAuthUids: readStringList(
+      data.interestedContractorAuthUids,
+    ),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -234,7 +238,11 @@ function canPerformTask(
   const subcategory = readText(taskData.subcategory);
   const savedSubcategories = readStringList(selectedSubcategoriesByService[category]);
 
-  if (selectedServices.size === 0 || !category || !selectedServices.has(category)) {
+  if (
+    selectedServices.size === 0 ||
+    !category ||
+    (!selectedServices.has(category) && !selectedServices.has(subcategory))
+  ) {
     return false;
   }
 
@@ -301,7 +309,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .sort((firstTask, secondTask) =>
         firstTask.taskId.localeCompare(secondTask.taskId),
       );
-    const tasks =
+    const allTasks =
       savedTasks.length > 0
         ? savedTasks
         : job.selectedSubcategories.map((subcategory, index) => ({
@@ -313,6 +321,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
             hiredContractorId: "",
             hiredContractorAuthUid: "",
             interestedContractorIds: [],
+            interestedContractorAuthUids: [],
             createdAt: job.createdAt,
             updatedAt: job.updatedAt,
             contractorServiceMatch: canPerformTask(contractorData, {
@@ -324,22 +333,38 @@ export async function GET(request: NextRequest, context: RouteContext) {
       typeof contractorProfile.get("contractorId") === "string"
         ? contractorProfile.get("contractorId")
         : contractorProfile.id;
-    const callerIsHiredContractor =
-      jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
-      jobSnapshot.get("hiredContractorId") === contractorId ||
-      tasks.some(
-        (task) =>
-          task.hiredContractorAuthUid === decodedToken.uid ||
-          task.hiredContractorId === contractorId,
-      );
-    const hasOpenTask = tasks.some((task) => task.status === "open");
-    const assignedTasks = tasks.filter(
+    const assignedTasks = allTasks.filter(
       (task) =>
         task.hiredContractorAuthUid === decodedToken.uid ||
         task.hiredContractorId === contractorId,
     );
+    const interestedTasks = allTasks.filter(
+      (task) =>
+        (task.interestedContractorIds as string[]).includes(contractorId) ||
+        (task.interestedContractorAuthUids as string[]).includes(
+          decodedToken.uid,
+        ),
+    );
+    const tasks =
+      assignedTasks.length > 0
+        ? assignedTasks
+        : interestedTasks.length > 0
+          ? interestedTasks
+          : allTasks.filter(
+              (task) =>
+                task.status === "open" && task.contractorServiceMatch === true,
+            );
+    const callerIsHiredContractor =
+      jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
+      jobSnapshot.get("hiredContractorId") === contractorId ||
+      assignedTasks.some(
+        (task) =>
+          task.hiredContractorAuthUid === decodedToken.uid ||
+          task.hiredContractorId === contractorId,
+      );
+    const hasOpenTask = allTasks.some((task) => task.status === "open");
     const assignedTaskIds = assignedTasks.map((task) => task.taskId);
-    const contractorAssignedStatus =
+    const savedContractorAssignedStatus =
       assignedTasks.find((task) => task.status === "in_progress")?.status ||
       assignedTasks.find((task) => task.status === "on_the_way")?.status ||
       assignedTasks.find(
@@ -348,11 +373,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       assignedTasks.find(
         (task) => task.status === "hired_pending_contractor",
       )?.status ||
-      assignedTasks.find((task) => task.status === "cancel_requested")?.status ||
-      assignedTasks.find((task) => task.status === "disputed")?.status ||
       assignedTasks.find((task) => task.status === "completed")?.status ||
       assignedTasks.find((task) => task.status === "cancelled")?.status ||
       (callerIsHiredContractor ? job.status : "");
+    const contractorAssignedStatus = getCompatibleLifecycleStatus(
+      savedContractorAssignedStatus,
+    );
 
     if (job.status !== "open" && !hasOpenTask && !callerIsHiredContractor) {
       return NextResponse.json(

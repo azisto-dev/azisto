@@ -13,8 +13,6 @@ const activeStatuses = new Set([
   "hired",
   "on_the_way",
   "in_progress",
-  "cancel_requested",
-  "disputed",
   "completed",
 ]);
 

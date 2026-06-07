@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeBadgeCounts } from "@/lib/badgeCounts";
 import { azistoUi } from "@/lib/theme";
+import ContractorHirePopup from "@/app/components/ContractorHirePopup";
 
 type UserRole = "customer" | "contractor" | "unknown";
 
@@ -75,6 +76,8 @@ export default function BottomNav({ role }: { role: UserRole }) {
   const pathname = usePathname();
   const navItems = getNavItems(role);
   const [messageBadgeCount, setMessageBadgeCount] = useState(0);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +86,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribeBadges?.();
       unsubscribeBadges = null;
+      setCurrentUser(user);
 
       if (!user || role === "unknown") {
         setMessageBadgeCount(0);
@@ -94,6 +98,9 @@ export default function BottomNav({ role }: { role: UserRole }) {
         (counts) => {
           if (isMounted) {
             setMessageBadgeCount(counts.messages);
+            if (role === "contractor" && counts.notifications > 0) {
+              setNotificationRefreshKey((currentKey) => currentKey + 1);
+            }
           }
         },
         "BottomNav",
@@ -110,50 +117,60 @@ export default function BottomNav({ role }: { role: UserRole }) {
   const isContractor = role === "contractor";
 
   return (
-    <nav
-      className={`sticky bottom-0 z-40 border-t px-3 py-2 ${
-        isContractor
-          ? "az-contractor-floating-nav border-[var(--azisto-contractor-border)]"
-          : "az-customer-floating-nav border-azisto-border"
-      }`}
-    >
-      <div className="grid grid-cols-4">
-        {navItems.map((item) => {
-          const isActive = item.matchPaths.some((matchPath) =>
-            pathname === matchPath || pathname.startsWith(`${matchPath}/`),
-          );
+    <>
+      <nav
+        className={`sticky bottom-0 z-40 border-t px-3 py-2 ${
+          isContractor
+            ? "az-contractor-floating-nav border-[var(--azisto-contractor-border)]"
+            : "az-customer-floating-nav border-azisto-border"
+        }`}
+      >
+        <div className="grid grid-cols-4">
+          {navItems.map((item) => {
+            const isActive = item.matchPaths.some(
+              (matchPath) =>
+                pathname === matchPath ||
+                pathname.startsWith(`${matchPath}/`),
+            );
 
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`relative rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
-                isActive
-                  ? isContractor
-                    ? "text-[var(--azisto-contractor-burgundy)]"
-                    : "text-azisto-accent"
-                  : isContractor
-                    ? "text-[var(--azisto-contractor-muted)]"
-                    : "text-azisto-muted"
-              }`}
-            >
-              {item.label === "Messages" && messageBadgeCount > 0 ? (
-                <span className="absolute right-5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
-                  {messageBadgeCount > 9 ? "9+" : messageBadgeCount}
-                </span>
-              ) : null}
-              <NavIcon path={item.path} />
-              <span
-                className={`mt-1 block ${
-                  isActive && !isContractor ? azistoUi.kicker : ""
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`relative rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
+                  isActive
+                    ? isContractor
+                      ? "text-[var(--azisto-contractor-burgundy)]"
+                      : "text-azisto-accent"
+                    : isContractor
+                      ? "text-[var(--azisto-contractor-muted)]"
+                      : "text-azisto-muted"
                 }`}
               >
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+                {item.label === "Messages" && messageBadgeCount > 0 ? (
+                  <span className="absolute right-5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
+                    {messageBadgeCount > 9 ? "9+" : messageBadgeCount}
+                  </span>
+                ) : null}
+                <NavIcon path={item.path} />
+                <span
+                  className={`mt-1 block ${
+                    isActive && !isContractor ? azistoUi.kicker : ""
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+      {isContractor ? (
+        <ContractorHirePopup
+          user={currentUser}
+          refreshKey={notificationRefreshKey}
+        />
+      ) : null}
+    </>
   );
 }

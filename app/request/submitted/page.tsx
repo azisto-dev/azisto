@@ -35,7 +35,7 @@ function SubmittedContent() {
             <Link
               href="/customer/jobs"
               className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to customer jobs"
+              aria-label="Back to my jobs"
             >
               <ChevronLeft aria-hidden="true" className="h-5 w-5" />
             </Link>

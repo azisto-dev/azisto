@@ -94,7 +94,7 @@ function getCustomerSaveErrorMessage(error: unknown) {
     return "Firebase connection failed. Try again.";
   }
 
-  return "Unable to save your customer profile. Please try again.";
+  return "Unable to save your user profile. Please try again.";
 }
 
 function getFirebaseErrorDetails(error: unknown) {
@@ -168,6 +168,13 @@ export default function CustomerOnboardingPage() {
       console.log("Customer onboarding: auth state loaded");
 
       if (user) {
+        if (!user.emailVerified) {
+          setCurrentUser(null);
+          setAuthLoading(false);
+          router.replace("/signup?role=user");
+          return;
+        }
+
         console.log("Customer onboarding auth user UID:", user.uid);
         console.log("Customer onboarding auth user email:", user.email);
         setCurrentUser(user);
@@ -204,6 +211,11 @@ export default function CustomerOnboardingPage() {
         "Customer onboarding: no auth state user, redirecting to login",
       );
       router.push("/login?reason=customer-onboarding");
+      return;
+    }
+
+    if (!user.emailVerified) {
+      router.push("/signup?role=user");
       return;
     }
 
@@ -272,10 +284,10 @@ export default function CustomerOnboardingPage() {
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
-              Customer profile
+              User profile
             </p>
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
-              Set up your customer profile
+              Set up your user profile
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               This helps contractors contact you and understand where service is
