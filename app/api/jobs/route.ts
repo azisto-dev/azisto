@@ -7,6 +7,10 @@ import {
 } from "@/lib/firebaseAdmin";
 import { ensureUniqueReadableId } from "@/lib/readableIds";
 import { calculateRiskScore, hasBlockedSpamText } from "@/lib/riskScore";
+import {
+  matchesServiceCity,
+  sanitizeServiceCities,
+} from "@/lib/serviceAreas";
 
 export const runtime = "nodejs";
 
@@ -127,6 +131,7 @@ function getMatchingSubcategories(
 
 async function notifyMatchingContractors(input: {
   jobId: string;
+  jobCity: string;
   serviceCategory: string;
   taskSubcategories: string[];
 }) {
@@ -145,11 +150,18 @@ async function notifyMatchingContractors(input: {
       input.serviceCategory,
       input.taskSubcategories,
     );
+    const filterPreferences = readStringRecord(
+      contractorData.jobFilterPreferences,
+    );
+    const serviceCities = sanitizeServiceCities(
+      filterPreferences.serviceCities ?? filterPreferences.cities,
+    );
 
     if (
       !recipientAuthUid ||
       !isApprovedContractor(contractorData) ||
-      matchingSubcategories.length === 0
+      matchingSubcategories.length === 0 ||
+      !matchesServiceCity(input.jobCity, serviceCities)
     ) {
       return;
     }
@@ -595,6 +607,7 @@ export async function POST(request: NextRequest) {
       try {
         await notifyMatchingContractors({
           jobId,
+          jobCity: locationMode === "manual" ? city : "",
           serviceCategory: selectedServiceCategory,
           taskSubcategories,
         });

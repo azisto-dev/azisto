@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft } from "lucide-react";
 import { auth, authPersistenceReady } from "@/lib/firebase";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const contactMethods = ["In-app message", "Phone call", "Text message"];
 
@@ -279,7 +280,7 @@ export default function CustomerOnboardingPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

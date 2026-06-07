@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { BriefcaseBusiness, ChevronLeft, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type InterestedContractor = {
   contractorId: string;
@@ -277,7 +278,7 @@ export default function CustomerInterestedContractorsPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

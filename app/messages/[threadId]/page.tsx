@@ -26,6 +26,7 @@ import {
   throwApiResponseError,
 } from "@/lib/authenticatedFetch";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type MessageThread = {
   threadId: string;
@@ -124,10 +125,20 @@ function getMessageReceipt(message: MessageItem) {
   return { label: "Delivered", state: "delivered" as const };
 }
 
-function MessageReceipt({ message }: { message: MessageItem }) {
+function MessageReceipt({
+  message,
+  isCustomerThread,
+}: {
+  message: MessageItem;
+  isCustomerThread: boolean;
+}) {
   const receipt = getMessageReceipt(message);
   const className =
-    receipt.state === "read" ? "text-[#2563EB]" : "text-white/75";
+    receipt.state === "read"
+      ? "text-[#2563EB]"
+      : isCustomerThread
+        ? "text-white/75"
+        : "text-[#5C0032]/60";
 
   return (
     <span
@@ -347,7 +358,7 @@ export default function MessageThreadPage() {
     : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
   const heroClass = isCustomerThread
     ? "az-customer-card mt-5 bg-gradient-to-br from-white via-blue-50 to-white p-4"
-    : "az-contractor-soft-hero mt-5 p-4";
+    : "az-contractor-soft-hero mt-4 p-3";
   const compactCardClass = isCustomerThread
     ? "az-customer-card"
     : "az-contractor-card-compact";
@@ -649,17 +660,17 @@ export default function MessageThreadPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className={heroClass}>
             <div className="relative z-10 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className={`text-sm font-semibold ${mutedTextClass}`}>Messages</p>
-                <h1 className={`mt-1 text-2xl font-normal leading-7 ${primaryTextClass}`}>
+                <h1 className={`mt-0.5 text-xl font-normal leading-6 ${primaryTextClass}`}>
                   {thread?.displayName || "Messages"}
                 </h1>
-                <p className={`mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold ${mutedTextClass}`}>
+                <p className={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${mutedTextClass}`}>
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                   Active recently
                 </p>
@@ -670,7 +681,7 @@ export default function MessageThreadPage() {
                   : thread?.status || "Open"}
               </span>
             </div>
-            <div className={`relative z-10 mt-4 rounded-xl border px-3 py-2 text-[11px] font-semibold ${detailPanelClass}`}>
+            <div className={`relative z-10 mt-2.5 rounded-xl border px-3 py-2 text-[11px] font-semibold ${detailPanelClass}`}>
               <p className={`truncate ${primaryTextClass}`}>
                 {thread?.jobTitle || "Service request"}
               </p>
@@ -684,7 +695,7 @@ export default function MessageThreadPage() {
                 </p>
               ) : null}
             </div>
-            <p className="relative z-10 mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-600">
+            <p className="relative z-10 mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold leading-5 text-red-600">
               Keep communication inside AZISTO until booking is confirmed.
             </p>
             {thread?.currentUserRole === "customer" &&
@@ -763,14 +774,21 @@ export default function MessageThreadPage() {
                     <div
                       className={`mt-1 flex items-center gap-1.5 text-[11px] font-semibold ${
                         isOwnMessage
-                          ? "justify-end text-white/75"
+                          ? isCustomerThread
+                            ? "justify-end text-white/75"
+                            : "justify-end text-[#5C0032]/60"
                           : "justify-start text-slate-400"
                       }`}
                     >
                       {message.createdAt ? (
                         <span>{formatMessageTime(message.createdAt)}</span>
                       ) : null}
-                      {isOwnMessage ? <MessageReceipt message={message} /> : null}
+                      {isOwnMessage ? (
+                        <MessageReceipt
+                          message={message}
+                          isCustomerThread={isCustomerThread}
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </div>

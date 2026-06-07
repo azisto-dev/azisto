@@ -13,6 +13,7 @@ import {
 } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type ActiveJob = {
   jobId: string;
@@ -259,7 +260,7 @@ export default function CustomerActiveJobsPage() {
             <Link href="/home" className="flex justify-center">
               <img src="/azisto-logo-cropped.png" alt="AZISTO" className="w-full max-w-[165px] object-contain" />
             </Link>
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">User jobs</p>

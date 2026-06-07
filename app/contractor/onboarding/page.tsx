@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { auth, authPersistenceReady, storage } from "@/lib/firebase";
 import { serviceCatalog } from "@/lib/serviceCatalog";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const allowedUploadTypes = [
   "application/pdf",
@@ -1029,7 +1030,7 @@ export default function ContractorOnboardingPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <nav className="mt-7 flex items-center justify-between gap-1" aria-label="Contractor onboarding steps">

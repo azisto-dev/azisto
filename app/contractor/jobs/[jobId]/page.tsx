@@ -10,6 +10,7 @@ import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import { getJobStatusLabel } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const reportReasonOptions = [
   { value: "fake_job", label: "Fake job" },
@@ -532,7 +533,7 @@ export default function ContractorJobDetailPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           {isLoading ? (
@@ -549,15 +550,15 @@ export default function ContractorJobDetailPage() {
 
           {job ? (
             <>
-              <section className="az-contractor-soft-hero mt-8 p-5">
+              <section className="az-contractor-soft-hero mt-6 p-4">
                 <div className="relative z-10">
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
                     {job.jobId}
                   </p>
-                  <h1 className="mt-2 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
+                  <h1 className="mt-1 text-2xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
                     {job.selectedServiceCategory || "Service request"}
                   </h1>
-                  <p className="mt-8 flex items-center gap-2 text-sm font-semibold leading-6 text-[var(--azisto-contractor-muted)]">
+                  <p className="mt-4 flex items-center gap-2 text-sm font-semibold leading-5 text-[var(--azisto-contractor-muted)]">
                     <MapPin aria-hidden="true" className="h-4 w-4" />
                     {[job.city, job.province].filter(Boolean).join(", ") ||
                       "Location not provided"}
@@ -569,14 +570,14 @@ export default function ContractorJobDetailPage() {
                       )}
                     </span>
                   </div>
-                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm leading-5">
-                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm leading-5">
+                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-2.5">
                       <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">Schedule</p>
                       <p className="mt-1 font-semibold text-[var(--azisto-contractor-text)]">
                         {formatScheduleLabel(job)}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-3">
+                    <div className="rounded-2xl border border-[var(--azisto-contractor-border)] bg-white/70 p-2.5">
                       <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--azisto-contractor-muted)]">Customer</p>
                       <p className="mt-1 font-semibold text-[var(--azisto-contractor-text)]">
                         {job.customerFirstName || "Customer"}
@@ -819,7 +820,7 @@ export default function ContractorJobDetailPage() {
               ["hired", "accepted", "on_the_way", "in_progress", "completed"].includes(
                 job.contractorAssignedStatus || job.status,
               ) ? (
-                <div className="az-contractor-action-bar sticky bottom-3 z-20 mt-6 rounded-[24px] p-2">
+                <div className="az-contractor-action-bar relative mt-6 rounded-[24px] p-2">
                   {job.status === "open" &&
                   !job.isAssignedToCurrentContractor ? (
                     <button

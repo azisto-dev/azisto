@@ -19,6 +19,7 @@ import {
 } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type CustomerJob = {
   jobId: string;
@@ -481,7 +482,7 @@ export default function CustomerJobsPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

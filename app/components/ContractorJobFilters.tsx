@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
+import { serviceAreaRegions } from "@/lib/serviceAreas";
 
 export type ContractorJobFilterPreferences = {
   categories: string[];
   subcategories: string[];
-  cities: string[];
+  serviceCities: string[];
   urgency: "any" | "flexible" | "this_week" | "urgent";
   sort: "newest" | "urgent";
 };
@@ -31,7 +32,7 @@ type ContractorJobFiltersProps = {
 const emptyFilters: ContractorJobFilterPreferences = {
   categories: [],
   subcategories: [],
-  cities: [],
+  serviceCities: [],
   urgency: "any",
   sort: "newest",
 };
@@ -150,27 +151,143 @@ function MultiSelectDropdown({
   );
 }
 
-function FilterChip({
-  isSelected,
-  label,
-  onClick,
+function ServiceAreaDropdown({
+  selectedCities,
+  isOpen,
+  onToggleOpen,
+  onChange,
 }: {
-  isSelected: boolean;
-  label: string;
-  onClick: () => void;
+  selectedCities: string[];
+  isOpen: boolean;
+  onToggleOpen: () => void;
+  onChange: (cities: string[]) => void;
 }) {
+  const selectedCount = selectedCities.length;
+
+  function toggleCity(city: string) {
+    onChange(toggleValue(selectedCities, city));
+  }
+
+  function toggleRegion(cities: string[]) {
+    const allSelected = cities.every((city) => selectedCities.includes(city));
+
+    onChange(
+      allSelected
+        ? selectedCities.filter((city) => !cities.includes(city))
+        : Array.from(new Set([...selectedCities, ...cities])),
+    );
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-2 text-xs font-bold transition ${
-        isSelected
-          ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(122_0_60_/_0.08)] text-[var(--azisto-contractor-burgundy)]"
-          : "border-[var(--azisto-contractor-border)] bg-white text-[var(--azisto-contractor-muted)]"
-      }`}
-    >
-      {label}
-    </button>
+    <section>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
+          Service Areas
+        </p>
+        {selectedCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-xs font-bold text-[var(--azisto-contractor-burgundy)]"
+          >
+            Clear cities
+          </button>
+        ) : null}
+      </div>
+
+      <div className="relative mt-3">
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          className="az-contractor-card-compact flex min-h-12 w-full items-center justify-between gap-3 rounded-[18px] px-3 py-2 text-left"
+          aria-expanded={isOpen}
+        >
+          <span>
+            <span className="block text-sm font-bold text-[var(--azisto-contractor-text)]">
+              {selectedCount > 0
+                ? `${selectedCount} ${selectedCount === 1 ? "city" : "cities"} selected`
+                : "Choose service cities"}
+            </span>
+            <span className="mt-0.5 block text-[11px] font-semibold text-[var(--azisto-contractor-muted)]">
+              {selectedCount > 0
+                ? selectedCities.join(", ")
+                : "Leave empty to see jobs in all cities"}
+            </span>
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-4 w-4 shrink-0 text-[var(--azisto-contractor-burgundy)] transition ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {isOpen ? (
+          <div className="az-contractor-card absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 max-h-72 overflow-y-auto p-2">
+            {serviceAreaRegions.map((region) =>
+              region.cities.length === 0 ? (
+                <p
+                  key={region.label}
+                  className="px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--azisto-contractor-muted)]"
+                >
+                  {region.label}
+                </p>
+              ) : (
+                <div
+                  key={region.label}
+                  className="border-b border-[var(--azisto-contractor-border)] py-2 last:border-b-0"
+                >
+                  <div className="flex items-center justify-between gap-3 px-3 pb-1">
+                    <p className="text-xs font-bold text-[var(--azisto-contractor-text)]">
+                      {region.label}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => toggleRegion(region.cities)}
+                      className="text-[10px] font-bold text-[var(--azisto-contractor-burgundy)]"
+                    >
+                      {region.cities.every((city) =>
+                        selectedCities.includes(city),
+                      )
+                        ? "Clear region"
+                        : "Select all"}
+                    </button>
+                  </div>
+
+                  {region.cities.map((city) => {
+                    const isSelected = selectedCities.includes(city);
+
+                    return (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => toggleCity(city)}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition ${
+                          isSelected
+                            ? "bg-[rgb(122_0_60_/_0.08)] text-[var(--azisto-contractor-burgundy)]"
+                            : "text-[var(--azisto-contractor-text)] hover:bg-[rgb(248_247_252_/_0.9)]"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                            isSelected
+                              ? "border-[var(--azisto-contractor-burgundy)] bg-[var(--azisto-contractor-burgundy)] text-white"
+                              : "border-[var(--azisto-contractor-border)] bg-white text-transparent"
+                          }`}
+                        >
+                          <Check aria-hidden="true" className="h-3 w-3" />
+                        </span>
+                        {city}
+                      </button>
+                    );
+                  })}
+                </div>
+              ),
+            )}
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -186,7 +303,7 @@ export default function ContractorJobFilters({
 }: ContractorJobFiltersProps) {
   const [draftFilters, setDraftFilters] = useState(filters);
   const [openDropdown, setOpenDropdown] = useState<
-    "categories" | "subcategories" | null
+    "categories" | "subcategories" | "serviceAreas" | null
   >(null);
   const visibleSubcategories = useMemo(() => {
     if (draftFilters.categories.length === 0) {
@@ -297,30 +414,21 @@ export default function ContractorJobFilters({
             emptyText="Select a category to see matching subcategories."
           />
 
-          <section>
-            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">City</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {options.cities.length > 0 ? (
-                options.cities.map((city) => (
-                  <FilterChip
-                    key={city}
-                    label={city}
-                    isSelected={draftFilters.cities.includes(city)}
-                    onClick={() =>
-                      updateDraftFilters({
-                        ...draftFilters,
-                        cities: toggleValue(draftFilters.cities, city),
-                      })
-                    }
-                  />
-                ))
-              ) : (
-                <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
-                  Cities appear here when open jobs are available.
-                </p>
-              )}
-            </div>
-          </section>
+          <ServiceAreaDropdown
+            selectedCities={draftFilters.serviceCities}
+            isOpen={openDropdown === "serviceAreas"}
+            onToggleOpen={() =>
+              setOpenDropdown((currentValue) =>
+                currentValue === "serviceAreas" ? null : "serviceAreas",
+              )
+            }
+            onChange={(serviceCities) =>
+              updateDraftFilters({
+                ...draftFilters,
+                serviceCities,
+              })
+            }
+          />
 
           <section>
             <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Urgency</p>

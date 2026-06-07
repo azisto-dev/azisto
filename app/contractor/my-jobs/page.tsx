@@ -14,6 +14,7 @@ import {
 } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type ContractorJob = {
   jobId: string;
@@ -296,7 +297,7 @@ export default function ContractorMyJobsPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">
@@ -344,7 +345,11 @@ export default function ContractorMyJobsPage() {
           <div className="mt-6 space-y-7">
             {sections.map((section) =>
               section.jobs.length > 0 ? (
-                <section key={section.title}>
+                <section
+                  key={section.title}
+                  id={section.title.toLowerCase().replaceAll(" ", "-")}
+                  className="scroll-mt-4"
+                >
                   <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-500">
                     {section.title}
                   </h2>

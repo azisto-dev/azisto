@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { auth, storage } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type ProfileRole = "customer" | "contractor";
 
@@ -65,9 +66,24 @@ type UploadedDocument = {
   contentType?: string;
   size?: number;
   uploadedAt?: string;
+  [key: string]: unknown;
 };
 
-type ContractorDocuments = Record<string, UploadedDocument | undefined>;
+type ContractorDocuments = Record<string, unknown>;
+
+type ContractorDocumentOption = {
+  key: string;
+  label: string;
+  type: string;
+  containerKey?: string;
+  fileNameField?: string;
+  fileUrlField?: string;
+  storagePathField?: string;
+  contentTypeField?: string;
+  sizeField?: string;
+  uploadedAtField?: string;
+  tradeCategory?: string;
+};
 
 type ProfileResponse = {
   role?: unknown;
@@ -234,7 +250,7 @@ const contractorServiceCatalog = [
   },
 ];
 
-const contractorDocumentOptions = [
+const contractorDocumentOptions: ContractorDocumentOption[] = [
   {
     key: "governmentId",
     label: "Government photo ID",
@@ -254,8 +270,227 @@ const contractorDocumentOptions = [
     key: "worksafeBC",
     label: "WorkSafeBC clearance",
     type: "worksafeBC",
+    fileUrlField: "clearanceLetterUrl",
   },
-] as const;
+  {
+    key: "drivingAbstract",
+    label: "Driving abstract",
+    type: "drivingAbstract",
+  },
+  {
+    key: "backgroundCheck",
+    label: "Background check",
+    type: "backgroundCheck",
+  },
+  {
+    key: "otherSupporting",
+    label: "Other supporting document",
+    type: "otherSupporting",
+  },
+  {
+    key: "tradeLicence-electrical",
+    label: "Electrical contractor licence / trade proof",
+    type: "tradeLicence",
+    tradeCategory: "Electrical",
+  },
+  {
+    key: "tradeLicence-plumbing",
+    label: "Plumbing licence / trade proof",
+    type: "tradeLicence",
+    tradeCategory: "Plumbing",
+  },
+  {
+    key: "tradeLicence-hvac",
+    label: "HVAC or gas fitter licence / trade proof",
+    type: "tradeLicence",
+    tradeCategory: "HVAC / gas",
+  },
+  {
+    key: "tradeLicence-pest",
+    label: "Pesticide applicator certificate / licence",
+    type: "tradeLicence",
+    tradeCategory: "Pest control",
+  },
+  {
+    key: "tradeLicence-roofing",
+    label: "Fall protection / roofing safety proof",
+    type: "tradeLicence",
+    tradeCategory: "Roofing",
+  },
+  {
+    key: "tradeLicence-tree",
+    label: "Arborist certification or experience proof",
+    type: "tradeLicence",
+    tradeCategory: "Tree services",
+  },
+  {
+    key: "tradeLicence-general",
+    label: "Other trade certificate",
+    type: "tradeLicence",
+    tradeCategory: "General",
+  },
+  {
+    key: "driverLicence",
+    label: "Driver licence",
+    type: "driverLicence",
+    containerKey: "vehicleDocuments",
+    fileNameField: "driverLicenceFileName",
+    fileUrlField: "driverLicenceUrl",
+    storagePathField: "driverLicenceStoragePath",
+    contentTypeField: "driverLicenceContentType",
+    sizeField: "driverLicenceSize",
+    uploadedAtField: "driverLicenceUploadedAt",
+  },
+  {
+    key: "vehicleRegistration",
+    label: "Vehicle registration",
+    type: "vehicleRegistration",
+    containerKey: "vehicleDocuments",
+    fileNameField: "vehicleRegistrationFileName",
+    fileUrlField: "vehicleRegistrationUrl",
+    storagePathField: "vehicleRegistrationStoragePath",
+    contentTypeField: "vehicleRegistrationContentType",
+    sizeField: "vehicleRegistrationSize",
+    uploadedAtField: "vehicleRegistrationUploadedAt",
+  },
+  {
+    key: "commercialVehicleInsurance",
+    label: "Commercial vehicle insurance",
+    type: "commercialVehicleInsurance",
+    containerKey: "vehicleDocuments",
+    fileNameField: "commercialVehicleInsuranceFileName",
+    fileUrlField: "commercialVehicleInsuranceUrl",
+    storagePathField: "commercialVehicleInsuranceStoragePath",
+    contentTypeField: "commercialVehicleInsuranceContentType",
+    sizeField: "commercialVehicleInsuranceSize",
+    uploadedAtField: "commercialVehicleInsuranceUploadedAt",
+  },
+  {
+    key: "cargoInsurance",
+    label: "Cargo insurance",
+    type: "cargoInsurance",
+    containerKey: "vehicleDocuments",
+    fileNameField: "cargoInsuranceFileName",
+    fileUrlField: "cargoInsuranceUrl",
+    storagePathField: "cargoInsuranceStoragePath",
+    contentTypeField: "cargoInsuranceContentType",
+    sizeField: "cargoInsuranceSize",
+    uploadedAtField: "cargoInsuranceUploadedAt",
+  },
+  {
+    key: "towingInsurance",
+    label: "Towing insurance",
+    type: "towingInsurance",
+    containerKey: "vehicleDocuments",
+    fileNameField: "towingInsuranceFileName",
+    fileUrlField: "towingInsuranceUrl",
+    storagePathField: "towingInsuranceStoragePath",
+    contentTypeField: "towingInsuranceContentType",
+    sizeField: "towingInsuranceSize",
+    uploadedAtField: "towingInsuranceUploadedAt",
+  },
+  {
+    key: "garageKeepersLiability",
+    label: "Garage keepers liability",
+    type: "garageKeepersLiability",
+    containerKey: "vehicleDocuments",
+    fileNameField: "garageKeepersLiabilityFileName",
+    fileUrlField: "garageKeepersLiabilityUrl",
+    storagePathField: "garageKeepersLiabilityStoragePath",
+    contentTypeField: "garageKeepersLiabilityContentType",
+    sizeField: "garageKeepersLiabilitySize",
+    uploadedAtField: "garageKeepersLiabilityUploadedAt",
+  },
+];
+
+function readDocumentRecord(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as UploadedDocument)
+    : {};
+}
+
+function getDocumentForOption(
+  documents: ContractorDocuments | undefined,
+  option: ContractorDocumentOption,
+) {
+  if (!documents) {
+    return {};
+  }
+
+  if (option.tradeCategory) {
+    const tradeLicences = Array.isArray(documents.tradeLicences)
+      ? documents.tradeLicences
+      : [];
+
+    return readDocumentRecord(
+      tradeLicences.find(
+        (item) =>
+          readDocumentRecord(item).category === option.tradeCategory,
+      ),
+    );
+  }
+
+  const container = option.containerKey
+    ? readDocumentRecord(documents[option.containerKey])
+    : readDocumentRecord(documents[option.key]);
+
+  return {
+    ...container,
+    fileName: container[option.fileNameField ?? "fileName"],
+    fileUrl: container[option.fileUrlField ?? "fileUrl"],
+  } as UploadedDocument;
+}
+
+function mergeUploadedDocument(
+  documents: ContractorDocuments | undefined,
+  option: ContractorDocumentOption,
+  uploadedDocument: UploadedDocument,
+) {
+  const nextDocuments: ContractorDocuments = { ...(documents ?? {}) };
+
+  if (option.tradeCategory) {
+    const tradeLicences = Array.isArray(nextDocuments.tradeLicences)
+      ? [...nextDocuments.tradeLicences]
+      : [];
+    const existingIndex = tradeLicences.findIndex(
+      (item) =>
+        readDocumentRecord(item).category === option.tradeCategory,
+    );
+    const nextTradeLicence = {
+      ...(existingIndex >= 0
+        ? readDocumentRecord(tradeLicences[existingIndex])
+        : {}),
+      ...uploadedDocument,
+      category: option.tradeCategory,
+      documentName: option.label,
+    };
+
+    if (existingIndex >= 0) {
+      tradeLicences[existingIndex] = nextTradeLicence;
+    } else {
+      tradeLicences.push(nextTradeLicence);
+    }
+
+    nextDocuments.tradeLicences = tradeLicences;
+    return nextDocuments;
+  }
+
+  const containerKey = option.containerKey ?? option.key;
+  const existingDocument = readDocumentRecord(nextDocuments[containerKey]);
+
+  nextDocuments[containerKey] = {
+    ...existingDocument,
+    status: "uploaded",
+    [option.fileNameField ?? "fileName"]: uploadedDocument.fileName,
+    [option.fileUrlField ?? "fileUrl"]: uploadedDocument.fileUrl,
+    [option.storagePathField ?? "storagePath"]: uploadedDocument.storagePath,
+    [option.contentTypeField ?? "contentType"]: uploadedDocument.contentType,
+    [option.sizeField ?? "size"]: uploadedDocument.size,
+    [option.uploadedAtField ?? "uploadedAt"]: uploadedDocument.uploadedAt,
+  };
+
+  return nextDocuments;
+}
 
 function StatusBar() {
   return (
@@ -668,8 +903,7 @@ export default function ProfilePage() {
   }
 
   async function handleDocumentChange(
-    documentKey: string,
-    documentType: string,
+    documentOption: ContractorDocumentOption,
     event: ChangeEvent<HTMLInputElement>,
   ) {
     const file = event.target.files?.[0];
@@ -680,21 +914,19 @@ export default function ProfilePage() {
     }
 
     try {
-      setUploadingDocumentKey(documentKey);
+      setUploadingDocumentKey(documentOption.key);
       setErrorMessage("");
       setSuccessMessage("");
       const uploadedDocument = await uploadContractorDocument(
         currentUser,
-        documentType,
+        documentOption.type,
         file,
       );
-      const updatedDocuments = {
-        ...(profile.documents ?? {}),
-        [documentKey]: {
-          ...(profile.documents?.[documentKey] ?? {}),
-          ...uploadedDocument,
-        },
-      };
+      const updatedDocuments = mergeUploadedDocument(
+        profile.documents,
+        documentOption,
+        uploadedDocument,
+      );
       const updatedProfile = await saveProfile(currentUser, {
         documents: updatedDocuments,
       });
@@ -809,7 +1041,7 @@ export default function ProfilePage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           {isLoading ? (
@@ -1288,7 +1520,10 @@ export default function ProfilePage() {
 	                  <div className="mt-4 space-y-3">
 	                    {contractorDocumentOptions.map((documentOption) => {
                       const document =
-                        profile.documents?.[documentOption.key] ?? {};
+                        getDocumentForOption(
+                          profile.documents,
+                          documentOption,
+                        );
                       const isUploading =
                         uploadingDocumentKey === documentOption.key;
 
@@ -1321,11 +1556,7 @@ export default function ProfilePage() {
                                 className="sr-only"
                                 disabled={Boolean(uploadingDocumentKey)}
                                 onChange={(event) =>
-                                  handleDocumentChange(
-                                    documentOption.key,
-                                    documentOption.type,
-                                    event,
-                                  )
+                                  handleDocumentChange(documentOption, event)
                                 }
                               />
                             </label>

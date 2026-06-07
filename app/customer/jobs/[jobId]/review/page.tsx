@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Star } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 function StatusBar() {
   return (
@@ -94,7 +95,7 @@ export default function CustomerJobReviewPage() {
             <Link href="/home" className="flex justify-center">
               <img src="/azisto-logo-cropped.png" alt="AZISTO" className="w-full max-w-[165px] object-contain" />
             </Link>
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">{jobId}</p>

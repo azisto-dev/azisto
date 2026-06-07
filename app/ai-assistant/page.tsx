@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, Sparkles } from "lucide-react";
+import NotificationBell from "@/app/components/NotificationBell";
 
 function StatusBar() {
   return (
@@ -43,7 +44,7 @@ export default function AiAssistantPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

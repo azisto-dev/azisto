@@ -9,6 +9,7 @@ import {
   type ServiceCatalogItem,
 } from "@/lib/serviceCatalog";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type ServiceDisplayDetails = {
   name: string;
@@ -465,7 +466,7 @@ export default function ServiceDetailPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

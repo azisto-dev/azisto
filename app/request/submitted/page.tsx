@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 function StatusBar() {
   return (
@@ -48,7 +49,7 @@ function SubmittedContent() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="flex flex-1 flex-col justify-center">

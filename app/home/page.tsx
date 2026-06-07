@@ -76,7 +76,7 @@ const services = [
 const emptyContractorFilters: ContractorJobFilterPreferences = {
   categories: [],
   subcategories: [],
-  cities: [],
+  serviceCities: [],
   urgency: "any",
   sort: "newest",
 };
@@ -137,6 +137,7 @@ type ContractorHomeData = {
   availableJobsCount: number;
   totalAvailableJobsCount: number;
   newTodayCount: number;
+  interestedJobsCount: number;
   availableJobs: ContractorHomeJob[];
   filters: ContractorJobFilterPreferences;
   savedFilters: ContractorJobFilterPreferences;
@@ -282,7 +283,7 @@ function readFilterPreferences(value: unknown): ContractorJobFilterPreferences {
   return {
     categories: readStringList(data.categories),
     subcategories: readStringList(data.subcategories),
-    cities: readStringList(data.cities),
+    serviceCities: readStringList(data.serviceCities ?? data.cities),
     urgency,
     sort,
   };
@@ -344,6 +345,7 @@ function readContractorHomeData(value: unknown): ContractorHomeData {
     availableJobsCount: readNumber(data.availableJobsCount),
     totalAvailableJobsCount: readNumber(data.totalAvailableJobsCount),
     newTodayCount: readNumber(data.newTodayCount),
+    interestedJobsCount: readNumber(data.interestedJobsCount),
     availableJobs: Array.isArray(data.availableJobs)
       ? data.availableJobs.map((job) => {
           const jobData =
@@ -383,6 +385,7 @@ function readContractorHomeData(value: unknown): ContractorHomeData {
 
 function buildFilterQuery(filters: ContractorJobFilterPreferences) {
   const params = new URLSearchParams();
+  params.set("filterOverride", "1");
 
   if (filters.categories.length > 0) {
     params.set("categories", filters.categories.join(","));
@@ -392,8 +395,8 @@ function buildFilterQuery(filters: ContractorJobFilterPreferences) {
     params.set("subcategories", filters.subcategories.join(","));
   }
 
-  if (filters.cities.length > 0) {
-    params.set("cities", filters.cities.join(","));
+  if (filters.serviceCities.length > 0) {
+    params.set("serviceCities", filters.serviceCities.join(","));
   }
 
   if (filters.urgency !== "any") {
@@ -1051,7 +1054,7 @@ export default function HomePage() {
     const hasActiveFilters =
       contractorFilters.categories.length > 0 ||
       contractorFilters.subcategories.length > 0 ||
-      contractorFilters.cities.length > 0 ||
+      contractorFilters.serviceCities.length > 0 ||
       contractorFilters.urgency !== "any" ||
       contractorFilters.sort !== "newest";
 
@@ -1126,6 +1129,7 @@ export default function HomePage() {
                 {
                   label: "New Jobs",
                   value: contractorHome?.availableJobsCount ?? 0,
+                  href: "#available-jobs",
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-emerald-700",
                   valueClassName: "text-emerald-700",
@@ -1136,7 +1140,8 @@ export default function HomePage() {
                 },
                 {
                   label: "Interested",
-                  value: 0,
+                  value: contractorHome?.interestedJobsCount ?? 0,
+                  href: "/contractor/my-jobs#interested",
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-[#4169E1]",
                   valueClassName: "text-[#4169E1]",
@@ -1145,6 +1150,7 @@ export default function HomePage() {
                 {
                   label: "Active Jobs",
                   value: contractorHome?.activeJob ? 1 : 0,
+                  href: "/contractor/dashboard",
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-black",
                   valueClassName: "text-black",
@@ -1155,6 +1161,7 @@ export default function HomePage() {
                 {
                   label: "Rating",
                   value: contractorHome?.averageRating ?? 0,
+                  href: "/profile",
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-black",
                   valueClassName: "text-black",
@@ -1162,8 +1169,9 @@ export default function HomePage() {
                   supportingText: "Premium score",
                 },
               ].map((stat) => (
-                <div
+                <Link
                   key={stat.label}
+                  href={stat.href}
                   className={`az-contractor-stat-card rounded-[22px] border px-3 py-3 ${stat.className}`}
                 >
                   <p className={`text-[11px] font-bold uppercase tracking-[0.12em] ${stat.labelClassName}`}>
@@ -1204,7 +1212,7 @@ export default function HomePage() {
                   <p className="mt-1 truncate text-[10px] font-semibold text-[var(--azisto-contractor-muted)]">
                     {stat.supportingText}
                   </p>
-                </div>
+                </Link>
               ))}
             </section>
 
@@ -1252,7 +1260,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <section className="mt-6">
+            <section id="available-jobs" className="mt-6 scroll-mt-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-2xl font-normal text-[var(--azisto-contractor-text)]">

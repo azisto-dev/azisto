@@ -17,6 +17,7 @@ import {
   isContractorPastStatus,
 } from "@/lib/jobStatus";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type DashboardTab = "active" | "available" | "past";
 
@@ -398,7 +399,7 @@ export default function ContractorDashboardPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="mt-8">

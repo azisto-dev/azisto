@@ -9,13 +9,18 @@ import {
   isQuotaExceededMessage,
 } from "@/lib/apiErrors";
 import { getServiceFilterOptions } from "@/lib/serviceCatalog";
+import {
+  matchesServiceCity,
+  sanitizeServiceCities,
+  serviceAreaCities,
+} from "@/lib/serviceAreas";
 
 export const runtime = "nodejs";
 
 type FilterPreferences = {
   categories: string[];
   subcategories: string[];
-  cities: string[];
+  serviceCities: string[];
   urgency: "any" | "flexible" | "this_week" | "urgent";
   sort: "newest" | "urgent";
 };
@@ -23,7 +28,7 @@ type FilterPreferences = {
 const defaultFilterPreferences: FilterPreferences = {
   categories: [],
   subcategories: [],
-  cities: [],
+  serviceCities: [],
   urgency: "any",
   sort: "newest",
 };
@@ -105,7 +110,7 @@ function normalizePreferences(value: unknown): FilterPreferences {
   return {
     categories: readLimitedStringList(data.categories),
     subcategories: readLimitedStringList(data.subcategories),
-    cities: readLimitedStringList(data.cities),
+    serviceCities: sanitizeServiceCities(data.serviceCities ?? data.cities),
     urgency: readUrgency(data.urgency),
     sort: readSort(data.sort),
   };
@@ -120,14 +125,16 @@ function parseCsv(value: string | null) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
-    .slice(0, 30);
+    .slice(0, 60);
 }
 
 function readQueryPreferences(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const hasQueryFilters = [
+    "filterOverride",
     "categories",
     "subcategories",
+    "serviceCities",
     "cities",
     "urgency",
     "sort",
@@ -140,7 +147,11 @@ function readQueryPreferences(request: NextRequest) {
   return {
     categories: parseCsv(searchParams.get("categories")),
     subcategories: parseCsv(searchParams.get("subcategories")),
-    cities: parseCsv(searchParams.get("cities")),
+    serviceCities: sanitizeServiceCities(
+      parseCsv(
+        searchParams.get("serviceCities") ?? searchParams.get("cities"),
+      ),
+    ),
     urgency: readUrgency(searchParams.get("urgency")),
     sort: readSort(searchParams.get("sort")),
   };
@@ -275,6 +286,7 @@ async function serializeAvailableJob(
     customerSafetyBadges: getSafetyBadges(data),
     selectedServiceCategory: readText(data.selectedServiceCategory),
     selectedSubcategories: readStringList(data.selectedSubcategories),
+    interestedContractorIds: readStringList(data.interestedContractorIds),
     city: readText(data.city),
     province: readText(data.province),
     scheduleMode: readText(data.scheduleMode),
@@ -309,6 +321,10 @@ async function serializeAvailableTask(
       taskId,
       selectedServiceCategory: category,
       selectedSubcategories: subcategory ? [subcategory] : [],
+      interestedContractorIds:
+        readStringList(taskData.interestedContractorIds).length > 0
+          ? readStringList(taskData.interestedContractorIds)
+          : readStringList(parentData.interestedContractorIds),
       city: readText(taskData.city) || readText(parentData.city),
       province: readText(taskData.province) || readText(parentData.province),
       preferredDate:
@@ -358,12 +374,7 @@ function matchesPreferences(
     return false;
   }
 
-  if (
-    preferences.cities.length > 0 &&
-    !preferences.cities.some(
-      (city) => city.toLowerCase() === job.city.toLowerCase(),
-    )
-  ) {
+  if (!matchesServiceCity(job.city, preferences.serviceCities)) {
     return false;
   }
 
@@ -404,15 +415,10 @@ function buildFilterOptions(
   const subcategoriesByCategory: Record<string, string[]> = {
     ...catalogFilterOptions.subcategoriesByCategory,
   };
-  const cities = new Set<string>();
 
   jobs.forEach((job) => {
     if (job.selectedServiceCategory) {
       categorySet.add(job.selectedServiceCategory);
-    }
-
-    if (job.city) {
-      cities.add(job.city);
     }
 
     if (!subcategoriesByCategory[job.selectedServiceCategory]) {
@@ -437,9 +443,7 @@ function buildFilterOptions(
       first.localeCompare(second),
     ),
     subcategoriesByCategory,
-    cities: Array.from(cities).sort((first, second) =>
-      first.localeCompare(second),
-    ),
+    cities: serviceAreaCities,
   };
 }
 
@@ -559,6 +563,11 @@ export async function GET(request: NextRequest) {
       0,
       10,
     );
+    const interestedJobsCount = new Set(
+      baseAvailableJobs
+        .filter((job) => job.interestedContractorIds.includes(contractorId))
+        .map((job) => job.parentJobId || job.jobId),
+    ).size;
     const today = getTodayDateString();
     const directActiveJob = hiredJobsSnapshot.docs
       .map((jobSnapshot) => jobSnapshot.data())
@@ -628,6 +637,7 @@ export async function GET(request: NextRequest) {
       newTodayCount: baseAvailableJobs.filter((job) =>
         job.createdAt.startsWith(today),
       ).length,
+      interestedJobsCount,
       availableJobs,
       filters: activePreferences,
       savedFilters: savedPreferences,

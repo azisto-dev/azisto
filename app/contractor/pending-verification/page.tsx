@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
+import NotificationBell from "@/app/components/NotificationBell";
 
 function StatusBar() {
   return (
@@ -38,7 +39,7 @@ export default function ContractorPendingVerificationPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className="flex flex-1 flex-col justify-center">

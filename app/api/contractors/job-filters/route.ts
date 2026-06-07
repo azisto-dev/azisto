@@ -5,13 +5,14 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { sanitizeServiceCities } from "@/lib/serviceAreas";
 
 export const runtime = "nodejs";
 
 type FilterPreferences = {
   categories: string[];
   subcategories: string[];
-  cities: string[];
+  serviceCities: string[];
   urgency: "any" | "flexible" | "this_week" | "urgent";
   sort: "newest" | "urgent";
 };
@@ -19,7 +20,7 @@ type FilterPreferences = {
 const defaultFilterPreferences: FilterPreferences = {
   categories: [],
   subcategories: [],
-  cities: [],
+  serviceCities: [],
   urgency: "any",
   sort: "newest",
 };
@@ -68,7 +69,7 @@ function normalizePreferences(value: unknown): FilterPreferences {
   return {
     categories: readStringList(data.categories),
     subcategories: readStringList(data.subcategories),
-    cities: readStringList(data.cities),
+    serviceCities: sanitizeServiceCities(data.serviceCities ?? data.cities),
     urgency: readUrgency(data.urgency),
     sort: readSort(data.sort),
   };

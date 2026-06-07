@@ -9,6 +9,7 @@ import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 type MessageThread = {
   threadId: string;
@@ -121,7 +122,7 @@ export default function MessagesPage() {
     : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
   const heroClass = isCustomer
     ? "az-customer-card mt-8 bg-gradient-to-br from-white via-blue-50 to-white p-5"
-    : "az-contractor-soft-hero mt-8 p-5";
+    : "az-contractor-soft-hero mt-6 p-4";
   const cardClass = isCustomer ? "az-customer-card" : "az-contractor-card";
   const compactCardClass = isCustomer
     ? "az-customer-card"
@@ -197,24 +198,24 @@ export default function MessagesPage() {
               />
             </Link>
 
-            <span aria-hidden="true" />
+            <NotificationBell />
           </header>
 
           <section className={heroClass}>
             <div className="relative z-10">
-              <p className={`text-lg font-normal leading-6 ${mutedTextClass}`}>
+              <p className={`text-sm font-normal leading-5 ${mutedTextClass}`}>
                 AZISTO inbox
               </p>
               <h1
-                className={`mt-2 text-4xl font-normal uppercase leading-none tracking-[0.04em] ${primaryTextClass}`}
+                className={`mt-1 text-3xl font-normal uppercase leading-none tracking-[0.04em] ${primaryTextClass}`}
               >
                 Messages
               </h1>
-              <p className={`mt-12 text-sm font-semibold leading-6 ${mutedTextClass}`}>
+              <p className={`mt-5 text-sm font-semibold leading-5 ${mutedTextClass}`}>
                 Conversations about your AZISTO job requests will appear here.
               </p>
               <span
-                className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${softChipClass}`}
+                className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${softChipClass}`}
               >
                 {threads.length} thread{threads.length === 1 ? "" : "s"}
               </span>

@@ -4,6 +4,10 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import {
+  matchesServiceCity,
+  sanitizeServiceCities,
+} from "@/lib/serviceAreas";
 
 export const runtime = "nodejs";
 
@@ -102,7 +106,7 @@ function getErrorDetails(error: unknown) {
   return { code, message };
 }
 
-async function hasContractorProfile(firebaseUid: string) {
+async function findContractorProfile(firebaseUid: string) {
   const contractorsCollection = adminDb.collection("contractors");
   const authUidSnapshot = await contractorsCollection
     .where("authUid", "==", firebaseUid)
@@ -110,7 +114,7 @@ async function hasContractorProfile(firebaseUid: string) {
     .get();
 
   if (!authUidSnapshot.empty) {
-    return true;
+    return authUidSnapshot.docs[0];
   }
 
   const legacyFirebaseUidSnapshot = await contractorsCollection
@@ -119,14 +123,14 @@ async function hasContractorProfile(firebaseUid: string) {
     .get();
 
   if (!legacyFirebaseUidSnapshot.empty) {
-    return true;
+    return legacyFirebaseUidSnapshot.docs[0];
   }
 
   const legacyDocumentSnapshot = await contractorsCollection
     .doc(firebaseUid)
     .get();
 
-  return legacyDocumentSnapshot.exists;
+  return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
 async function serializeJob(data: Record<string, unknown>) {
@@ -226,9 +230,9 @@ export async function GET(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
-    const isContractor = await hasContractorProfile(decodedToken.uid);
+    const contractorProfile = await findContractorProfile(decodedToken.uid);
 
-    if (!isContractor) {
+    if (!contractorProfile) {
       return NextResponse.json(
         {
           code: "contractor-profile-required",
@@ -238,6 +242,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const savedPreferences = contractorProfile.get("jobFilterPreferences");
+    const preferencesData =
+      typeof savedPreferences === "object" && savedPreferences !== null
+        ? (savedPreferences as Record<string, unknown>)
+        : {};
+    const serviceCities = sanitizeServiceCities(
+      preferencesData.serviceCities ?? preferencesData.cities,
+    );
     const openJobsSnapshot = await adminDb
       .collection("jobs")
       .where("status", "==", "open")
@@ -272,9 +284,12 @@ export async function GET(request: NextRequest) {
           );
         }),
       )
-    ).flat().sort((firstJob, secondJob) =>
-      secondJob.createdAt.localeCompare(firstJob.createdAt),
-    );
+    )
+      .flat()
+      .filter((job) => matchesServiceCity(job.city, serviceCities))
+      .sort((firstJob, secondJob) =>
+        secondJob.createdAt.localeCompare(firstJob.createdAt),
+      );
 
     return NextResponse.json({ ok: true, jobs });
   } catch (error) {

@@ -415,10 +415,10 @@ body {
   }
 
   .az-message-bubble-outgoing {
-    border: 1px solid rgb(98 0 51 / 0.7);
-    background: linear-gradient(135deg, #5C0032, #7A003C);
-    box-shadow: 0 6px 16px rgb(98 0 51 / 0.18);
-    color: white;
+    border: 1px solid rgb(92 0 50 / 0.34);
+    background: rgb(122 0 60 / 0.1);
+    box-shadow: 0 4px 14px rgb(92 0 50 / 0.1);
+    color: #5C0032;
   }
 
   .az-message-bubble-incoming {
