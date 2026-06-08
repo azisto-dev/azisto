@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -14,6 +15,12 @@ import {
   sanitizeServiceCities,
   serviceAreaCities,
 } from "@/lib/serviceAreas";
+import { createNotification } from "@/lib/notifications";
+import {
+  getMatchingContractorSubcategories,
+  hasActiveContractorSubscription,
+  isContractorEligibleForJobNotifications,
+} from "@/lib/contractorJobMatching";
 
 export const runtime = "nodejs";
 
@@ -447,6 +454,142 @@ function buildFilterOptions(
   };
 }
 
+async function backfillRecentMatchingJobNotifications(input: {
+  contractorProfile: FirebaseFirestore.DocumentSnapshot;
+  contractorId: string;
+  recipientAuthUid: string;
+  availableJobs: Array<Awaited<ReturnType<typeof serializeAvailableJob>>>;
+  serviceCities: string[];
+}) {
+  const contractorData = input.contractorProfile.data() ?? {};
+
+  if (
+    !input.recipientAuthUid ||
+    !isContractorEligibleForJobNotifications(contractorData) ||
+    !hasActiveContractorSubscription(contractorData)
+  ) {
+    return 0;
+  }
+
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const lastBackfilledJobId = readText(
+    contractorData.lastMatchingNotificationBackfillJobId,
+  );
+  const matchingJobs = new Map<
+    string,
+    {
+      jobId: string;
+      createdAt: string;
+      serviceCategory: string;
+      subcategories: Set<string>;
+      taskIds: Set<string>;
+    }
+  >();
+
+  input.availableJobs.forEach((job) => {
+    const createdAtTime = Date.parse(job.createdAt);
+
+    if (!Number.isFinite(createdAtTime) || createdAtTime < oneDayAgo) {
+      return;
+    }
+
+    if (!matchesServiceCity(job.city, input.serviceCities)) {
+      return;
+    }
+
+    const matchingSubcategories = getMatchingContractorSubcategories(
+      contractorData,
+      job.selectedServiceCategory,
+      job.selectedSubcategories,
+    );
+
+    if (matchingSubcategories.length === 0) {
+      return;
+    }
+
+    const parentJobId = job.parentJobId || job.jobId;
+    const existingJob =
+      matchingJobs.get(parentJobId) ??
+      {
+        jobId: parentJobId,
+        createdAt: job.createdAt,
+        serviceCategory: job.selectedServiceCategory,
+        subcategories: new Set<string>(),
+        taskIds: new Set<string>(),
+      };
+
+    matchingSubcategories.forEach((subcategory) =>
+      existingJob.subcategories.add(subcategory),
+    );
+
+    if (job.taskId) {
+      existingJob.taskIds.add(job.taskId);
+    }
+
+    if (job.createdAt > existingJob.createdAt) {
+      existingJob.createdAt = job.createdAt;
+    }
+
+    matchingJobs.set(parentJobId, existingJob);
+  });
+
+  const sortedMatchingJobs = Array.from(matchingJobs.values()).sort(
+    (firstJob, secondJob) =>
+      secondJob.createdAt.localeCompare(firstJob.createdAt),
+  );
+  const lastBackfilledIndex = lastBackfilledJobId
+    ? sortedMatchingJobs.findIndex((job) => job.jobId === lastBackfilledJobId)
+    : -1;
+  const jobsToBackfill = (
+    lastBackfilledIndex >= 0
+      ? sortedMatchingJobs.slice(0, lastBackfilledIndex)
+      : sortedMatchingJobs
+  ).slice(0, 5);
+
+  if (jobsToBackfill.length === 0) {
+    return 0;
+  }
+
+  let createdCount = 0;
+
+  for (const job of jobsToBackfill) {
+    const created = await createNotification({
+      dedupeKey: `new_matching_job_${job.jobId}_${input.contractorId}`,
+      recipientAuthUid: input.recipientAuthUid,
+      recipientRole: "contractor",
+      type: "new_matching_job",
+      title: "New matching job",
+      message: `${job.serviceCategory} job posted near your service area.`,
+      jobId: job.jobId,
+      data: {
+        taskIds: Array.from(job.taskIds),
+        serviceCategory: job.serviceCategory,
+        subcategories: Array.from(job.subcategories),
+      },
+    });
+
+    console.log("CONTRACTOR ID", input.contractorId);
+    if (created) {
+      createdCount += 1;
+      console.log("NOTIFICATION CREATED", {
+        jobId: job.jobId,
+        contractorId: input.contractorId,
+        source: "contractor-home-backfill",
+      });
+    }
+  }
+
+  await input.contractorProfile.ref.set(
+    {
+      lastMatchingNotificationBackfillJobId: jobsToBackfill[0].jobId,
+      lastMatchingNotificationBackfillAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return createdCount;
+}
+
 async function getUnreadMessagesCount(firebaseUid: string) {
   const threadsSnapshot = await adminDb
     .collection("messages")
@@ -563,6 +706,22 @@ export async function GET(request: NextRequest) {
       0,
       10,
     );
+    let matchingNotificationsCreated = 0;
+
+    try {
+      matchingNotificationsCreated = await backfillRecentMatchingJobNotifications(
+        {
+          contractorProfile,
+          contractorId,
+          recipientAuthUid: decodedToken.uid,
+          availableJobs: baseAvailableJobs,
+          serviceCities: savedPreferences.serviceCities,
+        },
+      );
+    } catch (error) {
+      console.error("Matching notification backfill failed:", error);
+    }
+
     const interestedJobsCount = new Set(
       baseAvailableJobs
         .filter((job) => job.interestedContractorIds.includes(contractorId))
@@ -642,6 +801,7 @@ export async function GET(request: NextRequest) {
       filters: activePreferences,
       savedFilters: savedPreferences,
       filterOptions,
+      matchingNotificationsCreated,
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {

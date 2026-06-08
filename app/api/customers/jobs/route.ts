@@ -4,6 +4,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { readJobProofPhotos } from "@/lib/jobProofPhotos";
 
 export const runtime = "nodejs";
 
@@ -119,6 +120,8 @@ function serializeJob(data: Record<string, unknown>) {
     hiredContractorId: readText(data.hiredContractorId),
     hiredContractorName: readText(data.hiredContractorName),
     hiredBusinessName: readText(data.hiredBusinessName),
+    beforePhotos: readJobProofPhotos(data.beforePhotos),
+    afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -134,6 +137,8 @@ function serializeTask(data: Record<string, unknown>) {
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
     hiredContractorId: readText(data.hiredContractorId),
     hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
+    beforePhotos: readJobProofPhotos(data.beforePhotos),
+    afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };

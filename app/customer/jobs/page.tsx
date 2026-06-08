@@ -20,6 +20,8 @@ import {
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 import NotificationBell from "@/app/components/NotificationBell";
+import JobProofGallery from "@/app/components/JobProofGallery";
+import type { JobProofPhoto } from "@/lib/jobProofPhotos";
 
 type CustomerJob = {
   jobId: string;
@@ -42,6 +44,8 @@ type CustomerJob = {
   hiredContractorName: string;
   hiredBusinessName: string;
   createdAt: string;
+  beforePhotos: JobProofPhoto[];
+  afterPhotos: JobProofPhoto[];
   tasks?: CustomerJobTask[];
 };
 
@@ -54,6 +58,8 @@ type CustomerJobTask = {
   contractorDecisionStatus?: string;
   hiredContractorId: string;
   hiredContractorAuthUid: string;
+  beforePhotos: JobProofPhoto[];
+  afterPhotos: JobProofPhoto[];
   createdAt: string;
 };
 
@@ -676,6 +682,12 @@ export default function CustomerJobsPage() {
                     </p>
                   ) : null}
                 </div>
+
+                <JobProofGallery
+                  beforePhotos={job.beforePhotos}
+                  afterPhotos={job.afterPhotos}
+                  tasks={job.tasks}
+                />
 
                 <div className="mt-4 grid gap-2">
                   {(job.status === "open" ||

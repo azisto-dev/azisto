@@ -237,6 +237,7 @@ export async function GET(request: NextRequest) {
       .where("hiredContractorIds", "array-contains", contractorId)
       .get();
     const jobsById = new Map<string, Awaited<ReturnType<typeof serializeJob>>>();
+    const assignedParentJobIds = new Set<string>();
 
     for (const documentSnapshot of hiredJobsSnapshot.docs) {
       jobsById.set(
@@ -273,13 +274,20 @@ export async function GET(request: NextRequest) {
       if (hasAssignedTask) {
         const parentJobId =
           readText(parentSnapshot.get("jobId")) || parentSnapshot.id;
+        assignedParentJobIds.add(parentJobId);
         jobsById.delete(parentSnapshot.id);
         jobsById.delete(parentJobId);
       }
     }
 
     for (const jobSnapshot of interestedSnapshot.docs) {
-      if (jobsById.has(jobSnapshot.id)) {
+      const parentJobId =
+        readText(jobSnapshot.get("jobId")) || jobSnapshot.id;
+
+      if (
+        jobsById.has(jobSnapshot.id) ||
+        assignedParentJobIds.has(parentJobId)
+      ) {
         continue;
       }
 
@@ -299,6 +307,10 @@ export async function GET(request: NextRequest) {
       let hasInterestedTask = false;
 
       for (const taskSnapshot of tasksSnapshot.docs) {
+        const taskStatus = readText(taskSnapshot.get("status"));
+        const taskHiredContractorId = readText(
+          taskSnapshot.get("hiredContractorId"),
+        );
         const taskContractorIds = readStringList(
           taskSnapshot.get("interestedContractorIds"),
         );
@@ -310,6 +322,10 @@ export async function GET(request: NextRequest) {
           !taskContractorIds.includes(contractorId) &&
           !taskContractorAuthUids.includes(decodedToken.uid)
         ) {
+          continue;
+        }
+
+        if (taskStatus !== "open" || taskHiredContractorId) {
           continue;
         }
 

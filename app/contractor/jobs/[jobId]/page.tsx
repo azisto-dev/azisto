@@ -4,9 +4,22 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Check, ChevronDown, ChevronLeft, Flag, MapPin, X } from "lucide-react";
-import { auth } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Flag,
+  MapPin,
+  X,
+} from "lucide-react";
+import { auth, storage } from "@/lib/firebase";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
+import {
+  ENABLE_JOB_PHOTO_ENFORCEMENT,
+  type JobProofPhoto,
+} from "@/lib/jobProofPhotos";
 import { getJobStatusLabel } from "@/lib/jobStatus";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
@@ -56,6 +69,8 @@ type ContractorJobDetail = {
   isAssignedToCurrentContractor?: boolean;
   assignedTaskIds?: string[];
   contractorAssignedStatus?: string;
+  beforePhotos: JobProofPhoto[];
+  afterPhotos: JobProofPhoto[];
   tasks?: JobTask[];
 };
 
@@ -70,6 +85,8 @@ type JobTask = {
   contractorDecisionStatus?: string;
   interestedContractorIds: string[];
   contractorServiceMatch?: boolean;
+  beforePhotos: JobProofPhoto[];
+  afterPhotos: JobProofPhoto[];
 };
 
 function StatusBar() {
@@ -264,6 +281,93 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
   }
 }
 
+function getOptionalLocation() {
+  return new Promise<{ lat: number | null; lng: number | null }>((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ lat: null, lng: null });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }),
+      () => resolve({ lat: null, lng: null }),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60000,
+        timeout: 8000,
+      },
+    );
+  });
+}
+
+async function uploadJobProofPhoto(
+  user: User,
+  jobId: string,
+  taskId: string,
+  type: "before" | "after",
+  file: File,
+) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please take an image using your camera.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Job photos must be 5MB or smaller.");
+  }
+
+  const safeFileName =
+    file.name.replace(/[^a-zA-Z0-9._-]/g, "-") || "job-photo.jpg";
+  const storagePath = `jobProofPhotos/${jobId}/${taskId || "parent"}/${type}/${Date.now()}-${safeFileName}`;
+  const storageReference = ref(storage, storagePath);
+  const location = await getOptionalLocation();
+
+  await uploadBytes(storageReference, file, {
+    contentType: file.type,
+    customMetadata: {
+      source: "camera",
+      proofType: type,
+      jobId,
+      taskId: taskId || "parent",
+    },
+  });
+
+  const url = await getDownloadURL(storageReference);
+  const token = await user.getIdToken();
+  const response = await fetch(
+    `/api/jobs/${encodeURIComponent(jobId)}/photos`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        taskId: taskId || undefined,
+        type,
+        url,
+        storagePath,
+        lat: location.lat,
+        lng: location.lng,
+      }),
+    },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : "Unable to save this job photo.",
+    );
+  }
+}
+
 async function submitContractorDecision(
   user: User,
   jobId: string,
@@ -320,10 +424,13 @@ export default function ContractorJobDetailPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [interestMessage, setInterestMessage] = useState("");
   const [lifecycleMessage, setLifecycleMessage] = useState("");
+  const [isLifecycleError, setIsLifecycleError] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [isMessagePromptOpen, setIsMessagePromptOpen] = useState(false);
   const [isRejectPromptOpen, setIsRejectPromptOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [uploadingPhotoKey, setUploadingPhotoKey] = useState("");
+  const [photoMessage, setPhotoMessage] = useState("");
   const selectedReportReason =
     reportReasonOptions.find((option) => option.value === reportReason) ??
     { value: "other", label: "Other" };
@@ -450,10 +557,12 @@ export default function ContractorJobDetailPage() {
     try {
       setIsUpdatingStatus(true);
       setLifecycleMessage("");
+      setIsLifecycleError(false);
       await updateJobStatus(currentUser, jobId, status);
       await loadJob(currentUser);
       setLifecycleMessage(successMessage);
     } catch (error) {
+      setIsLifecycleError(true);
       setLifecycleMessage(getErrorMessage(error));
     } finally {
       setIsUpdatingStatus(false);
@@ -470,6 +579,7 @@ export default function ContractorJobDetailPage() {
     try {
       setIsUpdatingStatus(true);
       setLifecycleMessage("");
+      setIsLifecycleError(false);
       await submitContractorDecision(
         currentUser,
         jobId,
@@ -485,6 +595,7 @@ export default function ContractorJobDetailPage() {
           : "Job declined. It is available to other contractors again.",
       );
     } catch (error) {
+      setIsLifecycleError(true);
       setLifecycleMessage(getErrorMessage(error));
     } finally {
       setIsUpdatingStatus(false);
@@ -507,6 +618,32 @@ export default function ContractorJobDetailPage() {
       setReportMessage(getErrorMessage(error));
     } finally {
       setIsSubmittingReport(false);
+    }
+  }
+
+  async function handlePhotoCapture(
+    file: File | undefined,
+    type: "before" | "after",
+    taskId: string,
+  ) {
+    if (!currentUser || !file || uploadingPhotoKey) {
+      return;
+    }
+
+    const uploadKey = `${taskId || "parent"}-${type}`;
+
+    try {
+      setUploadingPhotoKey(uploadKey);
+      setPhotoMessage("");
+      await uploadJobProofPhoto(currentUser, jobId, taskId, type, file);
+      await loadJob(currentUser);
+      setPhotoMessage(
+        `${type === "before" ? "Before" : "After"} photo saved as verified job proof.`,
+      );
+    } catch (error) {
+      setPhotoMessage(getErrorMessage(error));
+    } finally {
+      setUploadingPhotoKey("");
     }
   }
 
@@ -668,6 +805,151 @@ export default function ContractorJobDetailPage() {
                 </p>
               </section>
 
+              {job.isAssignedToCurrentContractor ? (
+                <section className="az-contractor-card mt-5 p-4">
+                  <div>
+                    <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
+                      Verified job photos
+                    </p>
+                    {ENABLE_JOB_PHOTO_ENFORCEMENT ? (
+                      <p className="mt-1 text-xs leading-5 text-[var(--azisto-contractor-muted)]">
+                        Take at least one before photo before starting and one
+                        after photo before completing. Three photos are
+                        recommended.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs leading-5 text-[var(--azisto-contractor-muted)]">
+                        Job photos are optional during temporary testing mode.
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs leading-5 text-[var(--azisto-contractor-muted)]">
+                      Location may be saved with job photos for trust and
+                      safety.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    {(job.tasks && job.tasks.length > 0
+                      ? job.tasks
+                      : [
+                          {
+                            taskId: "",
+                            subcategory:
+                              job.selectedServiceCategory || "Assigned job",
+                            status: job.contractorAssignedStatus || job.status,
+                            beforePhotos: job.beforePhotos ?? [],
+                            afterPhotos: job.afterPhotos ?? [],
+                          },
+                        ]
+                    ).map((proofTarget) => (
+                      <div
+                        key={proofTarget.taskId || job.jobId}
+                        className="rounded-[20px] border border-[var(--azisto-contractor-border)] bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,0.05)]"
+                      >
+                        <p className="text-xs font-bold text-[var(--azisto-contractor-text)]">
+                          {proofTarget.subcategory || "Assigned task"}
+                        </p>
+                        {(["before", "after"] as const).map((type) => {
+                          const photos =
+                            type === "before"
+                              ? proofTarget.beforePhotos ?? []
+                              : proofTarget.afterPhotos ?? [];
+                          const uploadKey = `${proofTarget.taskId || "parent"}-${type}`;
+                          const canTakePhoto =
+                            type === "before"
+                              ? [
+                                  "accepted",
+                                  "hired",
+                                  "on_the_way",
+                                  "in_progress",
+                                ].includes(proofTarget.status)
+                              : ["in_progress", "completed"].includes(
+                                  proofTarget.status,
+                                );
+
+                          return (
+                            <div key={type} className="mt-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs font-bold capitalize text-[var(--azisto-contractor-text)]">
+                                    {type} photos
+                                  </p>
+                                  <p className="text-[10px] text-[var(--azisto-contractor-muted)]">
+                                    {photos.length} saved ·{" "}
+                                    {ENABLE_JOB_PHOTO_ENFORCEMENT
+                                      ? "minimum 1"
+                                      : "optional"}
+                                  </p>
+                                </div>
+                                <label
+                                  className={`az-btn-contractor-outline flex min-h-9 items-center gap-2 rounded-full px-3 text-[11px] font-bold ${
+                                    canTakePhoto
+                                      ? "cursor-pointer"
+                                      : "cursor-not-allowed opacity-50"
+                                  }`}
+                                >
+                                  <Camera aria-hidden="true" className="h-3.5 w-3.5" />
+                                  {uploadingPhotoKey === uploadKey
+                                    ? "Saving..."
+                                    : `Take ${type} photo`}
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    disabled={
+                                      Boolean(uploadingPhotoKey) || !canTakePhoto
+                                    }
+                                    className="sr-only"
+                                    onChange={(event) => {
+                                      const file = event.target.files?.[0];
+                                      event.target.value = "";
+                                      void handlePhotoCapture(
+                                        file,
+                                        type,
+                                        proofTarget.taskId,
+                                      );
+                                    }}
+                                  />
+                                </label>
+                              </div>
+
+                              {photos.length > 0 ? (
+                                <div className="mt-2 grid grid-cols-3 gap-2">
+                                  {photos.map((photo) => (
+                                    <a
+                                      key={photo.storagePath}
+                                      href={photo.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="overflow-hidden rounded-xl border border-[var(--azisto-contractor-border)] bg-slate-50"
+                                    >
+                                      <img
+                                        src={photo.url}
+                                        alt={`Verified ${type} job photo`}
+                                        className="aspect-square w-full object-cover"
+                                      />
+                                      <span className="block truncate px-1.5 py-1 text-[9px] font-bold text-[var(--azisto-contractor-burgundy)]">
+                                        Verified job photo
+                                      </span>
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {photoMessage ? (
+                    <p className="mt-3 rounded-xl border border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--azisto-contractor-text)]">
+                      {photoMessage}
+                    </p>
+                  ) : null}
+                </section>
+              ) : null}
+
               <section className="az-contractor-card mt-5 p-4">
                 <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">Service address</p>
                 <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
@@ -808,7 +1090,13 @@ export default function ContractorJobDetailPage() {
               ) : null}
 
               {lifecycleMessage ? (
-                <p className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
+                <p
+                  className={`mt-5 rounded-xl border px-4 py-3 text-sm leading-6 ${
+                    isLifecycleError
+                      ? "border-red-100 bg-red-50 text-red-700"
+                      : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                  }`}
+                >
                   {lifecycleMessage}
                 </p>
               ) : null}

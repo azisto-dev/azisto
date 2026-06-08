@@ -4,6 +4,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { readJobProofPhotos } from "@/lib/jobProofPhotos";
 
 export const runtime = "nodejs";
 
@@ -75,6 +76,8 @@ function serializeJob(data: Record<string, unknown>) {
     preferredTimeWindow: readText(data.preferredTimeWindow),
     urgency: readText(data.urgency),
     schedule: readSchedule(data.schedule),
+    beforePhotos: readJobProofPhotos(data.beforePhotos),
+    afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
   };
 }

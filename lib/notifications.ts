@@ -9,25 +9,45 @@ type CreateNotificationInput = {
   message: string;
   jobId: string;
   threadId?: string;
+  dedupeKey?: string;
+  data?: Record<string, unknown>;
 };
 
 export async function createNotification(input: CreateNotificationInput) {
   if (!input.recipientAuthUid) {
-    return;
+    return false;
   }
 
-  const notificationDocument = adminDb.collection("notifications").doc();
+  const notificationDocument = input.dedupeKey
+    ? adminDb.collection("notifications").doc(input.dedupeKey)
+    : adminDb.collection("notifications").doc();
+  let created = false;
 
-  await notificationDocument.set({
-    notificationId: notificationDocument.id,
-    recipientAuthUid: input.recipientAuthUid,
-    recipientRole: input.recipientRole,
-    type: input.type,
-    title: input.title,
-    message: input.message,
-    jobId: input.jobId,
-    threadId: input.threadId ?? "",
-    read: false,
-    createdAt: FieldValue.serverTimestamp(),
+  await adminDb.runTransaction(async (transaction) => {
+    if (input.dedupeKey) {
+      const existingNotification = await transaction.get(notificationDocument);
+
+      if (existingNotification.exists) {
+        return;
+      }
+    }
+
+    transaction.set(notificationDocument, {
+      notificationId: notificationDocument.id,
+      recipientAuthUid: input.recipientAuthUid,
+      recipientRole: input.recipientRole,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      jobId: input.jobId,
+      threadId: input.threadId ?? "",
+      read: false,
+      clearedAt: null,
+      ...(input.data ?? {}),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    created = true;
   });
+
+  return created;
 }

@@ -5,6 +5,7 @@ import {
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
 import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
+import { readJobProofPhotos } from "@/lib/jobProofPhotos";
 
 export const runtime = "nodejs";
 
@@ -193,6 +194,8 @@ async function serializeJob(data: Record<string, unknown>) {
     hiredBusinessName:
       typeof data.hiredBusinessName === "string" ? data.hiredBusinessName : "",
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
+    beforePhotos: readJobProofPhotos(data.beforePhotos),
+    afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -212,6 +215,8 @@ function serializeTask(data: Record<string, unknown>) {
     interestedContractorAuthUids: readStringList(
       data.interestedContractorAuthUids,
     ),
+    beforePhotos: readJobProofPhotos(data.beforePhotos),
+    afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -322,6 +327,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
             hiredContractorAuthUid: "",
             interestedContractorIds: [],
             interestedContractorAuthUids: [],
+            beforePhotos: [],
+            afterPhotos: [],
             createdAt: job.createdAt,
             updatedAt: job.updatedAt,
             contractorServiceMatch: canPerformTask(contractorData, {

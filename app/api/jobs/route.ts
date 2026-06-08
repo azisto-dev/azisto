@@ -7,6 +7,12 @@ import {
 } from "@/lib/firebaseAdmin";
 import { ensureUniqueReadableId } from "@/lib/readableIds";
 import { calculateRiskScore, hasBlockedSpamText } from "@/lib/riskScore";
+import { createNotification } from "@/lib/notifications";
+import {
+  getMatchingContractorSubcategories,
+  hasActiveContractorSubscription,
+  isContractorEligibleForJobNotifications,
+} from "@/lib/contractorJobMatching";
 import {
   matchesServiceCity,
   sanitizeServiceCities,
@@ -78,74 +84,19 @@ function getContractorAuthUid(data: Record<string, unknown>) {
   return readText(data.authUid) || readText(data.firebaseUid);
 }
 
-function isApprovedContractor(data: Record<string, unknown>) {
-  const verificationStatus = readText(data.verificationStatus).toLowerCase();
-  const accountStatus = readText(data.accountStatus).toLowerCase();
-
-  return (
-    ["approved", "verified", "active"].includes(verificationStatus) &&
-    (!accountStatus || accountStatus === "active")
-  );
-}
-
-function getContractorServices(data: Record<string, unknown>) {
-  const selectedServices = readStringList(data.selectedServices);
-  const legacyServices = Array.isArray(data.servicesOffered)
-    ? readStringList(data.servicesOffered)
-    : readText(data.servicesOffered)
-        .split(",")
-        .map((service) => service.trim())
-        .filter(Boolean);
-
-  return new Set([...selectedServices, ...legacyServices]);
-}
-
-function getMatchingSubcategories(
-  data: Record<string, unknown>,
-  category: string,
-  subcategories: string[],
-) {
-  const selectedServices = getContractorServices(data);
-  const savedByService = readStringRecord(
-    data.selectedSubcategoriesByService ?? data.serviceSubcategories,
-  );
-  const savedSubcategories = readStringList(savedByService[category]);
-  const directlySelectedSubcategories = subcategories.filter((subcategory) =>
-    selectedServices.has(subcategory),
-  );
-
-  if (!selectedServices.has(category) && directlySelectedSubcategories.length === 0) {
-    return [];
-  }
-
-  if (savedSubcategories.length === 0) {
-    return selectedServices.has(category)
-      ? subcategories
-      : directlySelectedSubcategories;
-  }
-
-  return subcategories.filter((subcategory) =>
-    savedSubcategories.includes(subcategory),
-  );
-}
-
 async function notifyMatchingContractors(input: {
   jobId: string;
   jobCity: string;
   serviceCategory: string;
   taskSubcategories: string[];
 }) {
-  const contractorsSnapshot = await adminDb
-    .collection("contractors")
-    .limit(100)
-    .get();
-  const notificationBatch = adminDb.batch();
-  let notificationCount = 0;
-
-  contractorsSnapshot.docs.forEach((contractorSnapshot) => {
+  const contractorsSnapshot = await adminDb.collection("contractors").get();
+  const matches = contractorsSnapshot.docs.flatMap((contractorSnapshot) => {
     const contractorData = contractorSnapshot.data() ?? {};
     const recipientAuthUid = getContractorAuthUid(contractorData);
-    const matchingSubcategories = getMatchingSubcategories(
+    const contractorId =
+      readText(contractorData.contractorId) || contractorSnapshot.id;
+    const matchingSubcategories = getMatchingContractorSubcategories(
       contractorData,
       input.serviceCategory,
       input.taskSubcategories,
@@ -159,11 +110,12 @@ async function notifyMatchingContractors(input: {
 
     if (
       !recipientAuthUid ||
-      !isApprovedContractor(contractorData) ||
+      !isContractorEligibleForJobNotifications(contractorData) ||
+      !hasActiveContractorSubscription(contractorData) ||
       matchingSubcategories.length === 0 ||
       !matchesServiceCity(input.jobCity, serviceCities)
     ) {
-      return;
+      return [];
     }
 
     const matchingTaskIds = input.taskSubcategories.flatMap(
@@ -172,30 +124,47 @@ async function notifyMatchingContractors(input: {
           ? [`${input.jobId}-${index + 1}`]
           : [],
     );
-    const notificationDocument = adminDb.collection("notifications").doc();
-
-    notificationBatch.set(notificationDocument, {
-      notificationId: notificationDocument.id,
-      recipientAuthUid,
-      recipientRole: "contractor",
-      type: "new_matching_job",
-      title: "New matching job",
-      message: `${input.serviceCategory} job posted near your service area.`,
-      jobId: input.jobId,
-      taskIds: matchingTaskIds,
-      serviceCategory: input.serviceCategory,
-      subcategories: matchingSubcategories,
-      threadId: "",
-      read: false,
-      clearedAt: null,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    notificationCount += 1;
+    return [
+      {
+        contractorId,
+        recipientAuthUid,
+        matchingSubcategories,
+        matchingTaskIds,
+      },
+    ];
   });
 
-  if (notificationCount > 0) {
-    await notificationBatch.commit();
-  }
+  console.log("MATCHING CONTRACTORS FOUND", {
+    jobId: input.jobId,
+    count: matches.length,
+  });
+
+  await Promise.all(
+    matches.map(async (match) => {
+      const created = await createNotification({
+        dedupeKey: `new_matching_job_${input.jobId}_${match.contractorId}`,
+        recipientAuthUid: match.recipientAuthUid,
+        recipientRole: "contractor",
+        type: "new_matching_job",
+        title: "New matching job",
+        message: `${input.serviceCategory} job posted near your service area.`,
+        jobId: input.jobId,
+        data: {
+          taskIds: match.matchingTaskIds,
+          serviceCategory: input.serviceCategory,
+          subcategories: match.matchingSubcategories,
+        },
+      });
+
+      console.log("CONTRACTOR ID", match.contractorId);
+      if (created) {
+        console.log("NOTIFICATION CREATED", {
+          jobId: input.jobId,
+          contractorId: match.contractorId,
+        });
+      }
+    }),
+  );
 }
 
 function readSubcategoryGroups(value: unknown) {
@@ -593,6 +562,12 @@ export async function POST(request: NextRequest) {
     });
 
     await batch.commit();
+    console.log("JOB CREATED", {
+      jobId,
+      category: selectedServiceCategory,
+      subcategories: taskSubcategories,
+      city: locationMode === "manual" ? city : "",
+    });
     await customerProfile.ref.set(
       {
         emailVerified,
@@ -616,6 +591,20 @@ export async function POST(request: NextRequest) {
           jobId,
           notificationError,
         });
+
+        try {
+          await notifyMatchingContractors({
+            jobId,
+            jobCity: locationMode === "manual" ? city : "",
+            serviceCategory: selectedServiceCategory,
+            taskSubcategories,
+          });
+        } catch (retryError) {
+          console.error("Matching contractor notification retry failed:", {
+            jobId,
+            retryError,
+          });
+        }
       }
     }
 

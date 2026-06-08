@@ -19,6 +19,14 @@ type InterestRequestBody = {
   taskIds?: unknown;
 };
 
+const activeContractorStatuses = new Set([
+  "hired_pending_contractor",
+  "accepted",
+  "hired",
+  "on_the_way",
+  "in_progress",
+]);
+
 function getBearerToken(authorizationHeader: string | null) {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return "";
@@ -465,6 +473,121 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { code, message } = getErrorDetails(error);
 
     console.error("Contractor job interest API failed:", {
+      code,
+      message,
+      error,
+    });
+
+    return NextResponse.json(
+      {
+        code,
+        message,
+      },
+      { status: code === "missing-token" ? 401 : 500 },
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    assertFirebaseAdminConfig();
+
+    const token = getBearerToken(request.headers.get("authorization"));
+
+    if (!token) {
+      return NextResponse.json(
+        {
+          code: "missing-token",
+          message: "Please sign in again.",
+        },
+        { status: 401 },
+      );
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const contractorProfile = await findContractorProfile(decodedToken.uid);
+
+    if (!contractorProfile) {
+      return NextResponse.json(
+        {
+          code: "contractor-profile-required",
+          message: "Please use a contractor account to update job interest.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const { jobId } = await context.params;
+    const contractorId =
+      readText(contractorProfile.get("contractorId")) || contractorProfile.id;
+    const jobDocument = adminDb.collection("jobs").doc(jobId);
+    const [jobSnapshot, tasksSnapshot] = await Promise.all([
+      jobDocument.get(),
+      jobDocument.collection("tasks").get(),
+    ]);
+
+    if (!jobSnapshot.exists) {
+      return NextResponse.json(
+        {
+          code: "job-not-found",
+          message: "This job is no longer available.",
+        },
+        { status: 404 },
+      );
+    }
+
+    const contractorHasAcceptedTask = tasksSnapshot.docs.some(
+      (taskSnapshot) =>
+        readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
+        activeContractorStatuses.has(readText(taskSnapshot.get("status"))),
+    );
+    const contractorHasAcceptedParent =
+      readText(jobSnapshot.get("hiredContractorId")) === contractorId &&
+      activeContractorStatuses.has(readText(jobSnapshot.get("status")));
+
+    if (contractorHasAcceptedTask || contractorHasAcceptedParent) {
+      return NextResponse.json(
+        {
+          code: "job-already-accepted",
+          message:
+            "Accepted jobs are managed from the Active Jobs tab in your dashboard.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const batch = adminDb.batch();
+
+    batch.update(jobDocument, {
+      interestedContractorIds: FieldValue.arrayRemove(contractorId),
+      interestedContractorAuthUids: FieldValue.arrayRemove(decodedToken.uid),
+      [`selectedTaskIdsByContractor.${contractorId}`]: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    batch.delete(
+      jobDocument.collection("interestedContractors").doc(contractorId),
+    );
+
+    tasksSnapshot.docs.forEach((taskSnapshot) => {
+      batch.update(taskSnapshot.ref, {
+        interestedContractorIds: FieldValue.arrayRemove(contractorId),
+        interestedContractorAuthUids: FieldValue.arrayRemove(decodedToken.uid),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      batch.delete(
+        taskSnapshot.ref
+          .collection("interestedContractors")
+          .doc(contractorId),
+      );
+    });
+
+    await batch.commit();
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const { code, message } = getErrorDetails(error);
+
+    console.error("Remove contractor job interest API failed:", {
       code,
       message,
       error,

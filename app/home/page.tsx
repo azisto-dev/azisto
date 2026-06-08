@@ -9,7 +9,10 @@ import {
   RotateCw,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { subscribeBadgeCounts } from "@/lib/badgeCounts";
+import {
+  refreshBadgeCountsNow,
+  subscribeBadgeCounts,
+} from "@/lib/badgeCounts";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
 import {
   connectionInterruptedMessage,
@@ -138,6 +141,7 @@ type ContractorHomeData = {
   totalAvailableJobsCount: number;
   newTodayCount: number;
   interestedJobsCount: number;
+  matchingNotificationsCreated: number;
   availableJobs: ContractorHomeJob[];
   filters: ContractorJobFilterPreferences;
   savedFilters: ContractorJobFilterPreferences;
@@ -346,6 +350,9 @@ function readContractorHomeData(value: unknown): ContractorHomeData {
     totalAvailableJobsCount: readNumber(data.totalAvailableJobsCount),
     newTodayCount: readNumber(data.newTodayCount),
     interestedJobsCount: readNumber(data.interestedJobsCount),
+    matchingNotificationsCreated: readNumber(
+      data.matchingNotificationsCreated,
+    ),
     availableJobs: Array.isArray(data.availableJobs)
       ? data.availableJobs.map((job) => {
           const jobData =
@@ -577,7 +584,10 @@ async function fetchContractorHome(
     const data = readContractorHomeData(body);
 
     contractorHomeCache.set(requestKey, {
-      data,
+      data: {
+        ...data,
+        matchingNotificationsCreated: 0,
+      },
       expiresAt: Date.now() + contractorHomeCacheTtlMs,
     });
     lastGlobalContractorHomeSuccessAt = Date.now();
@@ -767,6 +777,9 @@ export default function HomePage() {
       );
       setContractorHome(nextHome);
       setFilterOptions(nextHome.filterOptions);
+      if (nextHome.matchingNotificationsCreated > 0) {
+        await refreshBadgeCountsNow(user, "contractor matching notification");
+      }
       setContractorHomeError("");
       const fetchedAt = Date.now();
       lastSuccessfulContractorFetchAtRef.current = fetchedAt;
@@ -830,6 +843,12 @@ export default function HomePage() {
 
         setContractorHome(nextHome);
         setFilterOptions(nextHome.filterOptions);
+        if (nextHome.matchingNotificationsCreated > 0) {
+          await refreshBadgeCountsNow(
+            user,
+            "contractor matching notification",
+          );
+        }
         const fetchedAt = Date.now();
         lastSuccessfulContractorFetchAtRef.current = fetchedAt;
         setLastSuccessfulContractorFetchAt(fetchedAt);

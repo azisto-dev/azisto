@@ -7,6 +7,7 @@ import {
 } from "@/lib/firebaseAdmin";
 import { createNotification } from "@/lib/notifications";
 import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
+import { ENABLE_JOB_PHOTO_ENFORCEMENT } from "@/lib/jobProofPhotos";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,10 @@ function getBearerToken(authorizationHeader: string | null) {
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readPhotoCount(value: unknown) {
+  return Array.isArray(value) ? value.length : 0;
 }
 
 function getErrorDetails(error: unknown) {
@@ -470,6 +475,48 @@ export async function POST(request: NextRequest, context: RouteContext) {
           );
         }
 
+        if (
+          ENABLE_JOB_PHOTO_ENFORCEMENT &&
+          requestedStatus === "in_progress"
+        ) {
+          const missingBeforePhoto = isLegacyParentAssignment
+            ? readPhotoCount(jobSnapshot.get("beforePhotos")) === 0
+            : targetTasks.some(
+                (taskSnapshot) =>
+                  readPhotoCount(taskSnapshot.get("beforePhotos")) === 0,
+              );
+
+          if (missingBeforePhoto) {
+            throw Object.assign(
+              new Error(
+                "Please take at least one before photo before starting the job.",
+              ),
+              { code: "before-photo-required" },
+            );
+          }
+        }
+
+        if (
+          ENABLE_JOB_PHOTO_ENFORCEMENT &&
+          requestedStatus === "completed"
+        ) {
+          const missingAfterPhoto = isLegacyParentAssignment
+            ? readPhotoCount(jobSnapshot.get("afterPhotos")) === 0
+            : targetTasks.some(
+                (taskSnapshot) =>
+                  readPhotoCount(taskSnapshot.get("afterPhotos")) === 0,
+              );
+
+          if (missingAfterPhoto) {
+            throw Object.assign(
+              new Error(
+                "Please take at least one after photo before completing the job.",
+              ),
+              { code: "after-photo-required" },
+            );
+          }
+        }
+
         historyFromStatus = transitionFromStatus;
         completionContractorId =
           readText(targetTasks[0]?.get("hiredContractorId")) ||
@@ -601,7 +648,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
               : code === "job-access-denied"
                 ? 403
                 : code === "contractor-already-accepted" ||
-                    code === "invalid-status-transition"
+                    code === "invalid-status-transition" ||
+                    code === "before-photo-required" ||
+                    code === "after-photo-required"
                   ? 409
                   : 500,
       },

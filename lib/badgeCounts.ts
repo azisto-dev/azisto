@@ -28,6 +28,7 @@ const badgePollingIntervalMs = 60_000;
 type BadgeSubscriber = (counts: BadgeCounts) => void;
 type BadgeSession = {
   intervalId: ReturnType<typeof setInterval>;
+  refreshListener: () => void;
   subscribers: Set<BadgeSubscriber>;
   user: User;
 };
@@ -161,6 +162,11 @@ async function refreshBadgeSession(user: User, source: string) {
   session?.subscribers.forEach((subscriber) => subscriber(counts));
 }
 
+export async function refreshBadgeCountsNow(user: User, source: string) {
+  badgeCache.delete(user.uid);
+  await refreshBadgeSession(user, source);
+}
+
 export function subscribeBadgeCounts(
   user: User,
   subscriber: BadgeSubscriber,
@@ -182,9 +188,15 @@ export function subscribeBadgeCounts(
 
       void refreshBadgeSession(user, "shared badge interval");
     }, badgePollingIntervalMs);
+    const refreshListener = () => {
+      void refreshBadgeCountsNow(user, "badge refresh event");
+    };
+
+    window.addEventListener("azisto:badges-refresh", refreshListener);
 
     session = {
       intervalId,
+      refreshListener,
       subscribers,
       user,
     };
@@ -211,6 +223,10 @@ export function subscribeBadgeCounts(
 
     if (currentSession.subscribers.size === 0) {
       clearInterval(currentSession.intervalId);
+      window.removeEventListener(
+        "azisto:badges-refresh",
+        currentSession.refreshListener,
+      );
       badgeSessions.delete(user.uid);
     }
   };

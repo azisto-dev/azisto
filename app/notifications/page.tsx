@@ -246,6 +246,7 @@ export default function NotificationsPage() {
     if (currentUser) {
       try {
         await markNotificationsRead(currentUser, notification.notificationId);
+        window.dispatchEvent(new Event("azisto:badges-refresh"));
       } catch (error) {
         console.error("Mark notification read failed:", error);
       }

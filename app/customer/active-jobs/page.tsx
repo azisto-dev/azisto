@@ -14,6 +14,8 @@ import {
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 import NotificationBell from "@/app/components/NotificationBell";
+import JobProofGallery from "@/app/components/JobProofGallery";
+import type { JobProofPhoto } from "@/lib/jobProofPhotos";
 
 type ActiveJob = {
   jobId: string;
@@ -30,7 +32,13 @@ type ActiveJob = {
   preferredTimeWindow: string;
   urgency: string;
   schedule: JobSchedule | null;
-  tasks?: Array<{ status: string }>;
+  beforePhotos: JobProofPhoto[];
+  afterPhotos: JobProofPhoto[];
+  tasks?: Array<{
+    status: string;
+    beforePhotos?: JobProofPhoto[];
+    afterPhotos?: JobProofPhoto[];
+  }>;
 };
 
 function StatusBar() {
@@ -294,6 +302,11 @@ export default function CustomerActiveJobsPage() {
                     ))}
                   </div>
                 ) : null}
+                <JobProofGallery
+                  beforePhotos={job.beforePhotos}
+                  afterPhotos={job.afterPhotos}
+                  tasks={job.tasks}
+                />
                 <div className="mt-4 grid gap-2">
                   <button type="button" onClick={() => handleMessage(job)} disabled={activeJobId === job.jobId} className="az-btn-primary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold">
                     <MessageCircle className="h-4 w-4" /> Message contractor
