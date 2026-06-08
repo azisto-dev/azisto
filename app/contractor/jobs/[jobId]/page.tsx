@@ -442,7 +442,11 @@ export default function ContractorJobDetailPage() {
     const requestedTaskId = searchParams.get("taskId");
     const initialTaskIds =
       requestedTaskId &&
-      openTasks.some((task) => task.taskId === requestedTaskId)
+      openTasks.some(
+        (task) =>
+          task.taskId === requestedTaskId &&
+          task.contractorServiceMatch !== false,
+      )
         ? [requestedTaskId]
         : jobDetails.assignedTaskIds ?? [];
 
@@ -737,6 +741,16 @@ export default function ContractorJobDetailPage() {
                         <button
                           key={task.taskId}
                           type="button"
+                          aria-pressed={isSelected}
+                          aria-label={
+                            canSelectTask
+                              ? `${isSelected ? "Deselect" : "Select"} ${
+                                  task.subcategory || task.category || "task"
+                                }`
+                              : `${
+                                  task.subcategory || task.category || "Task"
+                                } is not in your contractor profile`
+                          }
                           onClick={() => {
                             if (canSelectTask) {
                               toggleSelectedTask(task.taskId);
@@ -747,7 +761,7 @@ export default function ContractorJobDetailPage() {
                             isSelected
                               ? "border-[var(--azisto-contractor-burgundy)] bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-text)]"
                               : "border-[var(--azisto-contractor-border)] bg-[rgb(248_247_252_/_0.9)] text-[var(--azisto-contractor-muted)]"
-                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                          } disabled:cursor-not-allowed`}
                         >
                           <span className="flex min-w-0 items-start gap-3">
                             <span
@@ -771,10 +785,19 @@ export default function ContractorJobDetailPage() {
                               </span>
                             </span>
                           </span>
-                          <span className={`${getStatusChipClass(task.status || "open")} ml-10 self-start whitespace-normal text-left`}>
-                            {task.contractorServiceMatch === false
-                              ? "Not in profile"
-                              : getJobStatusLabel(task.status || "open")}
+                          <span className="ml-10 flex flex-wrap gap-2">
+                            <span
+                              className={`${getStatusChipClass(
+                                task.status || "open",
+                              )} whitespace-normal text-left`}
+                            >
+                              {getJobStatusLabel(task.status || "open")}
+                            </span>
+                            {task.contractorServiceMatch === false ? (
+                              <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                                Not in profile
+                              </span>
+                            ) : null}
                           </span>
                         </button>
                       );

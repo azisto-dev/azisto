@@ -1180,7 +1180,7 @@ export default function HomePage() {
                 {
                   label: "Rating",
                   value: contractorHome?.averageRating ?? 0,
-                  href: "/profile",
+                  href: "/contractor/reviews",
                   className: "border-[var(--azisto-contractor-border)] bg-white/75",
                   labelClassName: "text-black",
                   valueClassName: "text-black",

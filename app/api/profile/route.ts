@@ -91,6 +91,19 @@ function readStringListMap(value: unknown) {
   );
 }
 
+function serializeTimestamp(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+
+  return "";
+}
+
 function getErrorDetails(error: unknown) {
   const code =
     typeof error === "object" && error !== null && "code" in error
@@ -307,14 +320,55 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let serializedProfile: Record<string, unknown> = serializeProfile(
+      userProfile.role,
+      userProfile.snapshot.data() ?? {},
+      decodedToken.email ?? "",
+    );
+
+    if (userProfile.role === "contractor") {
+      const contractorData = userProfile.snapshot.data() ?? {};
+      const contractorId =
+        readText(contractorData.contractorId) || userProfile.snapshot.id;
+      const reviewsSnapshot = await adminDb
+        .collection("reviews")
+        .where("contractorId", "==", contractorId)
+        .get();
+      const recentReviews = reviewsSnapshot.docs
+        .map((reviewSnapshot) => ({
+          reviewId: reviewSnapshot.id,
+          jobId: readText(reviewSnapshot.get("jobId")),
+          rating: readNumber(reviewSnapshot.get("rating")),
+          reviewText: readText(reviewSnapshot.get("reviewText")),
+          tags: readStringList(reviewSnapshot.get("tags")),
+          subcategory: readText(reviewSnapshot.get("subcategory")),
+          createdAt: serializeTimestamp(reviewSnapshot.get("createdAt")),
+        }))
+        .sort((firstReview, secondReview) =>
+          secondReview.createdAt.localeCompare(firstReview.createdAt),
+        )
+        .slice(0, 3);
+
+      serializedProfile = {
+        ...serializedProfile,
+        ratingAverage:
+          readNumber(contractorData.ratingAverage) ||
+          readNumber(contractorData.averageRating),
+        ratingCount:
+          readNumber(contractorData.ratingCount) ||
+          readNumber(contractorData.reviewCount),
+        completedJobs: Math.max(
+          readNumber(contractorData.completedJobs),
+          readNumber(contractorData.completedJobsCount),
+        ),
+        recentReviews,
+      };
+    }
+
     return NextResponse.json({
       ok: true,
       role: userProfile.role,
-      profile: serializeProfile(
-        userProfile.role,
-        userProfile.snapshot.data() ?? {},
-        decodedToken.email ?? "",
-      ),
+      profile: serializedProfile,
     });
   } catch (error) {
     const { code, message } = getErrorDetails(error);

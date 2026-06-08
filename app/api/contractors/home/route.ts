@@ -785,9 +785,16 @@ export async function GET(request: NextRequest) {
         "Contractor",
       contractorId,
       verificationStatus: readText(contractorProfile.get("verificationStatus")),
-      completedJobsCount: readNumber(contractorProfile.get("completedJobsCount")),
-      averageRating: readNumber(contractorProfile.get("averageRating")),
-      reviewCount: readNumber(contractorProfile.get("reviewCount")),
+      completedJobsCount: Math.max(
+        readNumber(contractorProfile.get("completedJobs")),
+        readNumber(contractorProfile.get("completedJobsCount")),
+      ),
+      averageRating:
+        readNumber(contractorProfile.get("ratingAverage")) ||
+        readNumber(contractorProfile.get("averageRating")),
+      reviewCount:
+        readNumber(contractorProfile.get("ratingCount")) ||
+        readNumber(contractorProfile.get("reviewCount")),
       unreadMessagesCount,
       activeJob: serializedActiveJob,
       activeJobBlockingNewInterest: Boolean(serializedActiveJob),

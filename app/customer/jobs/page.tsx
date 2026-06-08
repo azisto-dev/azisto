@@ -46,6 +46,7 @@ type CustomerJob = {
   createdAt: string;
   beforePhotos: JobProofPhoto[];
   afterPhotos: JobProofPhoto[];
+  reviewed: boolean;
   tasks?: CustomerJobTask[];
 };
 
@@ -60,6 +61,7 @@ type CustomerJobTask = {
   hiredContractorAuthUid: string;
   beforePhotos: JobProofPhoto[];
   afterPhotos: JobProofPhoto[];
+  reviewed: boolean;
   createdAt: string;
 };
 
@@ -648,6 +650,22 @@ export default function CustomerJobsPage() {
                             Cancel task
                           </button>
                         ) : null}
+                        {task.status === "completed" ? (
+                          task.reviewed ? (
+                            <p className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-center text-xs font-bold text-emerald-700">
+                              Review submitted
+                            </p>
+                          ) : (
+                            <Link
+                              href={`/customer/jobs/${encodeURIComponent(
+                                job.jobId,
+                              )}/review?taskId=${encodeURIComponent(task.taskId)}`}
+                              className="az-btn-primary mt-3 flex h-9 w-full items-center justify-center rounded-lg text-xs font-bold"
+                            >
+                              Leave review
+                            </Link>
+                          )
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -740,20 +758,27 @@ export default function CustomerJobsPage() {
                     </>
                   ) : null}
 
-                  {job.status === "completed" ? (
+                  {job.status === "completed" &&
+                  (!job.tasks || job.tasks.length === 0) ? (
                     <>
                       <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">
                         Completed jobs cannot be cancelled. You can leave a
                         review or contact support.
                       </p>
-                      <Link
-                        href={`/customer/jobs/${encodeURIComponent(
-                          job.jobId,
-                        )}/review`}
-                        className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
-                      >
-                        Review contractor
-                      </Link>
+                      {job.reviewed ? (
+                        <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center text-sm font-bold text-emerald-700">
+                          Review submitted
+                        </p>
+                      ) : (
+                        <Link
+                          href={`/customer/jobs/${encodeURIComponent(
+                            job.jobId,
+                          )}/review`}
+                          className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                        >
+                          Leave review
+                        </Link>
+                      )}
                     </>
                   ) : null}
                 </div>

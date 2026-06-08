@@ -354,6 +354,19 @@ function getErrorDetails(error: unknown) {
   return { code, message };
 }
 
+function serializeTimestamp(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+
+  return "";
+}
+
 async function findExistingContractorProfile(firebaseUid: string) {
   const contractorsCollection = adminDb.collection("contractors");
   const authUidSnapshot = await contractorsCollection
@@ -379,6 +392,84 @@ async function findExistingContractorProfile(firebaseUid: string) {
     .get();
 
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    assertFirebaseAdminConfig();
+    const token = getBearerToken(request.headers.get("authorization"));
+
+    if (!token) {
+      return NextResponse.json(
+        { message: "Please sign in again." },
+        { status: 401 },
+      );
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const contractorSnapshot = await findExistingContractorProfile(
+      decodedToken.uid,
+    );
+
+    if (!contractorSnapshot) {
+      return NextResponse.json(
+        { message: "Contractor profile not found." },
+        { status: 404 },
+      );
+    }
+
+    const contractorData = contractorSnapshot.data() ?? {};
+    const contractorId =
+      readText(contractorData.contractorId) || contractorSnapshot.id;
+    const reviewsSnapshot = await adminDb
+      .collection("reviews")
+      .where("contractorId", "==", contractorId)
+      .get();
+    const recentReviews = reviewsSnapshot.docs
+      .map((reviewSnapshot) => ({
+        reviewId: reviewSnapshot.id,
+        jobId: readText(reviewSnapshot.get("jobId")),
+        taskId: readText(reviewSnapshot.get("taskId")),
+        rating: readNumber(reviewSnapshot.get("rating")),
+        reviewText: readText(reviewSnapshot.get("reviewText")),
+        tags: readStringList(reviewSnapshot.get("tags")),
+        serviceCategory: readText(reviewSnapshot.get("serviceCategory")),
+        subcategory: readText(reviewSnapshot.get("subcategory")),
+        city: readText(reviewSnapshot.get("city")),
+        createdAt: serializeTimestamp(reviewSnapshot.get("createdAt")),
+      }))
+      .sort((firstReview, secondReview) =>
+        secondReview.createdAt.localeCompare(firstReview.createdAt),
+      )
+      .slice(0, 10);
+
+    return NextResponse.json({
+      ok: true,
+      contractorId,
+      contractorName:
+        readText(contractorData.businessName) ||
+        readText(contractorData.contactName) ||
+        "Contractor",
+      ratingAverage:
+        readNumber(contractorData.ratingAverage) ||
+        readNumber(contractorData.averageRating),
+      ratingCount:
+        readNumber(contractorData.ratingCount) ||
+        readNumber(contractorData.reviewCount),
+      completedJobs: Math.max(
+        readNumber(contractorData.completedJobs),
+        readNumber(contractorData.completedJobsCount),
+      ),
+      recentReviews,
+    });
+  } catch (error) {
+    const { code, message } = getErrorDetails(error);
+    console.error("Contractor profile API GET failed:", { code, message, error });
+    return NextResponse.json(
+      { code, message },
+      { status: code === "missing-token" ? 401 : 500 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

@@ -104,7 +104,15 @@ function serializeInterestedContractor(data: Record<string, unknown>) {
     taskIds: readStringList(data.selectedTaskIds),
     taskLabels: readStringList(data.selectedTaskLabels),
     interestedAt: serializeTimestamp(data.interestedAt),
+    ratingAverage: 0,
+    ratingCount: 0,
+    completedJobs: 0,
+    verified: false,
   };
+}
+
+function readNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -231,12 +239,49 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }),
     );
 
-    const interestedContractors = Array.from(groupedContractors.values())
-      .sort((firstContractor, secondContractor) =>
-        secondContractor.interestedAt.localeCompare(
-          firstContractor.interestedAt,
-        ),
-      );
+    const interestedContractors = (
+      await Promise.all(
+        Array.from(groupedContractors.values()).map(async (contractor) => {
+          const contractorSnapshot = await adminDb
+            .collection("contractors")
+            .doc(contractor.contractorId)
+            .get();
+          const contractorData = contractorSnapshot.data() ?? {};
+          const verificationStatus =
+            readText(contractorData.verificationStatus) ||
+            contractor.verificationStatus;
+
+          return {
+            ...contractor,
+            contractorName:
+              readText(contractorData.contactName) ||
+              contractor.contractorName,
+            businessName:
+              readText(contractorData.businessName) || contractor.businessName,
+            city: readText(contractorData.city) || contractor.city,
+            province: readText(contractorData.province) || contractor.province,
+            verificationStatus,
+            verified: ["approved", "verified", "active"].includes(
+              verificationStatus.toLowerCase(),
+            ),
+            ratingAverage:
+              readNumber(contractorData.ratingAverage) ||
+              readNumber(contractorData.averageRating),
+            ratingCount:
+              readNumber(contractorData.ratingCount) ||
+              readNumber(contractorData.reviewCount),
+            completedJobs: Math.max(
+              readNumber(contractorData.completedJobs),
+              readNumber(contractorData.completedJobsCount),
+            ),
+          };
+        }),
+      )
+    ).sort((firstContractor, secondContractor) =>
+      secondContractor.interestedAt.localeCompare(
+        firstContractor.interestedAt,
+      ),
+    );
 
     return NextResponse.json({ ok: true, interestedContractors });
   } catch (error) {

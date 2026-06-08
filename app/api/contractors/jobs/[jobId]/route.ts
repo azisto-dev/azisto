@@ -357,10 +357,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         ? assignedTasks
         : interestedTasks.length > 0
           ? interestedTasks
-          : allTasks.filter(
-              (task) =>
-                task.status === "open" && task.contractorServiceMatch === true,
-            );
+          : allTasks.filter((task) => task.status === "open");
     const callerIsHiredContractor =
       jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
       jobSnapshot.get("hiredContractorId") === contractorId ||

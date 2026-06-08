@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { BriefcaseBusiness, ChevronLeft, MapPin } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  ChevronLeft,
+  MapPin,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -19,6 +25,10 @@ type InterestedContractor = {
   taskIds: string[];
   taskLabels: string[];
   interestedAt: string;
+  ratingAverage: number;
+  ratingCount: number;
+  completedJobs: number;
+  verified: boolean;
 };
 
 function StatusBar() {
@@ -348,12 +358,64 @@ export default function CustomerInterestedContractorsPage() {
                       </p>
                     ) : null}
                   </div>
-                  <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold capitalize text-amber-700">
-                    {contractor.verificationStatus || "pending"}
-                  </span>
+                  {contractor.verified ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-azisto-accent">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Verified
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-xs font-bold capitalize text-amber-700">
+                      {contractor.verificationStatus || "pending"}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
+                  <div className="grid grid-cols-3 gap-2">
+                    <Link
+                      href={`/customer/contractors/${encodeURIComponent(
+                        contractor.contractorId,
+                      )}/reviews?jobId=${encodeURIComponent(jobId)}`}
+                      aria-label={`View ratings and reviews for ${
+                        contractor.businessName ||
+                        contractor.contractorName ||
+                        "contractor"
+                      }`}
+                      className="cursor-pointer rounded-xl bg-blue-50 px-2 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98]"
+                    >
+                      <p className="flex items-center justify-center gap-1 text-sm font-bold text-slate-900">
+                        {contractor.ratingAverage > 0
+                          ? contractor.ratingAverage.toFixed(1)
+                          : "New"}
+                        <Star className="h-3.5 w-3.5 fill-[#FFD700] text-[#FFD700]" />
+                      </p>
+                      <p className="text-[10px] font-semibold text-slate-500">
+                        Rating
+                      </p>
+                    </Link>
+                    <Link
+                      href={`/customer/contractors/${encodeURIComponent(
+                        contractor.contractorId,
+                      )}/reviews?jobId=${encodeURIComponent(jobId)}`}
+                      aria-label={`View ${contractor.ratingCount} reviews`}
+                      className="cursor-pointer rounded-xl bg-slate-50 px-2 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98]"
+                    >
+                      <p className="text-sm font-bold text-slate-900">
+                        {contractor.ratingCount}
+                      </p>
+                      <p className="text-[10px] font-semibold text-slate-500">
+                        Reviews
+                      </p>
+                    </Link>
+                    <div className="rounded-xl bg-emerald-50 px-2 py-2 text-center">
+                      <p className="text-sm font-bold text-slate-900">
+                        {contractor.completedJobs}
+                      </p>
+                      <p className="text-[10px] font-semibold text-slate-500">
+                        Jobs Completed
+                      </p>
+                    </div>
+                  </div>
                   <p className="flex items-center gap-2">
                     <MapPin aria-hidden="true" className="h-4 w-4" />
                     {[contractor.city, contractor.province]

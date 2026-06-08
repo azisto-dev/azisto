@@ -100,7 +100,7 @@ async function findCustomerId(firebaseUid: string) {
     : "";
 }
 
-function serializeJob(data: Record<string, unknown>) {
+function serializeJob(data: Record<string, unknown>, reviewed = false) {
   return {
     jobId: readText(data.jobId),
     customerId: readText(data.customerId),
@@ -122,12 +122,13 @@ function serializeJob(data: Record<string, unknown>) {
     hiredBusinessName: readText(data.hiredBusinessName),
     beforePhotos: readJobProofPhotos(data.beforePhotos),
     afterPhotos: readJobProofPhotos(data.afterPhotos),
+    reviewed,
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
 }
 
-function serializeTask(data: Record<string, unknown>) {
+function serializeTask(data: Record<string, unknown>, reviewed = false) {
   return {
     taskId: readText(data.taskId),
     parentJobId: readText(data.parentJobId),
@@ -139,6 +140,7 @@ function serializeTask(data: Record<string, unknown>) {
     hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
     beforePhotos: readJobProofPhotos(data.beforePhotos),
     afterPhotos: readJobProofPhotos(data.afterPhotos),
+    reviewed,
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -173,22 +175,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const jobsSnapshot = await adminDb
-      .collection("jobs")
-      .where("customerAuthUid", "==", decodedToken.uid)
-      .get();
+    const [jobsSnapshot, reviewsSnapshot] = await Promise.all([
+      adminDb
+        .collection("jobs")
+        .where("customerAuthUid", "==", decodedToken.uid)
+        .get(),
+      adminDb
+        .collection("reviews")
+        .where("customerAuthUid", "==", decodedToken.uid)
+        .get(),
+    ]);
+    const reviewedTargets = new Set(
+      reviewsSnapshot.docs.map(
+        (reviewSnapshot) =>
+          `${readText(reviewSnapshot.get("jobId"))}:${readText(
+            reviewSnapshot.get("taskId"),
+          )}`,
+      ),
+    );
     const jobs = (
       await Promise.all(
         jobsSnapshot.docs.map(async (documentSnapshot) => {
           const tasksSnapshot = await documentSnapshot.ref.collection("tasks").get();
+          const jobId =
+            readText(documentSnapshot.get("jobId")) || documentSnapshot.id;
           const tasks = tasksSnapshot.docs
-            .map((taskSnapshot) => serializeTask(taskSnapshot.data()))
+            .map((taskSnapshot) => {
+              const taskId =
+                readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
+              return serializeTask(
+                taskSnapshot.data(),
+                reviewedTargets.has(`${jobId}:${taskId}`),
+              );
+            })
             .sort((firstTask, secondTask) =>
               firstTask.taskId.localeCompare(secondTask.taskId),
             );
+          const completedTasks = tasks.filter(
+            (task) => task.status === "completed" && task.hiredContractorId,
+          );
+          const reviewed =
+            reviewedTargets.has(`${jobId}:`) ||
+            (completedTasks.length > 0 &&
+              completedTasks.every((task) => task.reviewed));
 
           return {
-            ...serializeJob(documentSnapshot.data()),
+            ...serializeJob(documentSnapshot.data(), reviewed),
             overallStatus: readText(documentSnapshot.get("overallStatus")),
             requiresMultipleContractors:
               documentSnapshot.get("requiresMultipleContractors") === true,

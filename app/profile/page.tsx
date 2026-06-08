@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   FileText,
   ShieldCheck,
+  Star,
   Upload,
   UserRound,
 } from "lucide-react";
@@ -56,6 +57,18 @@ type ProfileData = {
   profilePhotoUrl?: string;
   profilePhotoStoragePath?: string;
   profilePhotoFileName?: string;
+  ratingAverage?: number;
+  ratingCount?: number;
+  completedJobs?: number;
+  recentReviews?: Array<{
+    reviewId: string;
+    jobId: string;
+    rating: number;
+    reviewText: string;
+    tags: string[];
+    subcategory: string;
+    createdAt: string;
+  }>;
 };
 
 type UploadedDocument = {
@@ -1494,6 +1507,98 @@ export default function ProfilePage() {
                   </div>
                 )}
               </section>
+
+              {profile.role === "contractor" ? (
+                <section className="az-contractor-card mt-5 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-normal text-[var(--azisto-contractor-text)]">
+                        Ratings &amp; reviews
+                      </h2>
+                      <p className="mt-1 text-sm text-[var(--azisto-contractor-muted)]">
+                        Your reputation across completed AZISTO jobs.
+                      </p>
+                    </div>
+                    <Link
+                      href="/contractor/reviews"
+                      className="az-btn-contractor-outline flex h-10 shrink-0 items-center rounded-full px-4 text-xs font-bold"
+                    >
+                      View all
+                    </Link>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
+                        Rating
+                      </p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="text-lg font-bold text-[var(--azisto-contractor-text)]">
+                          {(profile.ratingCount ?? 0) > 0
+                            ? (profile.ratingAverage ?? 0).toFixed(1)
+                            : "New"}
+                        </span>
+                        <Star
+                          aria-hidden="true"
+                          className="h-4 w-4 fill-[#FFD700] text-[#FFD700]"
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
+                        Reviews
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-[var(--azisto-contractor-text)]">
+                        {profile.ratingCount ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
+                        Completed
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-[var(--azisto-contractor-text)]">
+                        {profile.completedJobs ?? 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  {(profile.recentReviews ?? []).length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {(profile.recentReviews ?? []).map((review) => (
+                        <article
+                          key={review.reviewId}
+                          className="rounded-[18px] border border-[var(--azisto-contractor-border)] bg-white p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
+                              {review.subcategory || review.jobId}
+                            </p>
+                            <span
+                              className="flex items-center gap-1 text-sm font-bold text-[var(--azisto-contractor-text)]"
+                              aria-label={`${review.rating} star review`}
+                            >
+                              {review.rating.toFixed(1)}
+                              <Star
+                                aria-hidden="true"
+                                className="h-4 w-4 fill-[#FFD700] text-[#FFD700]"
+                              />
+                            </span>
+                          </div>
+                          {review.reviewText ? (
+                            <p className="mt-2 text-sm leading-6 text-[var(--azisto-contractor-muted)]">
+                              {review.reviewText}
+                            </p>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-[18px] border border-dashed border-[var(--azisto-contractor-border)] px-3 py-4 text-sm text-[var(--azisto-contractor-muted)]">
+                      Recent customer reviews will appear here.
+                    </p>
+                  )}
+                </section>
+              ) : null}
 
               {profile.role === "contractor" ? (
                 <section className="az-contractor-card mt-5 p-4">
