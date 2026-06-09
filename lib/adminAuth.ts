@@ -51,6 +51,7 @@ export async function requireAdmin(
   const allowedUids = readAdminList(process.env.ADMIN_UIDS);
   // TODO: remove this development fallback once ADMIN_EMAILS is configured.
   allowedEmails.add("admin@azisto.ca");
+  allowedEmails.add("azisto.services@gmail.com");
 
   const isAdmin =
     decodedToken.admin === true ||
