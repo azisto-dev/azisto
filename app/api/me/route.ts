@@ -11,6 +11,34 @@ import {
 
 export const runtime = "nodejs";
 
+type SessionApiResult = {
+  ok: true;
+  role: "customer" | "contractor" | "unknown";
+  customerId?: string;
+  contractorId?: string;
+  verificationStatus: string;
+  authUid: string;
+  displayName: string;
+};
+
+type SessionApiRuntime = {
+  cache: Map<string, { expiresAt: number; result: SessionApiResult }>;
+  requests: Map<string, Promise<SessionApiResult>>;
+};
+
+const sessionApiRuntimeKey = "__azistoSessionApiRuntime";
+const sessionApiRuntimeScope = globalThis as typeof globalThis & {
+  [sessionApiRuntimeKey]?: SessionApiRuntime;
+};
+const sessionApiRuntime =
+  sessionApiRuntimeScope[sessionApiRuntimeKey] ??
+  {
+    cache: new Map<string, { expiresAt: number; result: SessionApiResult }>(),
+    requests: new Map<string, Promise<SessionApiResult>>(),
+  };
+
+sessionApiRuntimeScope[sessionApiRuntimeKey] = sessionApiRuntime;
+
 function getBearerToken(authorizationHeader: string | null) {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return "";
@@ -83,6 +111,55 @@ async function findContractorProfile(firebaseUid: string) {
   return legacyDocumentSnapshot.exists ? legacyDocumentSnapshot : null;
 }
 
+async function resolveSessionProfile(firebaseUid: string): Promise<SessionApiResult> {
+  const contractorProfile = await findContractorProfile(firebaseUid);
+
+  if (contractorProfile) {
+    const contractorData = contractorProfile.data() ?? {};
+
+    return {
+      ok: true,
+      role: "contractor",
+      contractorId:
+        readText(contractorProfile.get("contractorId")) ||
+        contractorProfile.id,
+      verificationStatus: readText(
+        contractorProfile.get("verificationStatus"),
+      ),
+      authUid: firebaseUid,
+      displayName:
+        readText(contractorData.contactName) ||
+        readText(contractorData.businessName),
+    };
+  }
+
+  const customerProfile = await findCustomerProfile(firebaseUid);
+
+  if (customerProfile) {
+    const customerData = customerProfile.data() ?? {};
+
+    return {
+      ok: true,
+      role: "customer",
+      customerId:
+        readText(customerProfile.get("customerId")) || customerProfile.id,
+      verificationStatus: "",
+      authUid: firebaseUid,
+      displayName: readText(customerData.fullName),
+    };
+  }
+
+  return {
+    ok: true,
+    role: "unknown",
+    customerId: "",
+    contractorId: "",
+    verificationStatus: "",
+    authUid: firebaseUid,
+    displayName: "",
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     assertFirebaseAdminConfig();
@@ -100,52 +177,30 @@ export async function GET(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
-    const contractorProfile = await findContractorProfile(decodedToken.uid);
+    const cachedResult = sessionApiRuntime.cache.get(decodedToken.uid);
 
-    if (contractorProfile) {
-      const contractorData = contractorProfile.data() ?? {};
-
-      return NextResponse.json({
-        ok: true,
-        role: "contractor",
-        contractorId:
-          readText(contractorProfile.get("contractorId")) ||
-          contractorProfile.id,
-        verificationStatus: readText(
-          contractorProfile.get("verificationStatus"),
-        ),
-        authUid: decodedToken.uid,
-        displayName:
-          readText(contractorData.contactName) ||
-          readText(contractorData.businessName),
-      });
+    if (cachedResult && cachedResult.expiresAt > Date.now()) {
+      return NextResponse.json(cachedResult.result);
     }
 
-    const customerProfile = await findCustomerProfile(decodedToken.uid);
+    let requestPromise = sessionApiRuntime.requests.get(decodedToken.uid);
 
-    if (customerProfile) {
-      const customerData = customerProfile.data() ?? {};
-
-      return NextResponse.json({
-        ok: true,
-        role: "customer",
-        customerId:
-          readText(customerProfile.get("customerId")) || customerProfile.id,
-        verificationStatus: "",
-        authUid: decodedToken.uid,
-        displayName: readText(customerData.fullName),
-      });
+    if (!requestPromise) {
+      requestPromise = resolveSessionProfile(decodedToken.uid)
+        .then((result) => {
+          sessionApiRuntime.cache.set(decodedToken.uid, {
+            expiresAt: Date.now() + 60_000,
+            result,
+          });
+          return result;
+        })
+        .finally(() => {
+          sessionApiRuntime.requests.delete(decodedToken.uid);
+        });
+      sessionApiRuntime.requests.set(decodedToken.uid, requestPromise);
     }
 
-    return NextResponse.json({
-      ok: true,
-      role: "unknown",
-      customerId: "",
-      contractorId: "",
-      verificationStatus: "",
-      authUid: decodedToken.uid,
-      displayName: "",
-    });
+    return NextResponse.json(await requestPromise);
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 

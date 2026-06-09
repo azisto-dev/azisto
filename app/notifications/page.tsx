@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { ChevronLeft, Bell, Trash2, X } from "lucide-react";
+import { ChevronLeft, Bell, RefreshCw, Trash2, X } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import {
+  isQuotaExceededError,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
+import { refreshBadgeCountsNow } from "@/lib/badgeCounts";
 import BottomNav from "@/app/components/BottomNav";
 
 type NotificationItem = {
@@ -47,18 +56,23 @@ function formatDate(value: string) {
     : "Recently";
 }
 
-async function fetchNotifications(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/notifications", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+async function fetchNotifications(
+  user: User,
+  source: "page-open" | "interval" | "manual",
+) {
+  console.log(
+    `[${new Date().toISOString()}] NOTIFICATIONS FETCH source: ${source}`,
+  );
+  const response = await authenticatedFetch(user, "/api/notifications");
   const body = (await response.json().catch(() => null)) as {
+    code?: unknown;
     notifications?: unknown;
     message?: unknown;
   } | null;
 
   if (!response.ok) {
-    throw new Error(
+    await throwApiResponseError(
+      response,
       typeof body?.message === "string"
         ? body.message
         : "Unable to load notifications.",
@@ -71,12 +85,9 @@ async function fetchNotifications(user: User) {
 }
 
 async function markNotificationsRead(user: User, notificationId?: string) {
-  const token = await user.getIdToken();
-
-  await fetch("/api/notifications", {
+  await authenticatedFetch(user, "/api/notifications", {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(notificationId ? { notificationId } : {}),
@@ -84,11 +95,9 @@ async function markNotificationsRead(user: User, notificationId?: string) {
 }
 
 async function clearNotifications(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/notifications", {
+  const response = await authenticatedFetch(user, "/api/notifications", {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ action: "clear-all" }),
@@ -163,9 +172,12 @@ export default function NotificationsPage() {
   );
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const notificationRequestInFlightRef = useRef(false);
+  const notificationRetryAfterRef = useRef(0);
   const isCustomer = role !== "contractor";
   const shellClass = isCustomer
     ? "az-customer-shell min-h-screen md:px-6 md:py-8"
@@ -190,6 +202,48 @@ export default function NotificationsPage() {
     ? "border-blue-100 bg-blue-50 text-azisto-accent"
     : "border-[rgb(138_15_77_/_0.14)] bg-[rgb(138_15_77_/_0.08)] text-[var(--azisto-contractor-burgundy)]";
 
+  async function loadNotifications(
+    user: User,
+    source: "page-open" | "interval" | "manual",
+  ) {
+    if (
+      notificationRequestInFlightRef.current ||
+      notificationRetryAfterRef.current > Date.now()
+    ) {
+      return;
+    }
+
+    notificationRequestInFlightRef.current = true;
+
+    try {
+      const userNotifications = await fetchNotifications(user, source);
+      setNotifications(
+        userNotifications.filter((notification) => !notification.read),
+      );
+      notificationRetryAfterRef.current = 0;
+      setErrorMessage("");
+    } catch (error) {
+      if (
+        isQuotaExceededError(error) ||
+        isQuotaExceededMessage(
+          error instanceof Error ? error.message : String(error),
+        )
+      ) {
+        notificationRetryAfterRef.current = Date.now() + 10 * 60_000;
+      }
+
+      if (source !== "interval") {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load notifications.",
+        );
+      }
+    } finally {
+      notificationRequestInFlightRef.current = false;
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -204,10 +258,7 @@ export default function NotificationsPage() {
         setErrorMessage("");
         const profile = await fetchSessionProfile(user);
         setRole(profile.role);
-        const userNotifications = await fetchNotifications(user);
-        setNotifications(
-          userNotifications.filter((notification) => !notification.read),
-        );
+        await loadNotifications(user, "page-open");
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load notifications.");
       } finally {
@@ -217,6 +268,33 @@ export default function NotificationsPage() {
 
     return unsubscribe;
   }, [router]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        void loadNotifications(currentUser, "interval");
+      }
+    }, 120_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentUser]);
+
+  async function handleRefresh() {
+    if (!currentUser || isRefreshing) {
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      await loadNotifications(currentUser, "manual");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   async function handleNotificationClick(notification: NotificationItem) {
     let href = getNotificationHref(notification, role);
@@ -246,7 +324,7 @@ export default function NotificationsPage() {
     if (currentUser) {
       try {
         await markNotificationsRead(currentUser, notification.notificationId);
-        window.dispatchEvent(new Event("azisto:badges-refresh"));
+        await refreshBadgeCountsNow(currentUser, "notification read");
       } catch (error) {
         console.error("Mark notification read failed:", error);
       }
@@ -266,7 +344,7 @@ export default function NotificationsPage() {
       await clearNotifications(currentUser);
       setNotifications([]);
       setIsClearModalOpen(false);
-      window.dispatchEvent(new Event("azisto:badges-refresh"));
+      await refreshBadgeCountsNow(currentUser, "notifications cleared");
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -315,6 +393,19 @@ export default function NotificationsPage() {
                 Updates
               </h1>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-azisto-border bg-white text-[#64748B] shadow-sm disabled:opacity-50"
+                aria-label="Refresh notifications"
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+              </button>
             {notifications.length > 0 ? (
               <button
                 type="button"
@@ -325,6 +416,7 @@ export default function NotificationsPage() {
                 Clear all
               </button>
             ) : null}
+            </div>
           </section>
           {isLoading ? (
             <p className={`${compactCardClass} mt-6 px-4 py-3 text-sm ${mutedTextClass}`}>

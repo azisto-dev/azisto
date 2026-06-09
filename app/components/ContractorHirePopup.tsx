@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { BriefcaseBusiness, X } from "lucide-react";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 
 type HireNotification = {
   notificationId: string;
@@ -14,40 +15,73 @@ type HireNotification = {
   read: boolean;
 };
 
-async function fetchPendingHireNotification(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/notifications", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const body = (await response.json().catch(() => null)) as {
-    notifications?: unknown;
-  } | null;
+const hireNotificationCache = new Map<
+  string,
+  { expiresAt: number; notification: HireNotification | null }
+>();
+const hireNotificationRequests = new Map<
+  string,
+  Promise<HireNotification | null>
+>();
 
-  if (!response.ok || !Array.isArray(body?.notifications)) {
-    return null;
+async function fetchPendingHireNotification(user: User, forceRefresh = false) {
+  const cachedResult = hireNotificationCache.get(user.uid);
+
+  if (
+    !forceRefresh &&
+    cachedResult &&
+    cachedResult.expiresAt > Date.now()
+  ) {
+    return cachedResult.notification;
   }
 
-  return (
-    (body.notifications as HireNotification[]).find(
-      (notification) =>
-        notification.type === "contractor_selected" &&
-        !notification.read &&
-        Boolean(notification.jobId),
-    ) ?? null
-  );
+  const pendingRequest = hireNotificationRequests.get(user.uid);
+
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  const request = (async () => {
+    const response = await authenticatedFetch(user, "/api/notifications");
+    const body = (await response.json().catch(() => null)) as {
+      notifications?: unknown;
+    } | null;
+
+    if (!response.ok || !Array.isArray(body?.notifications)) {
+      return null;
+    }
+
+    const notification =
+      (body.notifications as HireNotification[]).find(
+        (notification) =>
+          notification.type === "contractor_selected" &&
+          !notification.read &&
+          Boolean(notification.jobId),
+      ) ?? null;
+
+    hireNotificationCache.set(user.uid, {
+      expiresAt: Date.now() + 120_000,
+      notification,
+    });
+
+    return notification;
+  })().finally(() => {
+    hireNotificationRequests.delete(user.uid);
+  });
+
+  hireNotificationRequests.set(user.uid, request);
+  return request;
 }
 
 async function markNotificationRead(user: User, notificationId: string) {
-  const token = await user.getIdToken();
-
-  await fetch("/api/notifications", {
+  await authenticatedFetch(user, "/api/notifications", {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ notificationId }),
   });
+  hireNotificationCache.delete(user.uid);
 }
 
 async function submitDecision(
@@ -104,7 +138,7 @@ export default function ContractorHirePopup({
       return;
     }
 
-    void fetchPendingHireNotification(user)
+    void fetchPendingHireNotification(user, refreshKey > 0)
       .then((pendingNotification) => {
         if (
           isMounted &&

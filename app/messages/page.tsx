@@ -2,11 +2,19 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { ChevronLeft, MessageCircle } from "lucide-react";
+import { ChevronLeft, MessageCircle, RefreshCw } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import {
+  isQuotaExceededError,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
 import { getStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -76,13 +84,14 @@ function formatTaskSummary(tasks: string[]) {
   return `${tasks[0]} +${tasks.length - 1} more`;
 }
 
-async function fetchThreads(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/messages/threads", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+async function fetchThreads(
+  user: User,
+  source: "page-open" | "interval" | "manual",
+) {
+  console.log(
+    `[${new Date().toISOString()}] MESSAGE INBOX FETCH source: ${source}`,
+  );
+  const response = await authenticatedFetch(user, "/api/messages/threads");
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
     message?: unknown;
@@ -90,10 +99,8 @@ async function fetchThreads(user: User) {
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -108,11 +115,15 @@ async function fetchThreads(user: User) {
 export default function MessagesPage() {
   const router = useRouter();
   const [threads, setThreads] = useState<MessageThread[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
     "unknown",
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const threadsRequestInFlightRef = useRef(false);
+  const threadsRetryAfterRef = useRef(0);
   const isCustomer = role !== "contractor";
   const shellClass = isCustomer
     ? "az-customer-shell min-h-screen md:px-6 md:py-8"
@@ -146,6 +157,41 @@ export default function MessagesPage() {
     ? "bg-blue-50 text-azisto-accent"
     : "bg-[rgb(138_15_77_/_0.07)] text-[var(--azisto-contractor-burgundy)]";
 
+  async function loadThreads(
+    user: User,
+    source: "page-open" | "interval" | "manual",
+  ) {
+    if (
+      threadsRequestInFlightRef.current ||
+      threadsRetryAfterRef.current > Date.now()
+    ) {
+      return;
+    }
+
+    threadsRequestInFlightRef.current = true;
+
+    try {
+      setThreads(await fetchThreads(user, source));
+      threadsRetryAfterRef.current = 0;
+      setErrorMessage("");
+    } catch (error) {
+      if (
+        isQuotaExceededError(error) ||
+        isQuotaExceededMessage(
+          error instanceof Error ? error.message : String(error),
+        )
+      ) {
+        threadsRetryAfterRef.current = Date.now() + 10 * 60_000;
+      }
+
+      if (source !== "interval") {
+        setErrorMessage(getErrorMessage(error));
+      }
+    } finally {
+      threadsRequestInFlightRef.current = false;
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -153,13 +199,14 @@ export default function MessagesPage() {
         return;
       }
 
+      setCurrentUser(user);
+
       try {
         setIsLoading(true);
         setErrorMessage("");
         const profile = await fetchSessionProfile(user);
         setRole(profile.role);
-        const messageThreads = await fetchThreads(user);
-        setThreads(messageThreads);
+        await loadThreads(user, "page-open");
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
       } finally {
@@ -169,6 +216,33 @@ export default function MessagesPage() {
 
     return unsubscribe;
   }, [router]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden) {
+        void loadThreads(currentUser, "interval");
+      }
+    }, 120_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentUser]);
+
+  async function handleRefresh() {
+    if (!currentUser || isRefreshing) {
+      return;
+    }
+
+    try {
+      setIsRefreshing(true);
+      await loadThreads(currentUser, "manual");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   return (
     <main className={shellClass}>
@@ -214,11 +288,25 @@ export default function MessagesPage() {
               <p className={`mt-5 text-sm font-semibold leading-5 ${mutedTextClass}`}>
                 Conversations about your AZISTO job requests will appear here.
               </p>
-              <span
-                className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${softChipClass}`}
-              >
-                {threads.length} thread{threads.length === 1 ? "" : "s"}
-              </span>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${softChipClass}`}
+                >
+                  {threads.length} thread{threads.length === 1 ? "" : "s"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleRefresh()}
+                  disabled={isRefreshing}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border bg-white shadow-sm disabled:opacity-50 ${softChipClass}`}
+                  aria-label="Refresh messages"
+                >
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
+                </button>
+              </div>
             </div>
           </section>
 

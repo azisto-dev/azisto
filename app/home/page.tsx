@@ -151,7 +151,7 @@ type ContractorHomeData = {
 
 type ContractorNetworkStatus = "online" | "offline" | "limited";
 
-const contractorHomeCacheTtlMs = 60_000;
+const contractorHomeCacheTtlMs = 120_000;
 const contractorHomeCache = new Map<
   string,
   {
@@ -557,7 +557,9 @@ async function fetchContractorHome(
   }
 
   const request = (async () => {
-  console.log(`[${new Date().toISOString()}] HOME API FETCH`, source);
+  console.log(
+    `[${new Date().toISOString()}] CONTRACTOR HOME FETCH source: ${source}`,
+  );
   const response = await authenticatedFetch(
     user,
     `/api/contractors/home${buildFilterQuery(filters)}`,
@@ -788,7 +790,9 @@ export default function HomePage() {
         window.navigator.onLine ? "online" : "offline",
       );
     } catch (error) {
-      const backoffMs = getRetryBackoffMs(error);
+      const backoffMs = isQuotaExceededError(error)
+        ? 10 * 60_000
+        : getRetryBackoffMs(error);
 
       if (backoffMs > 0) {
         contractorHomeRetryAfterRef.current = Date.now() + backoffMs;
@@ -835,7 +839,11 @@ export default function HomePage() {
         }
 
         setContractorFilters(savedFilters);
-        const nextHome = await fetchContractorHome(user, savedFilters, "initial");
+        const nextHome = await fetchContractorHome(
+          user,
+          savedFilters,
+          "page-open",
+        );
 
         if (isCancelled) {
           return;
@@ -857,7 +865,9 @@ export default function HomePage() {
         );
       } catch (error) {
         if (!isCancelled) {
-          const backoffMs = getRetryBackoffMs(error);
+          const backoffMs = isQuotaExceededError(error)
+            ? 10 * 60_000
+            : getRetryBackoffMs(error);
 
           if (backoffMs > 0) {
             contractorHomeRetryAfterRef.current = Date.now() + backoffMs;
@@ -928,7 +938,7 @@ export default function HomePage() {
         {},
         "interval",
       );
-    }, 60000);
+    }, 120_000);
 
     runtimeWindow.__azistoContractorHomeInterval = intervalId;
 
@@ -1244,7 +1254,7 @@ export default function HomePage() {
                     currentUser,
                     contractorFilters,
                     { forceRefresh: true },
-                    "refresh-button",
+                    "manual",
                   )
                 }
                 disabled={

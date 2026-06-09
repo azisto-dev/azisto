@@ -6,6 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import {
+  isQuotaExceededError,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import {
   getCompatibleLifecycleStatus,
@@ -54,18 +62,26 @@ function StatusBar() {
   );
 }
 
-async function fetchActiveJobs(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/customers/jobs", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+async function fetchActiveJobs(
+  user: User,
+  source: "page-open" | "interval" | "manual" | "focus",
+) {
+  console.log(
+    `[${new Date().toISOString()}] CUSTOMER JOBS FETCH source: ${source}`,
+  );
+  const response = await authenticatedFetch(user, "/api/customers/jobs");
   const body = (await response.json().catch(() => null)) as {
     jobs?: unknown;
     message?: unknown;
   } | null;
 
   if (!response.ok) {
-    throw new Error(typeof body?.message === "string" ? body.message : "Unable to load jobs.");
+    await throwApiResponseError(
+      response,
+      typeof body?.message === "string"
+        ? body.message
+        : "Unable to load jobs.",
+    );
   }
 
   if (!Array.isArray(body?.jobs)) {
@@ -150,18 +166,36 @@ export default function CustomerActiveJobsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [refreshWarning, setRefreshWarning] = useState("");
   const isJobsRequestInFlightRef = useRef(false);
+  const jobsRetryAfterRef = useRef(0);
 
-  async function loadJobs(currentUser: User, isBackgroundRefresh = false) {
-    if (isJobsRequestInFlightRef.current) {
+  async function loadJobs(
+    currentUser: User,
+    source: "page-open" | "interval" | "manual" | "focus",
+    isBackgroundRefresh = false,
+  ) {
+    if (
+      isJobsRequestInFlightRef.current ||
+      jobsRetryAfterRef.current > Date.now()
+    ) {
       return;
     }
 
     isJobsRequestInFlightRef.current = true;
 
     try {
-      setJobs(await fetchActiveJobs(currentUser));
+      setJobs(await fetchActiveJobs(currentUser, source));
       setRefreshWarning("");
+      jobsRetryAfterRef.current = 0;
     } catch (error) {
+      if (
+        isQuotaExceededError(error) ||
+        isQuotaExceededMessage(
+          error instanceof Error ? error.message : String(error),
+        )
+      ) {
+        jobsRetryAfterRef.current = Date.now() + 10 * 60_000;
+      }
+
       if (isBackgroundRefresh) {
         setRefreshWarning("Status updates paused. Retrying soon.");
         return;
@@ -185,7 +219,7 @@ export default function CustomerActiveJobsPage() {
       try {
         setIsLoading(true);
         setErrorMessage("");
-        await loadJobs(currentUser);
+        await loadJobs(currentUser, "page-open");
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Unable to load jobs.");
       } finally {
@@ -201,18 +235,22 @@ export default function CustomerActiveJobsPage() {
       return;
     }
 
-    const refreshVisibleJobs = () => {
-      if (document.visibilityState === "visible") {
-        void loadJobs(user, true);
+    const refreshVisibleJobs = (source: "interval" | "focus") => {
+      if (!document.hidden) {
+        void loadJobs(user, source, true);
       }
     };
-    const intervalId = window.setInterval(refreshVisibleJobs, 60000);
+    const intervalId = window.setInterval(
+      () => refreshVisibleJobs("interval"),
+      120_000,
+    );
+    const handleFocus = () => refreshVisibleJobs("focus");
 
-    window.addEventListener("focus", refreshVisibleJobs);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshVisibleJobs);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [user]);
 
@@ -233,7 +271,7 @@ export default function CustomerActiveJobsPage() {
       setActiveJobId(job.jobId);
       setErrorMessage("");
       await updateStatus(user, job.jobId, "cancelled");
-      await loadJobs(user);
+      await loadJobs(user, "manual");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to update job.",

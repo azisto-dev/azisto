@@ -251,6 +251,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const decodedToken = await adminAuth.verifyIdToken(token);
     const { threadId } = await context.params;
+    const shouldMarkRead = request.nextUrl.searchParams.get("markRead") === "1";
     const threadSnapshot = await getThreadForParticipant(
       threadId,
       decodedToken.uid,
@@ -300,7 +301,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
           ? senderAuthUid !== decodedToken.uid
           : senderRole !== currentUserRole;
 
-      if (isIncomingMessage && !readBy.includes(decodedToken.uid)) {
+      if (
+        shouldMarkRead &&
+        isIncomingMessage &&
+        !readBy.includes(decodedToken.uid)
+      ) {
         hasReadUpdates = true;
         readBatch.set(
           documentSnapshot.ref,
@@ -310,7 +315,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }
 
       return serializeMessage(
-        isIncomingMessage
+        shouldMarkRead && isIncomingMessage
           ? {
               ...messageData,
               readBy: readBy.includes(decodedToken.uid)
@@ -339,8 +344,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     };
 
     if (
-      readStringList(threadData.unreadBy).includes(decodedToken.uid) ||
-      hasReadUpdates
+      shouldMarkRead &&
+      (readStringList(threadData.unreadBy).includes(decodedToken.uid) ||
+        hasReadUpdates)
     ) {
       await threadSnapshot.ref.set(
         {
@@ -350,7 +356,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (hasReadUpdates) {
+    if (shouldMarkRead && hasReadUpdates) {
       await readBatch.commit();
     }
 

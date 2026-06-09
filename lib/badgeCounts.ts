@@ -23,12 +23,14 @@ const emptyBadgeCounts: BadgeCounts = {
   messages: 0,
   notifications: 0,
 };
-const badgeCacheTtlMs = 60_000;
-const badgePollingIntervalMs = 60_000;
+const badgeCacheTtlMs = 120_000;
+const badgePollingIntervalMs = 120_000;
+const badgeQuotaBackoffMs = 10 * 60_000;
 type BadgeSubscriber = (counts: BadgeCounts) => void;
 type BadgeSession = {
   intervalId: ReturnType<typeof setInterval>;
   refreshListener: () => void;
+  visibilityListener: () => void;
   subscribers: Set<BadgeSubscriber>;
   user: User;
 };
@@ -74,11 +76,12 @@ const badgeSessions = badgeRuntime.sessions;
 export async function fetchBadgeCounts(
   user: User,
   source = "unknown",
+  forceRefresh = false,
 ): Promise<BadgeCounts> {
   const cachedCounts = badgeCache.get(user.uid);
   const now = Date.now();
 
-  if (cachedCounts && cachedCounts.expiresAt > now) {
+  if (!forceRefresh && cachedCounts && cachedCounts.expiresAt > now) {
     return cachedCounts.counts;
   }
 
@@ -94,10 +97,14 @@ export async function fetchBadgeCounts(
 
   const nextRequest = (async () => {
     try {
-      console.log(`[${new Date().toISOString()}] BADGE API FETCH`, source);
+      console.log(
+        `[${new Date().toISOString()}] BADGE API FETCH source: global-service`,
+        source,
+      );
       const response = await authenticatedFetch(user, "/api/badges", {
         headers: {
-          "X-Azisto-Trigger": source,
+          "X-Azisto-Trigger": "global-service",
+          "X-Azisto-Force-Refresh": forceRefresh ? "true" : "false",
         },
       });
       const responseBody = (await response.json().catch(() => null)) as {
@@ -112,8 +119,11 @@ export async function fetchBadgeCounts(
             ? responseBody.message
             : "Unable to load badge counts.";
 
-        if (isQuotaExceededMessage(message)) {
-          badgeRetryAfter.set(user.uid, Date.now() + 5 * 60_000);
+        if (response.status === 429 || isQuotaExceededMessage(message)) {
+          badgeRetryAfter.set(user.uid, Date.now() + badgeQuotaBackoffMs);
+          console.warn(
+            "Badge polling paused due to quota. Retrying in 10 minutes.",
+          );
           return cachedCounts?.counts ?? emptyBadgeCounts;
         }
 
@@ -133,7 +143,12 @@ export async function fetchBadgeCounts(
 
       return counts;
     } catch (error) {
-      const backoffMs = getRetryBackoffMs(error, 2 * 60_000);
+      const quotaExceeded = isQuotaExceededMessage(
+        error instanceof Error ? error.message : String(error),
+      );
+      const backoffMs = quotaExceeded
+        ? badgeQuotaBackoffMs
+        : getRetryBackoffMs(error, 2 * 60_000);
 
       if (
         backoffMs > 0 ||
@@ -141,6 +156,13 @@ export async function fetchBadgeCounts(
         isNetworkError(error)
       ) {
         badgeRetryAfter.set(user.uid, Date.now() + Math.max(backoffMs, 2 * 60_000));
+
+        if (quotaExceeded) {
+          console.warn(
+            "Badge polling paused due to quota. Retrying in 10 minutes.",
+          );
+        }
+
         return cachedCounts?.counts ?? emptyBadgeCounts;
       }
 
@@ -155,8 +177,12 @@ export async function fetchBadgeCounts(
   return nextRequest;
 }
 
-async function refreshBadgeSession(user: User, source: string) {
-  const counts = await fetchBadgeCounts(user, source);
+async function refreshBadgeSession(
+  user: User,
+  source: string,
+  forceRefresh = false,
+) {
+  const counts = await fetchBadgeCounts(user, source, forceRefresh);
   const session = badgeSessions.get(user.uid);
 
   session?.subscribers.forEach((subscriber) => subscriber(counts));
@@ -164,7 +190,7 @@ async function refreshBadgeSession(user: User, source: string) {
 
 export async function refreshBadgeCountsNow(user: User, source: string) {
   badgeCache.delete(user.uid);
-  await refreshBadgeSession(user, source);
+  await refreshBadgeSession(user, source, true);
 }
 
 export function subscribeBadgeCounts(
@@ -191,12 +217,19 @@ export function subscribeBadgeCounts(
     const refreshListener = () => {
       void refreshBadgeCountsNow(user, "badge refresh event");
     };
+    const visibilityListener = () => {
+      if (!document.hidden) {
+        void refreshBadgeCountsNow(user, "tab visible");
+      }
+    };
 
     window.addEventListener("azisto:badges-refresh", refreshListener);
+    document.addEventListener("visibilitychange", visibilityListener);
 
     session = {
       intervalId,
       refreshListener,
+      visibilityListener,
       subscribers,
       user,
     };
@@ -226,6 +259,10 @@ export function subscribeBadgeCounts(
       window.removeEventListener(
         "azisto:badges-refresh",
         currentSession.refreshListener,
+      );
+      document.removeEventListener(
+        "visibilitychange",
+        currentSession.visibilityListener,
       );
       badgeSessions.delete(user.uid);
     }

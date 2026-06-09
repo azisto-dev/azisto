@@ -12,6 +12,14 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
+import {
+  isQuotaExceededError,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
+import {
+  authenticatedFetch,
+  throwApiResponseError,
+} from "@/lib/authenticatedFetch";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import {
   getCompatibleLifecycleStatus,
@@ -179,13 +187,14 @@ function getJobTab(job: CustomerJob): JobTab {
   return "open";
 }
 
-async function fetchCustomerJobs(user: User) {
-  const token = await user.getIdToken();
-  const response = await fetch("/api/customers/jobs", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+async function fetchCustomerJobs(
+  user: User,
+  source: "page-open" | "interval" | "manual" | "focus",
+) {
+  console.log(
+    `[${new Date().toISOString()}] CUSTOMER JOBS FETCH source: ${source}`,
+  );
+  const response = await authenticatedFetch(user, "/api/customers/jobs");
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
     message?: unknown;
@@ -193,10 +202,8 @@ async function fetchCustomerJobs(user: User) {
   } | null;
 
   if (!response.ok) {
-    throw createApiError(
-      typeof responseBody?.code === "string"
-        ? responseBody.code
-        : `api/${response.status}`,
+    await throwApiResponseError(
+      response,
       typeof responseBody?.message === "string"
         ? responseBody.message
         : response.statusText,
@@ -290,19 +297,28 @@ export default function CustomerJobsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<JobTab>("active");
   const isJobsRequestInFlightRef = useRef(false);
+  const jobsRetryAfterRef = useRef(0);
   const hasSelectedInitialTabRef = useRef(false);
 
-  async function loadJobs(user: User, isBackgroundRefresh = false) {
-    if (isJobsRequestInFlightRef.current) {
+  async function loadJobs(
+    user: User,
+    source: "page-open" | "interval" | "manual" | "focus",
+    isBackgroundRefresh = false,
+  ) {
+    if (
+      isJobsRequestInFlightRef.current ||
+      jobsRetryAfterRef.current > Date.now()
+    ) {
       return;
     }
 
     isJobsRequestInFlightRef.current = true;
 
     try {
-      const customerJobs = await fetchCustomerJobs(user);
+      const customerJobs = await fetchCustomerJobs(user, source);
       setJobs(customerJobs);
       setRefreshWarning("");
+      jobsRetryAfterRef.current = 0;
 
       if (!hasSelectedInitialTabRef.current) {
         const hasActiveJobs = customerJobs.some(
@@ -312,6 +328,15 @@ export default function CustomerJobsPage() {
         hasSelectedInitialTabRef.current = true;
       }
     } catch (error) {
+      if (
+        isQuotaExceededError(error) ||
+        isQuotaExceededMessage(
+          error instanceof Error ? error.message : String(error),
+        )
+      ) {
+        jobsRetryAfterRef.current = Date.now() + 10 * 60_000;
+      }
+
       if (isBackgroundRefresh) {
         setRefreshWarning("Status updates paused. Retrying soon.");
         return;
@@ -347,7 +372,7 @@ export default function CustomerJobsPage() {
           return;
         }
 
-        await loadJobs(user);
+        await loadJobs(user, "page-open");
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
       } finally {
@@ -363,18 +388,24 @@ export default function CustomerJobsPage() {
       return;
     }
 
-    const refreshVisibleJobs = () => {
-      if (document.visibilityState === "visible") {
-        void loadJobs(currentUser, true);
+    const refreshVisibleJobs = (
+      source: "interval" | "focus",
+    ) => {
+      if (!document.hidden) {
+        void loadJobs(currentUser, source, true);
       }
     };
-    const intervalId = window.setInterval(refreshVisibleJobs, 60000);
+    const intervalId = window.setInterval(
+      () => refreshVisibleJobs("interval"),
+      120_000,
+    );
+    const handleFocus = () => refreshVisibleJobs("focus");
 
-    window.addEventListener("focus", refreshVisibleJobs);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshVisibleJobs);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [currentUser]);
 
@@ -386,7 +417,7 @@ export default function CustomerJobsPage() {
     try {
       setIsRefreshing(true);
       setRefreshWarning("");
-      await loadJobs(currentUser);
+      await loadJobs(currentUser, "manual");
     } catch (error) {
       setRefreshWarning("Status updates paused. Retrying soon.");
       console.error("Customer job refresh failed:", error);
@@ -421,7 +452,7 @@ export default function CustomerJobsPage() {
         "cancelled",
         task?.taskId,
       );
-      await loadJobs(currentUser);
+      await loadJobs(currentUser, "manual");
       setSuccessMessage(task ? "Task cancelled." : "Job cancelled.");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));

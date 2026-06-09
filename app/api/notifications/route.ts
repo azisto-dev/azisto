@@ -5,6 +5,10 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import {
+  firebaseQuotaMessage,
+  isQuotaExceededMessage,
+} from "@/lib/apiErrors";
 
 export const runtime = "nodejs";
 
@@ -96,6 +100,13 @@ export async function GET(request: NextRequest) {
       message,
       error,
     });
+
+    if (isQuotaExceededMessage(`${code} ${message}`)) {
+      return NextResponse.json(
+        { code: "resource-exhausted", message: firebaseQuotaMessage },
+        { status: 429 },
+      );
+    }
 
     return NextResponse.json(
       {
@@ -222,6 +233,13 @@ export async function PATCH(request: NextRequest) {
       message,
       error,
     });
+
+    if (isQuotaExceededMessage(`${code} ${message}`)) {
+      return NextResponse.json(
+        { code: "resource-exhausted", message: firebaseQuotaMessage },
+        { status: 429 },
+      );
+    }
 
     return NextResponse.json(
       {

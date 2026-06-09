@@ -19,12 +19,15 @@ import { auth, storage } from "@/lib/firebase";
 import {
   connectionInterruptedMessage,
   getRetryBackoffMs,
+  isNetworkError,
+  isQuotaExceededError,
   isTransientApiError,
 } from "@/lib/apiErrors";
 import {
   authenticatedFetch,
   throwApiResponseError,
 } from "@/lib/authenticatedFetch";
+import { refreshBadgeCountsNow } from "@/lib/badgeCounts";
 import BottomNav from "@/app/components/BottomNav";
 import NotificationBell from "@/app/components/NotificationBell";
 
@@ -155,33 +158,109 @@ function MessageReceipt({
   );
 }
 
-async function fetchMessages(user: User, threadId: string) {
-  const response = await authenticatedFetch(
-    user,
-    `/api/messages/threads/${encodeURIComponent(threadId)}/messages`,
-  );
-  const responseBody = (await response.json().catch(() => null)) as {
-    code?: unknown;
-    message?: unknown;
-    thread?: unknown;
-    messages?: unknown;
-  } | null;
+type MessageFetchSource = "initial" | "interval" | "send-message" | "focus";
+type MessageConversation = {
+  thread: MessageThread;
+  messages: MessageItem[];
+};
 
-  if (!response.ok) {
-    await throwApiResponseError(
-      response,
-      typeof responseBody?.message === "string"
-        ? responseBody.message
-        : response.statusText,
-    );
+type MessageFetchRuntime = {
+  badgeRefreshAt: Map<string, number>;
+  initialCache: Map<
+    string,
+    {
+      expiresAt: number;
+      conversation: MessageConversation;
+    }
+  >;
+  requests: Map<string, Promise<MessageConversation>>;
+};
+
+const messageFetchRuntimeKey = "__azistoMessageFetchRuntime";
+const messageFetchRuntimeScope = globalThis as typeof globalThis & {
+  [messageFetchRuntimeKey]?: MessageFetchRuntime;
+};
+const messageFetchRuntime =
+  messageFetchRuntimeScope[messageFetchRuntimeKey] ??
+  {
+    badgeRefreshAt: new Map(),
+    initialCache: new Map(),
+    requests: new Map(),
+  };
+
+messageFetchRuntime.badgeRefreshAt ??= new Map();
+messageFetchRuntimeScope[messageFetchRuntimeKey] = messageFetchRuntime;
+
+async function fetchMessages(
+  user: User,
+  threadId: string,
+  source: MessageFetchSource,
+  markRead = false,
+) {
+  const requestKey = `${user.uid}:${threadId}:${markRead ? "read" : "list"}`;
+  const cachedConversation = messageFetchRuntime.initialCache.get(requestKey);
+
+  if (
+    source === "initial" &&
+    cachedConversation &&
+    cachedConversation.expiresAt > Date.now()
+  ) {
+    return cachedConversation.conversation;
   }
 
-  return {
-    thread: responseBody?.thread as MessageThread,
-    messages: Array.isArray(responseBody?.messages)
-      ? (responseBody.messages as MessageItem[])
-      : [],
-  };
+  const pendingRequest = messageFetchRuntime.requests.get(requestKey);
+
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  console.log(
+    `[${new Date().toISOString()}] MESSAGE THREAD FETCH source: ${source}`,
+  );
+  const request = (async () => {
+    const response = await authenticatedFetch(
+      user,
+      `/api/messages/threads/${encodeURIComponent(threadId)}/messages${
+        markRead ? "?markRead=1" : ""
+      }`,
+    );
+    const responseBody = (await response.json().catch(() => null)) as {
+      code?: unknown;
+      message?: unknown;
+      thread?: unknown;
+      messages?: unknown;
+    } | null;
+
+    if (!response.ok) {
+      await throwApiResponseError(
+        response,
+        typeof responseBody?.message === "string"
+          ? responseBody.message
+          : response.statusText,
+      );
+    }
+
+    const conversation = {
+      thread: responseBody?.thread as MessageThread,
+      messages: Array.isArray(responseBody?.messages)
+        ? (responseBody.messages as MessageItem[])
+        : [],
+    };
+
+    if (source === "initial") {
+      messageFetchRuntime.initialCache.set(requestKey, {
+        expiresAt: Date.now() + 2_000,
+        conversation,
+      });
+    }
+
+    return conversation;
+  })().finally(() => {
+    messageFetchRuntime.requests.delete(requestKey);
+  });
+
+  messageFetchRuntime.requests.set(requestKey, request);
+  return request;
 }
 
 function createSafeFileName(fileName: string) {
@@ -342,6 +421,17 @@ export default function MessageThreadPage() {
   const isLeavingForReviewRef = useRef(false);
   const isMessageRequestInFlightRef = useRef(false);
   const messageRetryAfterRef = useRef(0);
+  const lastSuccessfulMessageFetchAtRef = useRef(0);
+  const hasRefreshedBadgesForThreadRef = useRef(false);
+  const hasMarkedThreadReadRef = useRef(false);
+  const currentUserRef = useRef<User | null>(null);
+  const loadMessagesRef = useRef<
+    (
+      user: User,
+      source: MessageFetchSource,
+      markRead?: boolean,
+    ) => Promise<void>
+  >(async () => {});
   const hasComposerContent = Boolean(draft.trim() || selectedPhoto);
   const canHireContractor =
     thread?.currentUserRole === "customer" &&
@@ -400,7 +490,18 @@ export default function MessageThreadPage() {
     ? userMessageSuggestions
     : contractorMessageSuggestions;
 
-  async function loadMessages(user: User) {
+  async function loadMessages(
+    user: User,
+    source: MessageFetchSource,
+    markRead = false,
+  ) {
+    if (
+      (source === "interval" || source === "focus") &&
+      Date.now() - lastSuccessfulMessageFetchAtRef.current < 40_000
+    ) {
+      return;
+    }
+
     if (
       isMessageRequestInFlightRef.current ||
       messageRetryAfterRef.current > Date.now()
@@ -411,15 +512,24 @@ export default function MessageThreadPage() {
     isMessageRequestInFlightRef.current = true;
 
     try {
-      const conversation = await fetchMessages(user, threadId);
+      const conversation = await fetchMessages(
+        user,
+        threadId,
+        source,
+        markRead,
+      );
       setThread(conversation.thread);
       setMessages(conversation.messages);
+      lastSuccessfulMessageFetchAtRef.current = Date.now();
       messageRetryAfterRef.current = 0;
       setErrorMessage((currentValue) =>
         currentValue === connectionInterruptedMessage ? "" : currentValue,
       );
     } catch (error) {
-      const backoffMs = getRetryBackoffMs(error);
+      const backoffMs =
+        isQuotaExceededError(error) || isNetworkError(error)
+          ? 2 * 60_000
+          : getRetryBackoffMs(error);
 
       if (backoffMs > 0) {
         messageRetryAfterRef.current = Date.now() + backoffMs;
@@ -431,19 +541,47 @@ export default function MessageThreadPage() {
     }
   }
 
+  loadMessagesRef.current = loadMessages;
+
+  useEffect(() => {
+    hasMarkedThreadReadRef.current = false;
+    hasRefreshedBadgesForThreadRef.current = false;
+    messageRetryAfterRef.current = 0;
+    lastSuccessfulMessageFetchAtRef.current = 0;
+  }, [threadId]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        currentUserRef.current = null;
         router.replace("/login");
         return;
       }
 
+      currentUserRef.current = user;
       setCurrentUser(user);
 
       try {
         setIsLoading(true);
         setErrorMessage("");
-        await loadMessages(user);
+        const shouldMarkRead = !hasMarkedThreadReadRef.current;
+        hasMarkedThreadReadRef.current = true;
+        await loadMessagesRef.current(user, "initial", shouldMarkRead);
+        const badgeRefreshKey = `${user.uid}:${threadId}`;
+        const lastBadgeRefreshAt =
+          messageFetchRuntime.badgeRefreshAt.get(badgeRefreshKey) ?? 0;
+
+        if (
+          !hasRefreshedBadgesForThreadRef.current &&
+          Date.now() - lastBadgeRefreshAt > 2_000
+        ) {
+          hasRefreshedBadgesForThreadRef.current = true;
+          messageFetchRuntime.badgeRefreshAt.set(
+            badgeRefreshKey,
+            Date.now(),
+          );
+          await refreshBadgeCountsNow(user, "message thread opened");
+        }
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
       } finally {
@@ -451,7 +589,10 @@ export default function MessageThreadPage() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      currentUserRef.current = null;
+      unsubscribe();
+    };
   }, [router, threadId]);
 
   useEffect(() => {
@@ -500,20 +641,34 @@ export default function MessageThreadPage() {
   }, [currentUser, thread?.currentUserRole, customerPhoneNumber]);
 
   useEffect(() => {
-    if (!currentUser || isLeavingForReviewRef.current) {
-      return;
+    const runtimeWindow = window as typeof window & {
+      __azistoMessageThreadIntervals?: Map<
+        string,
+        ReturnType<typeof window.setInterval>
+      >;
+    };
+    const intervals =
+      runtimeWindow.__azistoMessageThreadIntervals ?? new Map();
+    runtimeWindow.__azistoMessageThreadIntervals = intervals;
+    const existingInterval = intervals.get(threadId);
+
+    if (existingInterval) {
+      window.clearInterval(existingInterval);
     }
 
-    const intervalId = window.setInterval(async () => {
+    const refreshThread = async (source: "interval" | "focus") => {
+      const user = currentUserRef.current;
+
       if (
+        !user ||
         isLeavingForReviewRef.current ||
-        document.visibilityState !== "visible"
+        document.hidden
       ) {
         return;
       }
 
       try {
-        await loadMessages(currentUser);
+        await loadMessagesRef.current(user, source);
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
 
@@ -521,10 +676,25 @@ export default function MessageThreadPage() {
           console.error("Message polling failed:", error);
         }
       }
-    }, 15000);
+    };
+    const intervalId = window.setInterval(
+      () => void refreshThread("interval"),
+      40_000,
+    );
+    const handleFocus = () => void refreshThread("focus");
 
-    return () => window.clearInterval(intervalId);
-  }, [currentUser, threadId]);
+    intervals.set(threadId, intervalId);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+
+      if (intervals.get(threadId) === intervalId) {
+        intervals.delete(threadId);
+      }
+    };
+  }, [threadId]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -544,7 +714,7 @@ export default function MessageThreadPage() {
       setDraft("");
       setSelectedPhoto(null);
       setIsAttachMenuOpen(false);
-      await loadMessages(currentUser);
+      await loadMessagesRef.current(currentUser, "send-message");
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -629,7 +799,7 @@ export default function MessageThreadPage() {
       setHireStatusMessage(
         "Contractor selected. Your phone no. was shared while you wait for their decision.",
       );
-      await loadMessages(currentUser);
+      await loadMessagesRef.current(currentUser, "send-message");
     } catch (error) {
       setHireStatusMessage(getErrorMessage(error));
     } finally {

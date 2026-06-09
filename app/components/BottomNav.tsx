@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeBadgeCounts } from "@/lib/badgeCounts";
@@ -78,6 +78,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
   const [messageBadgeCount, setMessageBadgeCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
+  const previousNotificationCountRef = useRef<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -86,6 +87,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       unsubscribeBadges?.();
       unsubscribeBadges = null;
+      previousNotificationCountRef.current = null;
       setCurrentUser(user);
 
       if (!user || role === "unknown") {
@@ -98,8 +100,18 @@ export default function BottomNav({ role }: { role: UserRole }) {
         (counts) => {
           if (isMounted) {
             setMessageBadgeCount(counts.messages);
-            if (role === "contractor" && counts.notifications > 0) {
-              setNotificationRefreshKey((currentKey) => currentKey + 1);
+            if (role === "contractor") {
+              const previousCount = previousNotificationCountRef.current;
+
+              if (
+                counts.notifications > 0 &&
+                previousCount !== null &&
+                counts.notifications > previousCount
+              ) {
+                setNotificationRefreshKey((currentKey) => currentKey + 1);
+              }
+
+              previousNotificationCountRef.current = counts.notifications;
             }
           }
         },
@@ -165,7 +177,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
           })}
         </div>
       </nav>
-      {isContractor ? (
+      {isContractor && pathname !== "/notifications" ? (
         <ContractorHirePopup
           user={currentUser}
           refreshKey={notificationRefreshKey}

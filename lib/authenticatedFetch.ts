@@ -5,6 +5,11 @@ type ApiErrorBody = {
   message?: unknown;
 };
 
+const errorBodyCache = new WeakMap<
+  Response,
+  Promise<ApiErrorBody | null>
+>();
+
 export class ApiRequestError extends Error {
   code: string;
   status: number;
@@ -18,12 +23,41 @@ export class ApiRequestError extends Error {
 }
 
 async function readErrorBody(response: Response) {
-  return (await response.clone().json().catch(() => null)) as ApiErrorBody | null;
+  const cachedBody = errorBodyCache.get(response);
+
+  if (cachedBody) {
+    return cachedBody;
+  }
+
+  if (response.bodyUsed) {
+    return null;
+  }
+
+  const bodyPromise = (async () => {
+    try {
+      const text = await response.clone().text();
+
+      if (!text) {
+        return null;
+      }
+
+      return JSON.parse(text) as ApiErrorBody;
+    } catch {
+      return null;
+    }
+  })();
+
+  errorBodyCache.set(response, bodyPromise);
+  return bodyPromise;
 }
 
 async function isExpiredTokenResponse(response: Response) {
   if (response.status === 401) {
     return true;
+  }
+
+  if (response.ok) {
+    return false;
   }
 
   const body = await readErrorBody(response);
@@ -41,10 +75,14 @@ export async function throwApiResponseError(
   fallbackMessage: string,
 ): Promise<never> {
   const body = await readErrorBody(response);
+  const message =
+    typeof body?.message === "string"
+      ? body.message
+      : fallbackMessage || response.statusText || "The request failed.";
 
   throw new ApiRequestError(
     typeof body?.code === "string" ? body.code : `api/${response.status}`,
-    typeof body?.message === "string" ? body.message : fallbackMessage,
+    message,
     response.status,
   );
 }

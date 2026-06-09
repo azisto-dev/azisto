@@ -160,7 +160,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
         reviewsByKey.set(
           reviewKey,
-          serializeReview(reviewSnapshot.id, data, {
+          serializeReview(`${jobId}:${reviewSnapshot.id}`, data, {
             serviceCategory: readText(jobData.selectedServiceCategory),
             subcategory: selectedSubcategories[0] ?? "",
             city: readText(jobData.city),

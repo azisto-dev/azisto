@@ -11,6 +11,30 @@ import {
 
 export const runtime = "nodejs";
 
+type BadgeApiResult = {
+  ok: true;
+  messages: number;
+  notifications: number;
+};
+
+type BadgeApiRuntime = {
+  cache: Map<string, { expiresAt: number; result: BadgeApiResult }>;
+  requests: Map<string, Promise<BadgeApiResult>>;
+};
+
+const badgeApiRuntimeKey = "__azistoBadgeApiRuntime";
+const badgeApiRuntimeScope = globalThis as typeof globalThis & {
+  [badgeApiRuntimeKey]?: BadgeApiRuntime;
+};
+const badgeApiRuntime =
+  badgeApiRuntimeScope[badgeApiRuntimeKey] ??
+  {
+    cache: new Map<string, { expiresAt: number; result: BadgeApiResult }>(),
+    requests: new Map<string, Promise<BadgeApiResult>>(),
+  };
+
+badgeApiRuntimeScope[badgeApiRuntimeKey] = badgeApiRuntime;
+
 function getBearerToken(authorizationHeader: string | null) {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return "";
@@ -32,11 +56,6 @@ function getErrorDetails(error: unknown) {
 export async function GET(request: NextRequest) {
   try {
     assertFirebaseAdminConfig();
-    console.log(
-      `[${new Date().toISOString()}] BADGE API FETCH`,
-      request.headers.get("x-azisto-trigger") || "unknown",
-    );
-
     const token = getBearerToken(request.headers.get("authorization"));
 
     if (!token) {
@@ -50,27 +69,54 @@ export async function GET(request: NextRequest) {
     }
 
     const decodedToken = await adminAuth.verifyIdToken(token);
-    const [threadsSnapshot, notificationsSnapshot] = await Promise.all([
-      adminDb
-        .collection("messages")
-        .where("unreadBy", "array-contains", decodedToken.uid)
-        .get(),
-      adminDb
-        .collection("notifications")
-        .where("recipientAuthUid", "==", decodedToken.uid)
-        .where("read", "==", false)
-        .get(),
-    ]);
-    const unreadMessagesCount = threadsSnapshot.size;
-    const unreadNotificationsCount = notificationsSnapshot.docs.filter(
-      (notificationSnapshot) => !notificationSnapshot.get("clearedAt"),
-    ).length;
+    const cachedResult = badgeApiRuntime.cache.get(decodedToken.uid);
+    const forceRefresh =
+      request.headers.get("x-azisto-force-refresh") === "true";
 
-    return NextResponse.json({
-      ok: true,
-      messages: unreadMessagesCount,
-      notifications: unreadNotificationsCount,
-    });
+    if (!forceRefresh && cachedResult && cachedResult.expiresAt > Date.now()) {
+      return NextResponse.json(cachedResult.result);
+    }
+
+    let requestPromise = badgeApiRuntime.requests.get(decodedToken.uid);
+
+    if (!requestPromise) {
+      requestPromise = (async () => {
+        console.log(
+          `[${new Date().toISOString()}] BADGE API FETCH source:`,
+          request.headers.get("x-azisto-trigger") || "global-service",
+        );
+        const [threadsSnapshot, notificationsSnapshot] = await Promise.all([
+          adminDb
+            .collection("messages")
+            .where("unreadBy", "array-contains", decodedToken.uid)
+            .get(),
+          adminDb
+            .collection("notifications")
+            .where("recipientAuthUid", "==", decodedToken.uid)
+            .where("read", "==", false)
+            .get(),
+        ]);
+        const result: BadgeApiResult = {
+          ok: true,
+          messages: threadsSnapshot.size,
+          notifications: notificationsSnapshot.docs.filter(
+            (notificationSnapshot) => !notificationSnapshot.get("clearedAt"),
+          ).length,
+        };
+
+        badgeApiRuntime.cache.set(decodedToken.uid, {
+          expiresAt: Date.now() + 60_000,
+          result,
+        });
+
+        return result;
+      })().finally(() => {
+        badgeApiRuntime.requests.delete(decodedToken.uid);
+      });
+      badgeApiRuntime.requests.set(decodedToken.uid, requestPromise);
+    }
+
+    return NextResponse.json(await requestPromise);
   } catch (error) {
     const { code, message } = getErrorDetails(error);
 
