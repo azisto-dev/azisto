@@ -1,0 +1,172 @@
+export type SubscriptionPlanId = "starter" | "professional" | "premium";
+
+export type SubscriptionPlan = {
+  id: SubscriptionPlanId;
+  name: string;
+  priceBiweekly: number;
+  acceptedJobsLimit: number | null;
+  trialDays: number;
+  description: string;
+};
+
+export const subscriptionPlans: SubscriptionPlan[] = [
+  {
+    id: "starter",
+    name: "Starter",
+    priceBiweekly: 15,
+    acceptedJobsLimit: 5,
+    trialDays: 60,
+    description: "A simple start for building your AZISTO business.",
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    priceBiweekly: 25,
+    acceptedJobsLimit: 10,
+    trialDays: 0,
+    description: "More monthly capacity for growing contractors.",
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    priceBiweekly: 35,
+    acceptedJobsLimit: null,
+    trialDays: 0,
+    description: "Unlimited accepted jobs for established businesses.",
+  },
+];
+
+export type SubscriptionSummary = {
+  plan: SubscriptionPlan;
+  status: string;
+  trialStartedAt: Date;
+  trialEndsAt: Date;
+  trialDaysRemaining: number;
+  acceptedJobsThisMonth: number;
+  jobsRemaining: number | null;
+  usageMonth: string;
+  billingCycleStart: Date;
+  billingCycleEnd: Date;
+};
+
+const dayMs = 24 * 60 * 60 * 1000;
+const billingCycleDays = 14;
+
+function readText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+export function subscriptionDate(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    const parsed = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+}
+
+export function getSubscriptionMonthKey(date = new Date()) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function getSubscriptionPlan(value: unknown) {
+  const planId = readText(value).toLowerCase();
+
+  return (
+    subscriptionPlans.find((plan) => plan.id === planId) ??
+    subscriptionPlans[0]
+  );
+}
+
+export function getStarterTrialDates(startedAt = new Date()) {
+  return {
+    trialStartedAt: startedAt,
+    trialEndsAt: new Date(startedAt.getTime() + 60 * dayMs),
+  };
+}
+
+export function getSubscriptionSummary(
+  data: Record<string, unknown>,
+  now = new Date(),
+): SubscriptionSummary {
+  const plan = getSubscriptionPlan(data.subscriptionPlan);
+  const fallbackStart =
+    subscriptionDate(data.createdAt) ??
+    subscriptionDate(data.subscriptionStartedAt) ??
+    now;
+  const trialStartedAt =
+    subscriptionDate(data.subscriptionTrialStartedAt) ?? fallbackStart;
+  const trialEndsAt =
+    subscriptionDate(data.subscriptionTrialEndsAt) ??
+    getStarterTrialDates(trialStartedAt).trialEndsAt;
+  const isTrialing = plan.id === "starter" && now < trialEndsAt;
+  const storedStatus = readText(data.subscriptionStatus).toLowerCase();
+  const status =
+    storedStatus === "cancelled" || storedStatus === "suspended"
+      ? storedStatus
+      : isTrialing
+        ? "trialing"
+        : "active";
+  const trialDaysRemaining = isTrialing
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / dayMs))
+    : 0;
+  const usageMonth = getSubscriptionMonthKey(now);
+  const acceptedJobsThisMonth =
+    readText(data.subscriptionAcceptedJobsMonth) === usageMonth
+      ? Math.max(0, Math.floor(readNumber(data.subscriptionAcceptedJobsCount)))
+      : 0;
+  const jobsRemaining =
+    plan.acceptedJobsLimit === null
+      ? null
+      : Math.max(0, plan.acceptedJobsLimit - acceptedJobsThisMonth);
+  const billingAnchor =
+    plan.id === "starter"
+      ? trialEndsAt
+      : subscriptionDate(data.subscriptionStartedAt) ?? fallbackStart;
+  const elapsedCycles = Math.max(
+    0,
+    Math.floor(
+      (now.getTime() - billingAnchor.getTime()) /
+        (billingCycleDays * dayMs),
+    ),
+  );
+  const billingCycleStart = isTrialing
+    ? trialStartedAt
+    : new Date(
+        billingAnchor.getTime() + elapsedCycles * billingCycleDays * dayMs,
+      );
+  const billingCycleEnd = isTrialing
+    ? trialEndsAt
+    : new Date(billingCycleStart.getTime() + billingCycleDays * dayMs);
+
+  return {
+    plan,
+    status,
+    trialStartedAt,
+    trialEndsAt,
+    trialDaysRemaining,
+    acceptedJobsThisMonth,
+    jobsRemaining,
+    usageMonth,
+    billingCycleStart,
+    billingCycleEnd,
+  };
+}

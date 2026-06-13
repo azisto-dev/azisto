@@ -652,7 +652,9 @@ export default function ContractorDashboardPage() {
                   </div>
 
                   <Link
-                    href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
+                    href={`/contractor/jobs/${encodeURIComponent(
+                      job.parentJobId || job.jobId,
+                    )}${job.taskId ? `?taskId=${encodeURIComponent(job.taskId)}` : ""}`}
                     className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
                   >
                     View details

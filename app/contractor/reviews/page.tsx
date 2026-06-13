@@ -143,10 +143,7 @@ export default function ContractorReviewsPage() {
           </header>
 
           <section className="mt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">
-              Contractor reputation
-            </p>
-            <h1 className="mt-1 text-3xl font-normal text-[var(--azisto-contractor-text)]">
+            <h1 className="text-3xl font-normal text-[var(--azisto-contractor-text)]">
               Ratings & reviews
             </h1>
           </section>

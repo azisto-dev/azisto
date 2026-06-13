@@ -790,7 +790,6 @@ export default function AdminConsolePage() {
                       <Meta label="Email" value={contractor.email} />
                       <Meta label="Phone" value={contractor.phone} />
                       <Meta label="Location" value={`${text(contractor.city, "")}, ${text(contractor.province, "")}`} />
-                      <Meta label="Subscription" value={contractor.subscriptionStatus} />
                       <Meta label="Services" value={list(contractor.services).join(", ")} />
                       <Meta label="Service cities" value={list(contractor.serviceCities).join(", ")} />
                     </dl>
@@ -817,6 +816,54 @@ export default function AdminConsolePage() {
                         Reject
                       </button>
                     </div>
+                  </section>
+
+                  <section className="rounded-lg border border-slate-200 bg-white p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-slate-400">
+                          Subscription
+                        </p>
+                        <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                          {text(contractor.subscriptionPlan, "Starter")}
+                        </h3>
+                      </div>
+                      <StatusPill value={contractor.subscriptionStatus} />
+                    </div>
+                    <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <Meta
+                        label="Trial days remaining"
+                        value={number(contractor.subscriptionTrialDaysRemaining)}
+                      />
+                      <Meta
+                        label="Accepted this month"
+                        value={number(contractor.subscriptionAcceptedJobsThisMonth)}
+                      />
+                      <Meta
+                        label="Jobs remaining"
+                        value={
+                          contractor.subscriptionJobsRemaining === null
+                            ? "Unlimited"
+                            : number(contractor.subscriptionJobsRemaining)
+                        }
+                      />
+                      <Meta
+                        label="Monthly limit"
+                        value={
+                          contractor.subscriptionAcceptedJobsLimit === null
+                            ? "Unlimited"
+                            : number(contractor.subscriptionAcceptedJobsLimit)
+                        }
+                      />
+                      <Meta
+                        label="Billing cycle starts"
+                        value={formatDate(contractor.subscriptionBillingCycleStart)}
+                      />
+                      <Meta
+                        label="Billing cycle ends"
+                        value={formatDate(contractor.subscriptionBillingCycleEnd)}
+                      />
+                    </dl>
                   </section>
 
                   <section className="rounded-lg border border-slate-200 bg-white p-5">

@@ -6,6 +6,7 @@ import {
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
 import { createNotification } from "@/lib/notifications";
+import { getSubscriptionSummary } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -153,6 +154,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const tasksSnapshot = await transaction.get(
         jobDocument.collection("tasks"),
       );
+      const currentContractorProfile = await transaction.get(
+        contractorProfile.ref,
+      );
       const assignedPendingTasks = tasksSnapshot.docs.filter(
         (taskSnapshot) =>
           taskSnapshot.get("status") === "hired_pending_contractor" &&
@@ -183,6 +187,38 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const changedAt = FieldValue.serverTimestamp();
 
       if (decision === "accepted") {
+        const subscription = getSubscriptionSummary(
+          currentContractorProfile.data() ?? {},
+        );
+
+        if (
+          subscription.plan.acceptedJobsLimit !== null &&
+          subscription.acceptedJobsThisMonth >=
+            subscription.plan.acceptedJobsLimit
+        ) {
+          throw Object.assign(
+            new Error(
+              `Your ${subscription.plan.name} plan has reached its ${subscription.plan.acceptedJobsLimit}-job monthly limit. Visit Subscription settings to review your plan.`,
+            ),
+            { code: "subscription-job-limit-reached" },
+          );
+        }
+
+        transaction.set(
+          contractorProfile.ref,
+          {
+            subscriptionPlan: subscription.plan.id,
+            subscriptionStatus: subscription.status,
+            subscriptionTrialStartedAt: subscription.trialStartedAt,
+            subscriptionTrialEndsAt: subscription.trialEndsAt,
+            subscriptionAcceptedJobsMonth: subscription.usageMonth,
+            subscriptionAcceptedJobsCount:
+              subscription.acceptedJobsThisMonth + 1,
+            subscriptionUpdatedAt: changedAt,
+          },
+          { merge: true },
+        );
+
         assignedPendingTasks.forEach((taskSnapshot) => {
           transaction.set(
             taskSnapshot.ref,
@@ -329,8 +365,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
               ? 404
               : code === "job-access-denied"
                 ? 403
-                : code === "decision-not-pending"
+              : code === "decision-not-pending"
                   ? 409
+                  : code === "subscription-job-limit-reached"
+                    ? 403
                   : 500,
       },
     );

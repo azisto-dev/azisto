@@ -11,6 +11,7 @@ import {
   serializeTimestamp,
   sortByNewest,
 } from "@/lib/adminConsole";
+import { getSubscriptionSummary } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .get(),
     ]);
     const documents = readRecord(data.documents);
+    const subscription = getSubscriptionSummary(data);
 
     return NextResponse.json({
       ok: true,
@@ -89,7 +91,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
         verificationStatus: readText(data.verificationStatus) || "pending",
         documentsVerificationStatus:
           readText(data.documentsVerificationStatus) || "pending",
-        subscriptionStatus: readText(data.subscriptionStatus) || "not set",
+        subscriptionPlan: subscription.plan.name,
+        subscriptionStatus: subscription.status,
+        subscriptionTrialDaysRemaining: subscription.trialDaysRemaining,
+        subscriptionAcceptedJobsThisMonth:
+          subscription.acceptedJobsThisMonth,
+        subscriptionJobsRemaining: subscription.jobsRemaining,
+        subscriptionAcceptedJobsLimit:
+          subscription.plan.acceptedJobsLimit,
+        subscriptionBillingCycleStart:
+          subscription.billingCycleStart.toISOString(),
+        subscriptionBillingCycleEnd:
+          subscription.billingCycleEnd.toISOString(),
         rating:
           readNumber(data.ratingAverage) || readNumber(data.averageRating),
         reviewCount:

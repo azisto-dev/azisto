@@ -1069,7 +1069,7 @@ export default function ProfilePage() {
                 className={
                   isCustomerProfile
                     ? "az-customer-card mt-6 bg-gradient-to-br from-white via-blue-50 to-white p-4"
-                    : "az-contractor-hero-card mt-6 p-4"
+                    : "az-contractor-hero-card mt-6 !border-[#C8A96B] p-4"
                 }
               >
                 <div className="relative z-10 flex items-start justify-between gap-3">

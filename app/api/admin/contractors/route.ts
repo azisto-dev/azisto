@@ -10,6 +10,7 @@ import {
   serializeTimestamp,
   sortByNewest,
 } from "@/lib/adminConsole";
+import { getSubscriptionSummary } from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       snapshot.docs.map((documentSnapshot) => {
         const data = documentSnapshot.data();
         const subcategoryMap = readRecord(data.selectedSubcategoriesByService);
+        const subscription = getSubscriptionSummary(data);
         return {
           contractorId: readText(data.contractorId) || documentSnapshot.id,
           name:
@@ -38,7 +40,8 @@ export async function GET(request: NextRequest) {
           services: readStringList(data.selectedServices),
           subcategories: Object.values(subcategoryMap).flatMap(readStringList),
           verificationStatus: readText(data.verificationStatus) || "pending",
-          subscriptionStatus: readText(data.subscriptionStatus) || "not set",
+          subscriptionPlan: subscription.plan.name,
+          subscriptionStatus: subscription.status,
           rating:
             readNumber(data.ratingAverage) || readNumber(data.averageRating),
           reviewCount:

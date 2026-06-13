@@ -6,6 +6,10 @@ import {
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
 import { ensureUniqueReadableId } from "@/lib/readableIds";
+import {
+  getStarterTrialDates,
+  getSubscriptionMonthKey,
+} from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -513,6 +517,9 @@ export async function POST(request: NextRequest) {
       .collection("contractors")
       .doc(contractorId);
     const contractorDocumentSnapshot = await contractorDocument.get();
+    const subscriptionStartedAt = new Date();
+    const { trialStartedAt, trialEndsAt } =
+      getStarterTrialDates(subscriptionStartedAt);
 
     const contractorProfile = {
       contractorId,
@@ -545,7 +552,17 @@ export async function POST(request: NextRequest) {
       updatedAt: FieldValue.serverTimestamp(),
       ...(contractorDocumentSnapshot.exists
         ? {}
-        : { createdAt: FieldValue.serverTimestamp() }),
+        : {
+            createdAt: FieldValue.serverTimestamp(),
+            subscriptionPlan: "starter",
+            subscriptionStatus: "trialing",
+            subscriptionStartedAt,
+            subscriptionTrialStartedAt: trialStartedAt,
+            subscriptionTrialEndsAt: trialEndsAt,
+            subscriptionAcceptedJobsMonth:
+              getSubscriptionMonthKey(subscriptionStartedAt),
+            subscriptionAcceptedJobsCount: 0,
+          }),
     };
 
     await contractorDocument.set(contractorProfile, { merge: true });

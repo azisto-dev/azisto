@@ -607,6 +607,7 @@ export default function HomePage() {
   const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
     "unknown",
   );
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
   const [greetingName, setGreetingName] = useState("");
   const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [contractorHome, setContractorHome] =
@@ -645,6 +646,7 @@ export default function HomePage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("Home auth state loaded");
       setCurrentUser(user);
+      setIsRoleLoading(true);
 
       if (!user) {
         console.log("Home current uid: none");
@@ -656,6 +658,7 @@ export default function HomePage() {
         setContractorHome(null);
         setContractorFilters(emptyContractorFilters);
         setFilterOptions(emptyFilterOptions);
+        setIsRoleLoading(false);
         return;
       }
 
@@ -684,6 +687,8 @@ export default function HomePage() {
         setRole("unknown");
         setGreetingName("");
         setNotificationBadgeCount(0);
+      } finally {
+        setIsRoleLoading(false);
       }
     });
 
@@ -1052,6 +1057,31 @@ export default function HomePage() {
     }
   }
 
+  if (isRoleLoading) {
+    return (
+      <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
+        <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 pt-5 shadow-none md:min-h-[780px] md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
+          <div className="mb-5 flex items-center justify-between text-xs font-bold">
+            <span>9:41</span>
+            <div className="flex items-center gap-1">
+              <span className="h-2.5 w-3 rounded-sm bg-black" />
+              <span className="h-2.5 w-3 rounded-sm border border-black" />
+              <span className="h-2.5 w-5 rounded-sm bg-black" />
+            </div>
+          </div>
+          <img
+            src="/azisto-logo-cropped.png"
+            alt="AZISTO - Your on-demand assistant"
+            className="mx-auto mt-3 w-full max-w-[165px] object-contain"
+          />
+          <p className="mt-10 text-center text-sm font-semibold text-[var(--azisto-contractor-muted)]">
+            Loading your AZISTO home...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (role === "contractor") {
     const contractorGreetingName =
       contractorHome?.contractorName.trim() || greetingName || "Contractor";
@@ -1414,7 +1444,7 @@ export default function HomePage() {
 
                     <Link
                       href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
-                      className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-[rgb(122_0_60_/_0.08)] text-xs font-bold text-[#5C0032]"
+                      className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-white text-xs font-bold text-[#5C0032]"
                     >
                       View job
                     </Link>
