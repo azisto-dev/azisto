@@ -863,6 +863,22 @@ export default function AdminConsolePage() {
                         label="Billing cycle ends"
                         value={formatDate(contractor.subscriptionBillingCycleEnd)}
                       />
+                      <Meta
+                        label="Next billing date"
+                        value={formatDate(contractor.nextBillingDate)}
+                      />
+                      <Meta
+                        label="Accepted this billing cycle"
+                        value={number(contractor.acceptedJobsThisCycle)}
+                      />
+                      <Meta
+                        label="Stripe customer ID"
+                        value={contractor.stripeCustomerId}
+                      />
+                      <Meta
+                        label="Stripe subscription ID"
+                        value={contractor.stripeSubscriptionId}
+                      />
                     </dl>
                   </section>
 

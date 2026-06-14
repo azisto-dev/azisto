@@ -40,6 +40,9 @@ type SubscriptionData = {
   usageMonth: string;
   billingCycleStart: string;
   billingCycleEnd: string;
+  nextBillingDate: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
 };
 
 function formatDate(value: string) {
@@ -55,7 +58,7 @@ function formatDate(value: string) {
 }
 
 function formatStatus(value: string) {
-  if (value === "trialing") {
+  if (value === "trialing" || value === "trial") {
     return "Free trial";
   }
 
@@ -99,8 +102,24 @@ export default function ContractorSubscriptionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [billingNotice, setBillingNotice] = useState("");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [checkoutPlan, setCheckoutPlan] =
+    useState<SubscriptionPlanId | null>(null);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
 
   useEffect(() => {
+    const stripeResult = new URLSearchParams(window.location.search).get(
+      "stripe",
+    );
+
+    if (stripeResult === "success") {
+      setBillingNotice(
+        "Subscription checkout completed. Your plan will update shortly.",
+      );
+    } else if (stripeResult === "cancelled") {
+      setBillingNotice("Checkout cancelled. No changes were made.");
+    }
+
     return onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace("/login");
@@ -108,6 +127,7 @@ export default function ContractorSubscriptionPage() {
       }
 
       try {
+        setCurrentUser(user);
         setIsLoading(true);
         setErrorMessage("");
         setSubscription(await fetchSubscription(user));
@@ -124,6 +144,70 @@ export default function ContractorSubscriptionPage() {
   }, [router]);
 
   const currentPlan = getSubscriptionPlan(subscription?.planId);
+
+  async function openStripeSession(
+    endpoint: "/api/stripe/checkout" | "/api/stripe/portal",
+    planId?: SubscriptionPlanId,
+  ) {
+    if (!currentUser) {
+      throw new Error("Please sign in again.");
+    }
+
+    const response = await authenticatedFetch(currentUser, endpoint, {
+      method: "POST",
+      headers: planId ? { "Content-Type": "application/json" } : undefined,
+      body: planId ? JSON.stringify({ plan: planId }) : undefined,
+    });
+    const body = (await response.json().catch(() => null)) as {
+      url?: unknown;
+      message?: unknown;
+    } | null;
+
+    if (!response.ok) {
+      await throwApiResponseError(
+        response,
+        typeof body?.message === "string"
+          ? body.message
+          : "Unable to open Stripe billing.",
+      );
+    }
+
+    if (typeof body?.url !== "string" || !body.url) {
+      throw new Error("Stripe did not return a billing URL.");
+    }
+
+    window.location.assign(body.url);
+  }
+
+  async function startCheckout(planId: SubscriptionPlanId) {
+    try {
+      setCheckoutPlan(planId);
+      setBillingNotice("");
+      await openStripeSession("/api/stripe/checkout", planId);
+    } catch (error) {
+      setBillingNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to start subscription checkout.",
+      );
+      setCheckoutPlan(null);
+    }
+  }
+
+  async function openBillingPortal() {
+    try {
+      setIsPortalLoading(true);
+      setBillingNotice("");
+      await openStripeSession("/api/stripe/portal");
+    } catch (error) {
+      setBillingNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to open billing management.",
+      );
+      setIsPortalLoading(false);
+    }
+  }
 
   return (
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
@@ -248,7 +332,8 @@ export default function ContractorSubscriptionPage() {
                       Billing cycle
                     </h2>
                     <p className="text-xs text-[var(--azisto-contractor-muted)]">
-                      {subscription.status === "trialing"
+                      {subscription.status === "trialing" ||
+                      subscription.status === "trial"
                         ? "Starter free-trial period"
                         : "Current 14-day billing period"}
                     </p>
@@ -291,6 +376,10 @@ export default function ContractorSubscriptionPage() {
                     const isCurrent = plan.id === subscription.planId;
                     const isUpgrade =
                       plan.priceBiweekly > currentPlan.priceBiweekly;
+                    const isCurrentStripePlan =
+                      isCurrent &&
+                      Boolean(subscription.stripeSubscriptionId);
+                    const isStartingCheckout = checkoutPlan === plan.id;
 
                     return (
                       <article
@@ -353,21 +442,25 @@ export default function ContractorSubscriptionPage() {
 
                         <button
                           type="button"
-                          disabled={isCurrent}
-                          onClick={() =>
-                            setBillingNotice(
-                              `${isUpgrade ? "Upgrades" : "Downgrades"} will be available when Stripe billing launches.`,
-                            )
+                          disabled={
+                            isCurrentStripePlan || checkoutPlan !== null
                           }
+                          onClick={() => void startCheckout(plan.id)}
                           className={`mt-5 flex h-11 w-full items-center justify-center rounded-full text-sm font-bold ${
-                            isCurrent
+                            isCurrentStripePlan
                               ? "cursor-default border border-slate-200 bg-slate-100 text-slate-500"
                               : "az-btn-contractor"
                           }`}
                         >
-                          {isCurrent
+                          {isStartingCheckout
+                            ? "Opening Stripe..."
+                            : isCurrentStripePlan
                             ? "Current plan"
-                            : `${isUpgrade ? "Upgrade" : "Downgrade"} (coming soon)`}
+                            : isCurrent
+                              ? "Set up billing"
+                              : isUpgrade
+                                ? "Upgrade plan"
+                                : "Downgrade plan"}
                         </button>
                       </article>
                     );
@@ -377,11 +470,22 @@ export default function ContractorSubscriptionPage() {
 
               <section className="mt-5 rounded-2xl border border-dashed border-[var(--azisto-contractor-border)] bg-slate-50 p-4 text-center">
                 <p className="text-sm font-bold text-[var(--azisto-contractor-text)]">
-                  Stripe billing coming soon
+                  Secure Stripe billing
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--azisto-contractor-muted)]">
-                  Plan changes and payment management are placeholders in v1.
+                  Payments are securely processed by Stripe. AZISTO does not
+                  store your card details.
                 </p>
+                {subscription.stripeCustomerId ? (
+                  <button
+                    type="button"
+                    disabled={isPortalLoading}
+                    onClick={() => void openBillingPortal()}
+                    className="az-btn-contractor mt-4 flex h-11 w-full items-center justify-center rounded-full text-sm font-bold disabled:opacity-60"
+                  >
+                    {isPortalLoading ? "Opening billing..." : "Manage billing"}
+                  </button>
+                ) : null}
                 {billingNotice ? (
                   <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[var(--azisto-contractor-burgundy)]">
                     {billingNotice}

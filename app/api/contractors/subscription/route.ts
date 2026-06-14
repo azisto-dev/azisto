@@ -93,6 +93,15 @@ export async function GET(request: NextRequest) {
         usageMonth: summary.usageMonth,
         billingCycleStart: summary.billingCycleStart.toISOString(),
         billingCycleEnd: summary.billingCycleEnd.toISOString(),
+        nextBillingDate: summary.nextBillingDate.toISOString(),
+        stripeCustomerId:
+          typeof data.stripeCustomerId === "string"
+            ? data.stripeCustomerId
+            : "",
+        stripeSubscriptionId:
+          typeof data.stripeSubscriptionId === "string"
+            ? data.stripeSubscriptionId
+            : "",
       },
     });
   } catch (error) {
@@ -110,4 +119,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

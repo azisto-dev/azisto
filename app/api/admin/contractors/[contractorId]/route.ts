@@ -103,6 +103,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
           subscription.billingCycleStart.toISOString(),
         subscriptionBillingCycleEnd:
           subscription.billingCycleEnd.toISOString(),
+        nextBillingDate: subscription.nextBillingDate.toISOString(),
+        stripeCustomerId: readText(data.stripeCustomerId),
+        stripeSubscriptionId: readText(data.stripeSubscriptionId),
+        acceptedJobsThisCycle: readNumber(data.acceptedJobsThisCycle),
+        acceptedJobsLimit:
+          data.acceptedJobsLimit === null
+            ? null
+            : readNumber(data.acceptedJobsLimit) ||
+              subscription.plan.acceptedJobsLimit,
         rating:
           readNumber(data.ratingAverage) || readNumber(data.averageRating),
         reviewCount:

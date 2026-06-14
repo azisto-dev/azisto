@@ -47,6 +47,7 @@ export type SubscriptionSummary = {
   usageMonth: string;
   billingCycleStart: Date;
   billingCycleEnd: Date;
+  nextBillingDate: Date;
 };
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -117,14 +118,29 @@ export function getSubscriptionSummary(
   const trialEndsAt =
     subscriptionDate(data.subscriptionTrialEndsAt) ??
     getStarterTrialDates(trialStartedAt).trialEndsAt;
-  const isTrialing = plan.id === "starter" && now < trialEndsAt;
   const storedStatus = readText(data.subscriptionStatus).toLowerCase();
-  const status =
-    storedStatus === "cancelled" || storedStatus === "suspended"
+  const hasStripeSubscription = Boolean(
+    readText(data.stripeSubscriptionId),
+  );
+  const normalizedStripeStatus =
+    storedStatus === "trialing"
+      ? "trial"
+      : storedStatus === "canceled"
+        ? "cancelled"
+        : storedStatus === "incomplete_expired"
+          ? "expired"
+          : storedStatus;
+  const isLegacyTrial =
+    !hasStripeSubscription && plan.id === "starter" && now < trialEndsAt;
+  const status = hasStripeSubscription
+    ? normalizedStripeStatus || "incomplete"
+    : storedStatus === "cancelled" || storedStatus === "suspended"
       ? storedStatus
-      : isTrialing
+      : isLegacyTrial
         ? "trialing"
         : "active";
+  const isTrialing =
+    (status === "trial" || status === "trialing") && now < trialEndsAt;
   const trialDaysRemaining = isTrialing
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / dayMs))
     : 0;
@@ -148,14 +164,22 @@ export function getSubscriptionSummary(
         (billingCycleDays * dayMs),
     ),
   );
-  const billingCycleStart = isTrialing
+  const calculatedBillingCycleStart = isTrialing
     ? trialStartedAt
     : new Date(
         billingAnchor.getTime() + elapsedCycles * billingCycleDays * dayMs,
       );
-  const billingCycleEnd = isTrialing
+  const calculatedBillingCycleEnd = isTrialing
     ? trialEndsAt
-    : new Date(billingCycleStart.getTime() + billingCycleDays * dayMs);
+    : new Date(
+        calculatedBillingCycleStart.getTime() + billingCycleDays * dayMs,
+      );
+  const billingCycleStart =
+    subscriptionDate(data.billingCycleStart) ?? calculatedBillingCycleStart;
+  const billingCycleEnd =
+    subscriptionDate(data.billingCycleEnd) ?? calculatedBillingCycleEnd;
+  const nextBillingDate =
+    subscriptionDate(data.nextBillingDate) ?? billingCycleEnd;
 
   return {
     plan,
@@ -168,5 +192,21 @@ export function getSubscriptionSummary(
     usageMonth,
     billingCycleStart,
     billingCycleEnd,
+    nextBillingDate,
   };
+}
+
+export function canAcceptJobsForSubscription(
+  data: Record<string, unknown>,
+  summary = getSubscriptionSummary(data),
+) {
+  const hasStripeSubscription = Boolean(
+    readText(data.stripeSubscriptionId),
+  );
+
+  if (!hasStripeSubscription) {
+    return !["cancelled", "suspended"].includes(summary.status);
+  }
+
+  return ["active", "trial", "trialing"].includes(summary.status);
 }

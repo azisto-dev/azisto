@@ -6,7 +6,10 @@ import {
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
 import { createNotification } from "@/lib/notifications";
-import { getSubscriptionSummary } from "@/lib/subscriptions";
+import {
+  canAcceptJobsForSubscription,
+  getSubscriptionSummary,
+} from "@/lib/subscriptions";
 
 export const runtime = "nodejs";
 
@@ -190,6 +193,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const subscription = getSubscriptionSummary(
           currentContractorProfile.data() ?? {},
         );
+        const subscriptionData = currentContractorProfile.data() ?? {};
+
+        if (
+          !canAcceptJobsForSubscription(subscriptionData, subscription)
+        ) {
+          throw Object.assign(
+            new Error(
+              "Your subscription is not active. Please update your subscription to accept new jobs.",
+            ),
+            { code: "subscription-inactive" },
+          );
+        }
 
         if (
           subscription.plan.acceptedJobsLimit !== null &&
@@ -367,9 +382,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 ? 403
               : code === "decision-not-pending"
                   ? 409
-                  : code === "subscription-job-limit-reached"
-                    ? 403
-                  : 500,
+                  : code === "subscription-job-limit-reached" ||
+                      code === "subscription-inactive"
+                      ? 403
+                    : 500,
       },
     );
   }
