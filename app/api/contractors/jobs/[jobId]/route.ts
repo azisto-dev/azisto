@@ -6,6 +6,7 @@ import {
 } from "@/lib/firebaseAdmin";
 import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
 import { readJobProofPhotos } from "@/lib/jobProofPhotos";
+import { getParentJobIdFromTaskId } from "@/lib/contractorJobHref";
 
 export const runtime = "nodejs";
 
@@ -288,7 +289,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const { jobId } = await context.params;
-    const jobSnapshot = await adminDb.collection("jobs").doc(jobId).get();
+    let jobSnapshot = await adminDb.collection("jobs").doc(jobId).get();
+
+    if (!jobSnapshot.exists) {
+      const parentJobId = getParentJobIdFromTaskId(jobId);
+
+      if (parentJobId) {
+        jobSnapshot = await adminDb.collection("jobs").doc(parentJobId).get();
+      }
+    }
 
     if (!jobSnapshot.exists) {
       return NextResponse.json(

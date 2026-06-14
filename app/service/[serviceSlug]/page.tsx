@@ -9,7 +9,7 @@ import {
   type ServiceCatalogItem,
 } from "@/lib/serviceCatalog";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
 
 type ServiceDisplayDetails = {
   name: string;
@@ -97,7 +97,7 @@ const iconBadgeStyles = {
   amber:
     "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-100 shadow-amber-100/80",
   blue:
-    "border-azisto-gold/30 bg-white shadow-azisto-gold/10",
+    "border-[#F5B400]/30 bg-white shadow-amber-100/60",
   cyan:
     "border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-100 shadow-cyan-100/80",
   emerald:
@@ -311,9 +311,9 @@ function SubcategoryIcon({
 
   return (
     <span
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-0 shadow-sm ${
         isSelected
-          ? "border-azisto-accent bg-blue-50 shadow-blue-100"
+          ? "bg-blue-50 shadow-blue-100"
           : badgeClass
       }`}
     >
@@ -382,7 +382,7 @@ export default function ServiceDetailPage() {
 
   if (!service) {
     return (
-      <main className="min-h-screen bg-azisto-background text-black">
+      <main className="az-customer-shell min-h-screen bg-azisto-background text-black">
         <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 py-5">
           <Link
             href="/home"
@@ -437,37 +437,20 @@ export default function ServiceDetailPage() {
   });
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-5">
-          <div className="mb-5 flex items-center justify-between text-xs font-bold">
-            <span>9:41</span>
-            <div className="flex items-center gap-1">
-              <span className="h-2.5 w-3 rounded-sm bg-black" />
-              <span className="h-2.5 w-3 rounded-sm border border-black" />
-              <span className="h-2.5 w-5 rounded-sm bg-black" />
-            </div>
-          </div>
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/home"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to home"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/home"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to home"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-8">
             <div className="flex items-center gap-4">
@@ -511,7 +494,7 @@ export default function ServiceDetailPage() {
                     }}
                     className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold shadow-sm transition duration-200 ${
                       isSelected
-                        ? "border-azisto-accent bg-azisto-accent text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]"
+                        ? "border-[#1F1F1F] bg-[#1F1F1F] text-white shadow-[0_6px_16px_rgba(31,31,31,0.16)]"
                         : "border-azisto-border bg-white/45 text-slate-600"
                     }`}
                   >
@@ -531,10 +514,10 @@ export default function ServiceDetailPage() {
                   key={subcategory}
                   type="button"
                   onClick={() => toggleSubcategory(subcategory)}
-                  className={`flex min-h-[60px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left shadow-sm transition ${
+                  className={`az-service-subcategory-card flex min-h-[58px] w-full items-center justify-between rounded-2xl border-0 px-3 py-2.5 text-left shadow-[0_2px_8px_rgba(0,0,0,0.055)] outline-none transition hover:-translate-y-0.5 ${
                     isSelected
-                      ? "border-azisto-accent bg-blue-50 text-black shadow-blue-100"
-                      : "border-azisto-gold bg-white text-black"
+                      ? "bg-blue-50 text-black"
+                      : "bg-white/90 text-black hover:bg-white"
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-3">
@@ -550,8 +533,8 @@ export default function ServiceDetailPage() {
                   <span
                     className={`ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
                       isSelected
-                        ? "border-azisto-accent bg-azisto-accent text-white"
-                        : "border-azisto-gold bg-white text-transparent"
+                        ? "border-[var(--azisto-customer-azure)] bg-[var(--azisto-customer-azure)] text-white"
+                        : "border-[var(--azisto-customer-border)] bg-white text-transparent"
                     }`}
                   >
                     <Check aria-hidden="true" className="h-4 w-4" />

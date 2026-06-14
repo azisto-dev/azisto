@@ -7,7 +7,8 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { Calendar, Camera, ChevronLeft, Clock, LocateFixed, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 
 const scheduleModeOptions = [
   {
@@ -65,19 +66,6 @@ const initialJobRequestForm: JobRequestForm = {
 
 function getTodayDateString() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
@@ -362,30 +350,20 @@ function RequestForm() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell az-request-service-page min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-28 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/home"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to home"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/home"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to home"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
@@ -401,7 +379,7 @@ function RequestForm() {
           </section>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <section className="rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
+            <section className="az-request-card rounded-xl border-0 bg-white p-4 shadow-sm">
               <p className="text-sm font-bold text-black">
                 Selected service summary
               </p>
@@ -436,7 +414,7 @@ function RequestForm() {
             </section>
 
             {/* TODO: Replace this placeholder with Firebase Phone Auth before production. */}
-            <section className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+            <section className="az-request-card rounded-xl border-0 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
               <p className="font-bold">Phone verification required soon</p>
               <p className="mt-1">
                 You can post now, but AZISTO will require phone verification
@@ -460,23 +438,23 @@ function RequestForm() {
               <FieldLabel>Photos</FieldLabel>
               <button
                 type="button"
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-sm font-bold text-slate-700"
+                className="az-request-card flex h-14 w-full items-center justify-center gap-2 rounded-xl border-0 bg-slate-50 text-sm font-bold text-slate-700"
               >
                 <Camera aria-hidden="true" className="h-5 w-5" />
                 Add photos
               </button>
             </div>
 
-            <section className="space-y-3 rounded-[22px] border border-azisto-border bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.07)]">
+            <section className="az-request-card space-y-3 rounded-[22px] border-0 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.07)]">
               <FieldLabel>Where do you need service?</FieldLabel>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={captureLiveLocation}
-                  className={`min-h-[108px] rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.98] ${
+                  className={`az-request-option-card min-h-[108px] rounded-2xl border-0 p-3 text-left transition duration-200 active:scale-[0.98] ${
                     locationMode === "live"
-                      ? "border-azisto-accent bg-blue-50 text-[#0F172A] shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
-                      : "border-azisto-border bg-white text-slate-700 shadow-sm"
+                      ? "bg-blue-50 text-[#0F172A] shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
+                      : "bg-white text-slate-700 shadow-sm"
                   }`}
                 >
                   <span className="flex items-center gap-2 text-sm font-bold leading-5">
@@ -498,10 +476,10 @@ function RequestForm() {
                     setLocationStatus("idle");
                     setLocationMessage("");
                   }}
-                  className={`min-h-[108px] rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.98] ${
+                  className={`az-request-option-card min-h-[108px] rounded-2xl border-0 p-3 text-left transition duration-200 active:scale-[0.98] ${
                     locationMode === "manual"
-                      ? "border-azisto-accent bg-blue-50 text-[#0F172A] shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
-                      : "border-azisto-border bg-white text-slate-700 shadow-sm"
+                      ? "bg-blue-50 text-[#0F172A] shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
+                      : "bg-white text-slate-700 shadow-sm"
                   }`}
                 >
                   <span className="flex items-center gap-2 text-sm font-bold leading-5">
@@ -515,7 +493,7 @@ function RequestForm() {
               </div>
 
               {locationMode === "live" ? (
-                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                <div className="az-request-card rounded-2xl border-0 bg-blue-50 px-4 py-3 text-sm leading-6 text-slate-700">
                   <p className="font-bold text-[#0F172A]">
                     {locationMessage || "Getting your location..."}
                   </p>
@@ -601,7 +579,7 @@ function RequestForm() {
               )}
             </section>
 
-            <section className="space-y-3 rounded-xl border border-azisto-border bg-white p-4 shadow-sm">
+            <section className="az-request-card space-y-3 rounded-xl border-0 bg-white p-4 shadow-sm">
               <FieldLabel>When do you need this done?</FieldLabel>
               <div className="grid grid-cols-2 gap-2">
                 {scheduleModeOptions.map((option) => {
@@ -612,10 +590,10 @@ function RequestForm() {
                       key={option.value}
                       type="button"
                       onClick={() => setScheduleMode(option.value)}
-                      className={`min-h-[96px] rounded-2xl border p-3 text-left transition duration-200 ${
+                      className={`az-request-option-card min-h-[96px] rounded-2xl border-0 p-3 text-left transition duration-200 ${
                         isSelected
-                          ? "border-azisto-accent bg-blue-50 text-black shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
-                          : "border-azisto-border bg-white text-slate-700 shadow-sm"
+                          ? "bg-blue-50 text-black shadow-[0_8px_22px_rgba(37,99,235,0.12)]"
+                          : "bg-white text-slate-700 shadow-sm"
                       }`}
                     >
                       <span className="flex items-center gap-2 text-sm font-bold leading-5">
@@ -668,10 +646,10 @@ function RequestForm() {
                             onClick={() =>
                               updateField("preferredTimeWindow", option)
                             }
-                            className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-bold leading-5 transition duration-200 ${
+                            className={`az-request-option-card min-h-12 rounded-xl border-0 px-3 py-2 text-sm font-bold leading-5 transition duration-200 ${
                               isSelected
-                                ? "border-azisto-accent bg-blue-50 text-black shadow-sm"
-                                : "border-azisto-border bg-white text-slate-700"
+                                ? "bg-blue-50 text-black shadow-sm"
+                                : "bg-white text-slate-700"
                             }`}
                           >
                             {option}
@@ -693,10 +671,10 @@ function RequestForm() {
                           key={option}
                           type="button"
                           onClick={() => setUrgency(option)}
-                          className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-bold leading-5 transition duration-200 ${
+                          className={`az-request-option-card min-h-12 rounded-xl border-0 px-3 py-2 text-sm font-bold leading-5 transition duration-200 ${
                             isSelected
-                              ? "border-azisto-accent bg-blue-50 text-black shadow-sm"
-                              : "border-azisto-border bg-white text-slate-700"
+                              ? "bg-blue-50 text-black shadow-sm"
+                              : "bg-white text-slate-700"
                           }`}
                         >
                           {option}
@@ -709,9 +687,7 @@ function RequestForm() {
             </section>
 
             {authLoading ? (
-              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-                Checking account...
-              </p>
+              <AppShimmer rows={1} />
             ) : null}
 
             {errorMessage ? (

@@ -9,6 +9,7 @@ import {
   fetchSessionProfile,
   getDefaultRouteForSession,
 } from "@/lib/sessionProfile";
+import AppShimmer from "@/app/components/AppShimmer";
 
 const accountTypes = [
   {
@@ -26,19 +27,6 @@ const accountTypes = [
     href: "/signup?role=contractor",
   },
 ];
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 export default function AccountTypePage() {
   const router = useRouter();
@@ -73,16 +61,14 @@ export default function AccountTypePage() {
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 flex justify-center">
+          <header className="mt-1 flex justify-center">
             <img
               src="/azisto-logo-cropped.png"
               alt="AZISTO - Your on-demand assistant"
-              className="w-full max-w-[175px] object-contain"
+              className="w-full max-w-[150px] object-contain"
             />
           </header>
 
@@ -93,11 +79,13 @@ export default function AccountTypePage() {
             <h1 className="mt-1 text-3xl font-bold leading-tight text-black">
               Create your AZISTO account
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {authLoaded
-                ? "Choose the account type that fits what you want to do."
-                : "Checking account..."}
-            </p>
+            {authLoaded ? (
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Choose the account type that fits what you want to do.
+              </p>
+            ) : (
+              <AppShimmer className="mt-5" rows={1} />
+            )}
           </section>
 
           <section className="mt-7 space-y-4">

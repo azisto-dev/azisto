@@ -29,7 +29,9 @@ import {
 } from "@/lib/authenticatedFetch";
 import { refreshBadgeCountsNow } from "@/lib/badgeCounts";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
+import ContractorHeader from "@/app/components/ContractorHeader";
 
 type MessageThread = {
   threadId: string;
@@ -81,19 +83,6 @@ const contractorMessageSuggestions = [
   "I have completed the job.",
 ];
 
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
-
 function getErrorMessage(error: unknown) {
   if (isTransientApiError(error)) {
     return connectionInterruptedMessage;
@@ -140,7 +129,7 @@ function MessageReceipt({
     receipt.state === "read"
       ? "text-[#2563EB]"
       : isCustomerThread
-        ? "text-white/75"
+        ? "text-slate-400"
         : "text-[#5C0032]/60";
 
   return (
@@ -447,7 +436,7 @@ export default function MessageThreadPage() {
     ? "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border"
     : "mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]";
   const heroClass = isCustomerThread
-    ? "az-customer-card mt-5 bg-gradient-to-br from-white via-blue-50 to-white p-4"
+    ? "az-customer-card az-customer-soft-hero mt-5 p-4"
     : "az-contractor-soft-hero mt-4 p-3";
   const compactCardClass = isCustomerThread
     ? "az-customer-card"
@@ -456,7 +445,7 @@ export default function MessageThreadPage() {
     ? "az-customer-card"
     : "az-contractor-card";
   const primaryTextClass = isCustomerThread
-    ? "text-[#0F172A]"
+    ? "text-[#1F1F1F]"
     : "text-[var(--azisto-contractor-text)]";
   const mutedTextClass = isCustomerThread
     ? "text-[#64748B]"
@@ -811,27 +800,32 @@ export default function MessageThreadPage() {
     <main className={shellClass}>
       <div className={frameClass}>
         <div className="flex min-h-screen flex-1 flex-col px-5 pb-5 pt-5 md:min-h-[780px]">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/messages"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to messages"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[150px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          {isCustomerThread ? (
+            <AppHeader
+              leftControl={
+                <Link
+                  href="/messages"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Back to messages"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </Link>
+              }
+            />
+          ) : (
+            <ContractorHeader
+              logoClassName="w-full max-w-[150px] object-contain"
+              leftControl={
+                <Link
+                  href="/messages"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Back to messages"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </Link>
+              }
+            />
+          )}
 
           <section className={heroClass}>
             <div className="relative z-10 flex items-start justify-between gap-2">
@@ -856,7 +850,9 @@ export default function MessageThreadPage() {
                 {thread?.jobTitle || "Service request"}
               </p>
               <p className="mt-1 truncate">
-                {thread?.jobId ?? "Conversation"}
+                <span className="az-job-id">
+                  {thread?.jobId ?? "Conversation"}
+                </span>
               </p>
               {thread?.selectedTaskLabels &&
               thread.selectedTaskLabels.length > 0 ? (
@@ -882,9 +878,7 @@ export default function MessageThreadPage() {
           </section>
 
           {isLoading ? (
-            <p className={`${compactCardClass} mt-5 px-4 py-3 text-sm leading-6 ${mutedTextClass}`}>
-              Loading conversation...
-            </p>
+            <AppShimmer className="mt-5" rows={2} />
           ) : null}
 
           {errorMessage ? (
@@ -914,10 +908,10 @@ export default function MessageThreadPage() {
                     className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                       isOwnMessage
                         ? isCustomerThread
-                          ? "rounded-br-md border border-blue-700 bg-azisto-accent text-white shadow-[0_6px_16px_rgba(37,99,235,0.18)]"
+                          ? "az-customer-message-outgoing rounded-br-md"
                           : "az-message-bubble-outgoing rounded-br-md"
                         : isCustomerThread
-                          ? "rounded-bl-md border border-azisto-border bg-white text-[#0F172A] shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
+                          ? "az-customer-message-incoming rounded-bl-md"
                           : "az-message-bubble-incoming rounded-bl-md"
                     }`}
                   >
@@ -945,7 +939,7 @@ export default function MessageThreadPage() {
                       className={`mt-1 flex items-center gap-1.5 text-[11px] font-semibold ${
                         isOwnMessage
                           ? isCustomerThread
-                            ? "justify-end text-white/75"
+                            ? "justify-end text-slate-400"
                             : "justify-end text-[#5C0032]/60"
                           : "justify-start text-slate-400"
                       }`}

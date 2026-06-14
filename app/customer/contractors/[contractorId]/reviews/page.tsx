@@ -7,7 +7,8 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, ShieldCheck, Star } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 
 type PublicReview = {
   reviewId: string;
@@ -34,19 +35,6 @@ type PublicReviewsResponse = {
   contractor: ContractorReviewSummary;
   reviews: PublicReview[];
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function formatDate(value: string) {
   if (!value) {
@@ -91,7 +79,7 @@ async function fetchPublicReviews(user: User, contractorId: string) {
 function RatingStars({ rating }: { rating: number }) {
   return (
     <span
-      className="flex items-center gap-0.5 text-[#FFD700]"
+      className="flex items-center gap-0.5 text-[#F5B400]"
       aria-label={`${rating.toFixed(1)} out of 5 stars`}
     >
       {Array.from({ length: 5 }).map((_, index) => (
@@ -100,8 +88,8 @@ function RatingStars({ rating }: { rating: number }) {
           aria-hidden="true"
           className={`h-4 w-4 ${
             index < Math.round(rating)
-              ? "fill-[#FFD700]"
-              : "fill-transparent text-[#FFD700]/35"
+              ? "fill-[#F5B400]"
+              : "fill-transparent text-[#F5B400]/35"
           }`}
         />
       ))}
@@ -151,27 +139,20 @@ export default function CustomerContractorReviewsPage() {
     data && data.contractor.ratingCount > 0 && data.reviews.length === 0;
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href={backHref}
-              aria-label="Back to interested contractors"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href={backHref}
+                aria-label="Back to interested contractors"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-azisto-accent">
@@ -183,9 +164,7 @@ export default function CustomerContractorReviewsPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-600">
-              Loading contractor reviews...
-            </p>
+            <AppShimmer className="mt-6" rows={3} />
           ) : null}
 
           {errorMessage ? (
@@ -200,12 +179,16 @@ export default function CustomerContractorReviewsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">
-                      {data.contractor.name}
+                      <span className="az-customer-name">
+                        {data.contractor.name}
+                      </span>
                     </h2>
                     {data.contractor.contactName &&
                     data.contractor.contactName !== data.contractor.name ? (
                       <p className="mt-1 text-sm text-slate-600">
-                        {data.contractor.contactName}
+                        <span className="az-customer-name">
+                          {data.contractor.contactName}
+                        </span>
                       </p>
                     ) : null}
                   </div>
@@ -287,7 +270,7 @@ export default function CustomerContractorReviewsPage() {
                           </div>
                           <span className="flex items-center gap-1 text-sm font-bold text-slate-900">
                             {review.rating.toFixed(1)}
-                            <Star className="h-4 w-4 fill-[#FFD700] text-[#FFD700]" />
+                            <Star className="h-4 w-4 fill-[#F5B400] text-[#F5B400]" />
                           </span>
                         </div>
                         <div className="mt-2">
@@ -311,7 +294,9 @@ export default function CustomerContractorReviewsPage() {
                           </div>
                         ) : null}
                         <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-400">
-                          <span>{review.customerName}</span>
+                          <span className="az-customer-name">
+                            {review.customerName}
+                          </span>
                           <span>{formatDate(review.createdAt)}</span>
                         </div>
                       </article>

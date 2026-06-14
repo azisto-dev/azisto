@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 
 type InterestedContractor = {
   contractorId: string;
@@ -30,19 +31,6 @@ type InterestedContractor = {
   completedJobs: number;
   verified: boolean;
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function createApiError(_code: string, message: string) {
   return new Error(message);
@@ -266,30 +254,20 @@ export default function CustomerInterestedContractorsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/customer/jobs"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to my jobs"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/customer/jobs"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to my jobs"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-job-id">
@@ -305,9 +283,7 @@ export default function CustomerInterestedContractorsPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-              Loading interested contractors...
-            </p>
+            <AppShimmer className="mt-6" rows={3} />
           ) : null}
 
           {errorMessage ? (
@@ -340,7 +316,7 @@ export default function CustomerInterestedContractorsPage() {
             {contractors.map((contractor) => (
               <article
                 key={contractor.contractorId}
-                className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
+                className="az-customer-job-card rounded-xl border bg-white p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -387,7 +363,7 @@ export default function CustomerInterestedContractorsPage() {
                         {contractor.ratingAverage > 0
                           ? contractor.ratingAverage.toFixed(1)
                           : "New"}
-                        <Star className="h-3.5 w-3.5 fill-[#FFD700] text-[#FFD700]" />
+                        <Star className="h-3.5 w-3.5 fill-[#F5B400] text-[#F5B400]" />
                       </p>
                       <p className="text-[10px] font-semibold text-slate-500">
                         Rating
@@ -435,7 +411,7 @@ export default function CustomerInterestedContractorsPage() {
                         {contractor.taskLabels.map((taskLabel) => (
                           <span
                             key={taskLabel}
-                            className="rounded-full border border-azisto-gold bg-amber-50 px-3 py-1 text-xs font-bold text-slate-800"
+                            className="rounded-full border border-[#F5B400] bg-amber-50 px-3 py-1 text-xs font-bold text-slate-800"
                           >
                             ✓ {taskLabel}
                           </span>
@@ -460,7 +436,7 @@ export default function CustomerInterestedContractorsPage() {
                   type="button"
                   onClick={() => handleHireContractor(contractor)}
                   disabled={Boolean(hiringContractorId)}
-                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-azisto-gold bg-white text-sm font-bold text-azisto-text shadow-sm shadow-azisto-gold/10 transition hover:bg-azisto-gold/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-[#F5B400] bg-white text-sm font-bold text-[#1F1F1F] shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                 >
                   {hiringContractorId === contractor.contractorId
                     ? "Hiring..."

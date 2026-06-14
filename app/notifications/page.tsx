@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
@@ -17,6 +16,10 @@ import {
 } from "@/lib/authenticatedFetch";
 import { refreshBadgeCountsNow } from "@/lib/badgeCounts";
 import BottomNav from "@/app/components/BottomNav";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
+import ContractorHeader from "@/app/components/ContractorHeader";
+import { getContractorJobHref } from "@/lib/contractorJobHref";
 
 type NotificationItem = {
   notificationId: string;
@@ -33,19 +36,6 @@ type NotificationThreadLink = {
   threadId: string;
   jobId: string;
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function formatDate(value: string) {
   return value
@@ -160,7 +150,7 @@ function getNotificationHref(
   }
 
   return role === "contractor"
-    ? `/contractor/jobs/${encodeURIComponent(notification.jobId)}`
+    ? getContractorJobHref(notification.jobId)
     : "/customer/jobs";
 }
 
@@ -190,7 +180,7 @@ export default function NotificationsPage() {
     ? "az-customer-card"
     : "az-contractor-card-compact";
   const primaryTextClass = isCustomer
-    ? "text-[#0F172A]"
+    ? "text-[#1F1F1F]"
     : "text-[var(--azisto-contractor-text)]";
   const mutedTextClass = isCustomer
     ? "text-[#64748B]"
@@ -199,7 +189,7 @@ export default function NotificationsPage() {
     ? "text-azisto-accent"
     : "text-[var(--azisto-contractor-burgundy)]";
   const notificationChipClass = isCustomer
-    ? "border-blue-100 bg-blue-50 text-azisto-accent"
+    ? "az-customer-unread-badge"
     : "border-[rgb(138_15_77_/_0.14)] bg-[rgb(138_15_77_/_0.08)] text-[var(--azisto-contractor-burgundy)]";
 
   async function loadNotifications(
@@ -365,25 +355,33 @@ export default function NotificationsPage() {
         )}
       >
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Go back"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </button>
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-            <span aria-hidden="true" />
-          </header>
+          {isCustomer ? (
+            <AppHeader
+              leftControl={
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </button>
+              }
+            />
+          ) : (
+            <ContractorHeader
+              leftControl={
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </button>
+              }
+            />
+          )}
           <section className="mt-8 flex items-end justify-between gap-4">
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.14em] ${accentTextClass}`}>
@@ -410,7 +408,11 @@ export default function NotificationsPage() {
               <button
                 type="button"
                 onClick={() => setIsClearModalOpen(true)}
-                className="flex items-center gap-2 rounded-full border border-[var(--azisto-contractor-burgundy)] bg-white px-4 py-2 text-xs font-bold text-[var(--azisto-contractor-burgundy)] shadow-sm"
+                className={`flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-xs font-bold shadow-sm ${
+                  isCustomer
+                    ? "border-[#1F1F1F] text-[#1F1F1F]"
+                    : "border-[var(--azisto-contractor-burgundy)] text-[var(--azisto-contractor-burgundy)]"
+                }`}
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
                 Clear all
@@ -419,9 +421,7 @@ export default function NotificationsPage() {
             </div>
           </section>
           {isLoading ? (
-            <p className={`${compactCardClass} mt-6 px-4 py-3 text-sm ${mutedTextClass}`}>
-              Loading notifications...
-            </p>
+            <AppShimmer className="mt-6" rows={3} />
           ) : null}
           {errorMessage ? (
             <p className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft } from "lucide-react";
 import { auth, authPersistenceReady } from "@/lib/firebase";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 
 const contactMethods = ["In-app message", "Phone call", "Text message"];
 
@@ -31,19 +32,6 @@ const initialForm: CustomerForm = {
   province: "",
   postalCode: "",
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -258,30 +246,20 @@ export default function CustomerOnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/account-type"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to account type"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/account-type"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to account type"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
@@ -384,15 +362,15 @@ export default function CustomerOnboardingPage() {
                       onClick={() => setPreferredContactMethod(method)}
                       className={`flex h-12 items-center justify-between rounded-xl border px-4 text-sm font-bold transition ${
                         isSelected
-                          ? "border-azisto-gold bg-white text-azisto-text shadow-sm shadow-azisto-gold/10"
-                          : "border-azisto-gold bg-white text-slate-700"
+                          ? "border-[#F5B400] bg-white text-[#1F1F1F] shadow-sm"
+                          : "border-[#F5B400] bg-white text-slate-700"
                       }`}
                     >
                       <span>{method}</span>
                       <span
                         className={`h-4 w-4 rounded-full border ${
                           isSelected
-                            ? "border-azisto-gold bg-azisto-gold"
+                            ? "border-[#F5B400] bg-[#F5B400]"
                             : "border-slate-300 bg-white"
                         }`}
                       />
@@ -403,9 +381,7 @@ export default function CustomerOnboardingPage() {
             </section>
 
             {authLoading ? (
-              <p className="rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-                Checking account...
-              </p>
+              <AppShimmer rows={1} />
             ) : null}
 
             {errorMessage ? (

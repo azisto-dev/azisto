@@ -14,6 +14,18 @@
   --azisto-success: #10B981;
   --azisto-warning: #F59E0B;
   --azisto-danger: #EF4444;
+  --azisto-customer-charcoal: #171717;
+  --azisto-customer-azure: #42675D;
+  --azisto-customer-gold: #C7A35A;
+  --azisto-customer-background: #F4F5F0;
+  --azisto-customer-surface: #FFFFFF;
+  --azisto-customer-surface-muted: #F0F1ED;
+  --azisto-customer-soft-gray: #F0F1ED;
+  --azisto-customer-border: #E1E3DC;
+  --azisto-customer-muted: #696B65;
+  --azisto-customer-accent-soft: #E8EFEB;
+  --azisto-customer-message-blue: #E5F1FF;
+  --azisto-customer-error: #D64545;
   --azisto-contractor-bg: #FFFFFF;
   --azisto-contractor-card: #FFFFFF;
   --azisto-contractor-border: #E8E2DC;
@@ -151,32 +163,126 @@ body {
   }
 
   .az-customer-shell {
-    background: #F7F7F9;
-    color: #0F172A;
+    background: var(--azisto-customer-background);
+    color: var(--azisto-customer-charcoal);
+    font-family: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  .az-customer-shell.text-black {
+    color: var(--azisto-customer-charcoal);
   }
 
   .az-customer-card {
-    border: 1px solid #E5E7EB;
-    border-radius: 22px;
-    background: #FFFFFF;
-    box-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
+    border: 1px solid var(--azisto-customer-border);
+    border-radius: 24px;
+    background: var(--azisto-customer-surface);
+    box-shadow:
+      0 1px 2px rgb(23 23 23 / 0.03),
+      0 10px 28px rgb(23 23 23 / 0.055);
     transition: box-shadow 180ms ease, transform 180ms ease;
   }
 
   .az-customer-card:hover {
-    box-shadow: 0 10px 28px rgb(15 23 42 / 0.09);
+    box-shadow:
+      0 2px 4px rgb(23 23 23 / 0.04),
+      0 14px 32px rgb(23 23 23 / 0.07);
     transform: translateY(-1px);
   }
 
+  .az-customer-name {
+    color: var(--azisto-customer-charcoal);
+  }
+
+  .az-customer-shell .text-black {
+    color: var(--azisto-customer-charcoal);
+  }
+
+  .az-customer-job-card {
+    border-color: var(--azisto-customer-border);
+    border-radius: 22px;
+    background: var(--azisto-customer-surface);
+    box-shadow: 0 8px 24px rgb(23 23 23 / 0.055);
+  }
+
+  .az-request-card {
+    border: 0;
+    box-shadow: 0 8px 24px rgb(23 23 23 / 0.055);
+  }
+
+  .az-request-option-card {
+    border: 0;
+    box-shadow: 0 4px 14px rgb(23 23 23 / 0.05);
+  }
+
+  .az-service-subcategory-card:focus-visible {
+    box-shadow:
+      0 0 0 2px rgb(66 103 93 / 0.28),
+      0 2px 8px rgb(0 0 0 / 0.055);
+  }
+
+  .az-customer-soft-hero {
+    border-color: var(--azisto-customer-border);
+    background:
+      radial-gradient(circle at 88% 8%, rgb(255 255 255 / 0.9), transparent 38%),
+      linear-gradient(145deg, #F4F5F0 0%, #EBEDE7 100%);
+    box-shadow:
+      0 1px 2px rgb(23 23 23 / 0.03),
+      0 12px 30px rgb(23 23 23 / 0.055);
+  }
+
+  .az-customer-message-outgoing {
+    border: 1px solid #D4E6F8;
+    background: var(--azisto-customer-message-blue);
+    color: var(--azisto-customer-charcoal);
+    box-shadow: 0 3px 12px rgb(55 104 151 / 0.08);
+  }
+
+  .az-customer-message-incoming {
+    border: 1px solid #E1E2DE;
+    background: var(--azisto-customer-soft-gray);
+    color: var(--azisto-customer-charcoal);
+    box-shadow: 0 3px 12px rgb(23 23 23 / 0.045);
+  }
+
+  .az-customer-unread-badge {
+    border-color: rgb(239 68 68 / 0.16);
+    background: rgb(239 68 68 / 0.1);
+    color: var(--azisto-customer-error);
+  }
+
+  .az-customer-shell .az-btn-primary {
+    border-color: var(--azisto-customer-charcoal);
+    background: var(--azisto-customer-charcoal);
+    color: #FFFFFF;
+    box-shadow: 0 7px 18px rgb(23 23 23 / 0.16);
+  }
+
+  .az-customer-shell .az-btn-primary:hover {
+    border-color: #111111;
+    background: #111111;
+  }
+
+  .az-customer-shell .az-btn-secondary {
+    border-color: var(--azisto-customer-border);
+    background: var(--azisto-customer-surface-muted);
+    color: var(--azisto-customer-charcoal);
+    box-shadow: none;
+  }
+
+  .az-customer-shell .az-btn-secondary:hover {
+    background: #E7E9E3;
+  }
+
   .az-customer-page {
-    background: #FAFAF8;
+    background: var(--azisto-customer-background);
   }
 
   .az-customer-floating-nav {
     border-radius: 22px 22px 0 0;
-    background: rgb(255 255 255 / 0.94);
-    box-shadow: 0 -8px 24px rgb(15 23 42 / 0.08);
-    backdrop-filter: blur(12px);
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: 0 -10px 30px rgb(23 23 23 / 0.07);
+    backdrop-filter: blur(18px);
   }
 
   .az-btn-royal-blue {
@@ -464,7 +570,7 @@ body {
   }
 
   .az-job-id {
-    @apply text-[#4169E1];
+    color: var(--azisto-customer-azure);
   }
 
   .az-ai-pill {
@@ -527,11 +633,86 @@ body {
   }
 
   .az-shimmer {
-    @apply relative overflow-hidden bg-slate-100;
+    @apply relative overflow-hidden;
+    background: #E7E9E3;
   }
 
   .az-shimmer::after {
-    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/70 to-transparent content-[""];
-    animation: azisto-shimmer 1.4s ease-in-out infinite;
+    @apply absolute inset-0 content-[""];
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.78),
+      transparent
+    );
+    animation: azisto-shimmer 1.25s ease-in-out infinite;
+  }
+
+  .az-shimmer-loader {
+    border: 1px solid var(--azisto-customer-border);
+    border-radius: 24px;
+    background: rgb(255 255 255 / 0.88);
+    padding: 1.25rem;
+    box-shadow: 0 10px 28px rgb(23 23 23 / 0.05);
+  }
+}
+
+.az-customer-shell.bg-azisto-background,
+.az-customer-shell.md\:bg-azisto-background {
+  background: var(--azisto-customer-background);
+}
+
+.az-customer-shell > .mx-auto {
+  background: var(--azisto-customer-surface);
+}
+
+.az-customer-shell .text-slate-400,
+.az-customer-shell .text-slate-500,
+.az-customer-shell .text-slate-600,
+.az-customer-shell .text-\[\#64748B\] {
+  color: var(--azisto-customer-muted);
+}
+
+.az-customer-shell .text-azisto-accent,
+.az-customer-shell .az-kicker,
+.az-customer-shell .az-job-id {
+  color: var(--azisto-customer-azure);
+}
+
+.az-customer-shell .border-azisto-border,
+.az-customer-shell .border-blue-100,
+.az-customer-shell .border-slate-200 {
+  border-color: var(--azisto-customer-border);
+}
+
+.az-customer-shell .bg-blue-50 {
+  background: var(--azisto-customer-accent-soft);
+}
+
+.az-customer-shell .bg-slate-50,
+.az-customer-shell .bg-slate-100 {
+  background: var(--azisto-customer-surface-muted);
+}
+
+.az-customer-shell .shadow-sm {
+  box-shadow: 0 7px 20px rgb(23 23 23 / 0.055);
+}
+
+.az-customer-shell input,
+.az-customer-shell select,
+.az-customer-shell textarea,
+.az-customer-shell button {
+  font: inherit;
+}
+
+@media (min-width: 768px) {
+  .az-customer-shell > .mx-auto {
+    box-shadow: 0 26px 70px rgb(23 23 23 / 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .az-shimmer::after {
+    animation: none;
   }
 }

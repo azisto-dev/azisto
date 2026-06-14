@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import ContractorHeader from "@/app/components/ContractorHeader";
 import { auth } from "@/lib/firebase";
 import {
   authenticatedFetch,
@@ -42,18 +42,6 @@ type SubscriptionData = {
   billingCycleEnd: string;
 };
 
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 function formatDate(value: string) {
   const parsed = new Date(value);
 
@@ -141,23 +129,18 @@ export default function ContractorSubscriptionPage() {
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-
-          <header className="grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/home"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--azisto-contractor-border)] bg-white text-black"
-              aria-label="Back to home"
-            >
-              <ArrowLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-            <img
-              src="/azisto-logo-cropped.png"
-              alt="AZISTO - Your on-demand assistant"
-              className="mx-auto w-full max-w-[155px] object-contain"
-            />
-            <NotificationBell />
-          </header>
+          <ContractorHeader
+            logoClassName="w-full max-w-[155px] object-contain"
+            leftControl={
+              <Link
+                href="/home"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--azisto-contractor-border)] bg-white text-black"
+                aria-label="Back to home"
+              >
+                <ArrowLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="mt-7">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--azisto-contractor-burgundy)]">

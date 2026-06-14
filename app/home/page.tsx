@@ -26,9 +26,13 @@ import {
   authenticatedFetch,
   throwApiResponseError,
 } from "@/lib/authenticatedFetch";
+import { getContractorJobHref } from "@/lib/contractorJobHref";
 import { formatScheduleLabel, type JobSchedule } from "@/lib/jobSchedule";
 import BottomNav from "@/app/components/BottomNav";
 import AppMenu from "@/app/components/AppMenu";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
+import ContractorHeader from "@/app/components/ContractorHeader";
 import ContractorJobFilters, {
   type ContractorJobFilterOptions,
   type ContractorJobFilterPreferences,
@@ -1061,22 +1065,12 @@ export default function HomePage() {
     return (
       <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
         <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 pt-5 shadow-none md:min-h-[780px] md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
-          <div className="mb-5 flex items-center justify-between text-xs font-bold">
-            <span>9:41</span>
-            <div className="flex items-center gap-1">
-              <span className="h-2.5 w-3 rounded-sm bg-black" />
-              <span className="h-2.5 w-3 rounded-sm border border-black" />
-              <span className="h-2.5 w-5 rounded-sm bg-black" />
-            </div>
-          </div>
           <img
             src="/azisto-logo-cropped.png"
             alt="AZISTO - Your on-demand assistant"
-            className="mx-auto mt-3 w-full max-w-[165px] object-contain"
+            className="mx-auto mt-1 w-full max-w-[150px] object-contain"
           />
-          <p className="mt-10 text-center text-sm font-semibold text-[var(--azisto-contractor-muted)]">
-            Loading your AZISTO home...
-          </p>
+          <AppShimmer className="mt-10" rows={3} />
         </div>
       </main>
     );
@@ -1121,41 +1115,7 @@ export default function HomePage() {
       <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
         <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
           <div className="flex-1 px-5 pb-6 pt-5">
-            <div className="mb-5 flex items-center justify-between text-xs font-bold">
-              <span>9:41</span>
-              <div className="flex items-center gap-1">
-                <span className="h-2.5 w-3 rounded-sm bg-black" />
-                <span className="h-2.5 w-3 rounded-sm border border-black" />
-                <span className="h-2.5 w-5 rounded-sm bg-black" />
-              </div>
-            </div>
-
-            <header className="relative mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-              <div className="translate-y-3">
-                <AppMenu role={role} />
-              </div>
-
-              <Link href="/home" className="flex justify-center">
-                <img
-                  src="/azisto-logo-cropped.png"
-                  alt="AZISTO - Your on-demand assistant"
-                  className="w-full max-w-[165px] object-contain"
-                />
-              </Link>
-
-              <Link
-                href={notificationsHref}
-                className="relative flex h-10 w-10 translate-y-3 items-center justify-center justify-self-end rounded-full text-black"
-                aria-label="Notifications"
-              >
-                <BellIcon />
-                {notificationBadgeCount > 0 ? (
-                  <span className="absolute right-0 top-0 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
-                    {notificationBadgeCount > 9 ? "9+" : notificationBadgeCount}
-                  </span>
-                ) : null}
-              </Link>
-            </header>
+            <ContractorHeader leftControl={<AppMenu role={role} />} />
 
             <section className="mt-6">
               <h1 className="mt-4 text-3xl font-normal leading-tight text-[var(--azisto-contractor-text)]">
@@ -1443,7 +1403,7 @@ export default function HomePage() {
                     </div>
 
                     <Link
-                      href={`/contractor/jobs/${encodeURIComponent(job.jobId)}`}
+                      href={getContractorJobHref(job.jobId)}
                       className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-white text-xs font-bold text-[#5C0032]"
                     >
                       View job
@@ -1472,50 +1432,36 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex-1 px-5 pb-6 pt-5">
-          <div className="mb-5 flex items-center justify-between text-xs font-bold">
-            <span>9:41</span>
-            <div className="flex items-center gap-1">
-              <span className="h-2.5 w-3 rounded-sm bg-black" />
-              <span className="h-2.5 w-3 rounded-sm border border-black" />
-              <span className="h-2.5 w-5 rounded-sm bg-black" />
-            </div>
-          </div>
-
-          <header className="relative mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <AppMenu role={role} />
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <Link
-              href={notificationsHref}
-              className="relative flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-black"
-              aria-label="Notifications"
-            >
-              <BellIcon />
-              {notificationBadgeCount > 0 ? (
-                <span className="absolute right-0 top-0 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
-                  {notificationBadgeCount > 9 ? "9+" : notificationBadgeCount}
-                </span>
-              ) : null}
-            </Link>
-          </header>
+          <AppHeader
+            leftControl={<AppMenu role={role} />}
+            rightControl={
+              <Link
+                href={notificationsHref}
+                className="relative flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Notifications"
+              >
+                <BellIcon />
+                {notificationBadgeCount > 0 ? (
+                  <span className="absolute right-0 top-0 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-azisto-danger px-1 text-[10px] font-black leading-none text-white shadow-md shadow-red-200 ring-2 ring-white">
+                    {notificationBadgeCount > 9
+                      ? "9+"
+                      : notificationBadgeCount}
+                  </span>
+                ) : null}
+              </Link>
+            }
+          />
 
           <section className="mt-6">
-            <h1 className="text-xl font-normal leading-tight text-black">
+            <h1 className="az-customer-name text-xl font-normal leading-tight">
               Hello
               {greetingName ? (
                 <>
                   ,{" "}
-                  <span className="text-azisto-text">{greetingName}</span>
+                  <span>{greetingName}</span>
                 </>
               ) : null}
             </h1>
@@ -1587,7 +1533,7 @@ export default function HomePage() {
               </div>
 
               <p className="text-sm font-semibold text-black">
-                <span className="text-[#FFD700]">★</span> 4.9{" "}
+                <span className="text-[#F5B400]">★</span> 4.9{" "}
                 <span className="font-normal text-slate-500">
                   (2.3k reviews)
                 </span>

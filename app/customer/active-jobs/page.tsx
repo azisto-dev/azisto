@@ -19,9 +19,10 @@ import {
   getCompatibleLifecycleStatus,
   getJobStatusLabel,
 } from "@/lib/jobStatus";
-import { getStatusChipClass } from "@/lib/theme";
+import { getCustomerStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 import JobProofGallery from "@/app/components/JobProofGallery";
 import type { JobProofPhoto } from "@/lib/jobProofPhotos";
 
@@ -48,19 +49,6 @@ type ActiveJob = {
     afterPhotos?: JobProofPhoto[];
   }>;
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 async function fetchActiveJobs(
   user: User,
@@ -295,24 +283,26 @@ export default function CustomerActiveJobsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <button type="button" onClick={() => router.push("/customer/jobs")} className="flex h-10 w-10 items-center justify-center rounded-full text-black" aria-label="Back to jobs">
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <Link href="/home" className="flex justify-center">
-              <img src="/azisto-logo-cropped.png" alt="AZISTO" className="w-full max-w-[165px] object-contain" />
-            </Link>
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <button
+                type="button"
+                onClick={() => router.push("/customer/jobs")}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to jobs"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            }
+          />
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">User jobs</p>
             <h1 className="mt-1 text-3xl font-bold leading-tight">Active jobs</h1>
           </section>
-          {isLoading ? <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Loading active jobs...</p> : null}
+          {isLoading ? <AppShimmer className="mt-6" rows={2} /> : null}
           {errorMessage ? <p className="mt-6 whitespace-pre-line rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
           {refreshWarning ? (
             <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
@@ -321,13 +311,13 @@ export default function CustomerActiveJobsPage() {
           ) : null}
           <section className="mt-6 space-y-4">
             {jobs.map((job) => (
-              <article key={job.jobId} className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm">
+              <article key={job.jobId} className="az-customer-job-card rounded-xl border bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">{job.jobId}</p>
                     <h2 className="mt-1 text-lg font-bold">{job.selectedServiceCategory || "Service request"}</h2>
                   </div>
-                  <span className={getStatusChipClass(job.status)}>
+                  <span className={getCustomerStatusChipClass(job.status)}>
                     {getJobStatusLabel(job.status)}
                   </span>
                 </div>

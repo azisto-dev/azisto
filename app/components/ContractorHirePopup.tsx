@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { BriefcaseBusiness, X } from "lucide-react";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
+import { getContractorJobHref } from "@/lib/contractorJobHref";
 
 type HireNotification = {
   notificationId: string;
@@ -180,7 +181,7 @@ export default function ContractorHirePopup({
       setNotification(null);
 
       if (decision === "accepted") {
-        router.push(`/contractor/jobs/${encodeURIComponent(jobId)}`);
+        router.push(getContractorJobHref(jobId));
       }
     } catch (error) {
       setErrorMessage(
@@ -205,7 +206,7 @@ export default function ContractorHirePopup({
     }
 
     setNotification(null);
-    router.push(`/contractor/jobs/${encodeURIComponent(jobId)}`);
+    router.push(getContractorJobHref(jobId));
   }
 
   if (!notification) {

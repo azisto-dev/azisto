@@ -176,7 +176,7 @@ function SignupForm() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-azisto-background px-5 py-10">
+    <main className="az-customer-shell flex min-h-screen items-center justify-center bg-azisto-background px-5 py-10">
       <section className="w-full max-w-md rounded-2xl border border-azisto-border bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
         <img
           src="/azisto-logo-cropped.png"

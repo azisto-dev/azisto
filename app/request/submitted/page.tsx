@@ -5,20 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
+import AppHeader from "@/app/components/AppHeader";
 
 function SubmittedContent() {
   const searchParams = useSearchParams();
@@ -27,30 +14,20 @@ function SubmittedContent() {
   const isUnderReview = status === "review_required";
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="flex flex-1 flex-col px-5 pb-28 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/customer/jobs"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to my jobs"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/customer/jobs"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to my jobs"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <section className="flex flex-1 flex-col justify-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 shadow-sm">

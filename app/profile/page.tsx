@@ -27,7 +27,9 @@ import {
 } from "lucide-react";
 import { auth, storage } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
+import ContractorHeader from "@/app/components/ContractorHeader";
 
 type ProfileRole = "customer" | "contractor";
 
@@ -503,19 +505,6 @@ function mergeUploadedDocument(
   };
 
   return nextDocuments;
-}
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
 }
 
 function createApiError(_code: string, message: string) {
@@ -1034,33 +1023,36 @@ export default function ProfilePage() {
     <main className={shellClass} style={profileThemeStyle}>
       <div className={frameClass}>
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Go back"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </button>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          {isCustomerProfile ? (
+            <AppHeader
+              leftControl={
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </button>
+              }
+            />
+          ) : (
+            <ContractorHeader
+              leftControl={
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+                </button>
+              }
+            />
+          )}
 
           {isLoading ? (
-            <p className={`${compactCardClass} mt-8 px-4 py-3 text-sm leading-6 text-[var(--azisto-contractor-muted)]`}>
-              Loading profile...
-            </p>
+            <AppShimmer className="mt-8" rows={2} />
           ) : null}
 
           {profile ? (
@@ -1068,15 +1060,15 @@ export default function ProfilePage() {
               <section
                 className={
                   isCustomerProfile
-                    ? "az-customer-card mt-6 bg-gradient-to-br from-white via-blue-50 to-white p-4"
-                    : "az-contractor-hero-card mt-6 !border-[#C8A96B] p-4"
+                    ? "az-customer-card az-customer-soft-hero mt-6 p-4"
+                    : "az-contractor-hero-card mt-6 !border-4 !border-[#C8A96B] p-4"
                 }
               >
                 <div className="relative z-10 flex items-start justify-between gap-3">
                   <div className="min-w-0 text-left">
                     <p
                       className={`truncate text-2xl font-normal leading-tight ${
-                        isCustomerProfile ? "text-azisto-accent" : "text-[#C8A96B]"
+                        isCustomerProfile ? "az-customer-name" : "text-[#C8A96B]"
                       }`}
                     >
                       {displayName}

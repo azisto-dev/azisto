@@ -22,13 +22,13 @@ const supportSections = [
 
 export default function ContactPage() {
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white px-5 pb-0 pt-5 shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <header className="mt-8 flex justify-center">
           <img
             src="/azisto-logo-cropped.png"
             alt="AZISTO - Your on-demand assistant"
-            className="w-full max-w-[165px] object-contain"
+            className="w-full max-w-[150px] object-contain"
           />
         </header>
 

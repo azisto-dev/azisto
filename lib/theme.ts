@@ -71,3 +71,44 @@ export function getStatusChipClass(status: string) {
 
   return "az-status-chip az-status-neutral";
 }
+
+export function getCustomerStatusChipClass(status: string) {
+  const normalizedStatus = status.toLowerCase().replaceAll("_", " ");
+
+  if (normalizedStatus === "open" || normalizedStatus === "completed") {
+    return "az-status-chip az-status-success";
+  }
+
+  if (
+    normalizedStatus === "pending" ||
+    normalizedStatus === "hired" ||
+    normalizedStatus === "accepted" ||
+    normalizedStatus === "hired pending contractor" ||
+    normalizedStatus === "pending contractor acceptance" ||
+    normalizedStatus === "partially hired"
+  ) {
+    return "az-status-chip az-status-warning";
+  }
+
+  if (
+    normalizedStatus === "on the way" ||
+    normalizedStatus === "in progress" ||
+    normalizedStatus === "partially active" ||
+    normalizedStatus === "partially in progress"
+  ) {
+    return "az-status-chip border-blue-100 bg-blue-50 text-[#2563EB]";
+  }
+
+  if (
+    normalizedStatus === "cancelled" ||
+    normalizedStatus === "canceled" ||
+    normalizedStatus === "error" ||
+    normalizedStatus === "failed" ||
+    normalizedStatus === "rejected" ||
+    normalizedStatus === "expired"
+  ) {
+    return "az-status-chip az-status-danger";
+  }
+
+  return "az-status-chip az-status-neutral";
+}

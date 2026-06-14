@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ChevronLeft, Star } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import ContractorHeader from "@/app/components/ContractorHeader";
 
 type ContractorReview = {
   reviewId: string;
@@ -30,19 +29,6 @@ type ReviewSummary = {
   completedJobs: number;
   recentReviews: ContractorReview[];
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function formatDate(value: string) {
   if (!value) {
@@ -122,25 +108,18 @@ export default function ContractorReviewsPage() {
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Go back"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-            <NotificationBell />
-          </header>
+          <ContractorHeader
+            leftControl={
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Go back"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            }
+          />
 
           <section className="mt-8">
             <h1 className="text-3xl font-normal text-[var(--azisto-contractor-text)]">

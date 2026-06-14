@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { auth, authPersistenceReady, storage } from "@/lib/firebase";
 import { serviceCatalog } from "@/lib/serviceCatalog";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
 
 const allowedUploadTypes = [
   "application/pdf",
@@ -192,19 +192,6 @@ const initialDocumentForm: DocumentForm = {
   driverLicenceExpiryDate: "",
   drivingRecordConfirmed: false,
 };
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -1011,27 +998,17 @@ export default function ContractorOnboardingPage() {
     <main className="az-contractor-shell min-h-screen md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-[var(--azisto-contractor-bg)] shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-[var(--azisto-contractor-border)]">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <Link
-              href="/account-type"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Back to account type"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </Link>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <Link
+                href="/account-type"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Back to account type"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </Link>
+            }
+          />
 
           <nav className="mt-7 flex items-center justify-between gap-1" aria-label="Contractor onboarding steps">
             {[

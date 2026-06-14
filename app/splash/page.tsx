@@ -15,7 +15,7 @@ export default function Splash() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white px-6">
+    <main className="az-customer-shell flex min-h-screen items-center justify-center bg-white px-6">
       <img
         src="/azisto-logo.png"
         alt="AZISTO - Your on-demand assistant"

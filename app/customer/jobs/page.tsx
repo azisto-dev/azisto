@@ -6,9 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   Briefcase,
+  CalendarDays,
   ChevronLeft,
+  Clock3,
+  MapPin,
   MessageCircle,
   RefreshCw,
+  UserRound,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
@@ -25,9 +29,10 @@ import {
   getCompatibleLifecycleStatus,
   getJobStatusLabel,
 } from "@/lib/jobStatus";
-import { getStatusChipClass } from "@/lib/theme";
+import { getCustomerStatusChipClass } from "@/lib/theme";
 import BottomNav from "@/app/components/BottomNav";
-import NotificationBell from "@/app/components/NotificationBell";
+import AppHeader from "@/app/components/AppHeader";
+import AppShimmer from "@/app/components/AppShimmer";
 import JobProofGallery from "@/app/components/JobProofGallery";
 import type { JobProofPhoto } from "@/lib/jobProofPhotos";
 
@@ -97,19 +102,6 @@ const pastJobStatuses = new Set([
   "rejected",
   "expired",
 ]);
-
-function StatusBar() {
-  return (
-    <div className="mb-5 flex items-center justify-between text-xs font-bold">
-      <span>9:41</span>
-      <div className="flex items-center gap-1">
-        <span className="h-2.5 w-3 rounded-sm bg-black" />
-        <span className="h-2.5 w-3 rounded-sm border border-black" />
-        <span className="h-2.5 w-5 rounded-sm bg-black" />
-      </div>
-    </div>
-  );
-}
 
 function createApiError(_code: string, message: string) {
   return new Error(message);
@@ -498,31 +490,21 @@ export default function CustomerJobsPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
+    <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex h-screen min-h-0 w-full max-w-[390px] flex-col bg-white shadow-none md:h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
         <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
-          <StatusBar />
-
-          <header className="mt-3 grid grid-cols-[40px_1fr_40px] items-center">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-black"
-              aria-label="Go back"
-            >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5" />
-            </button>
-
-            <Link href="/home" className="flex justify-center">
-              <img
-                src="/azisto-logo-cropped.png"
-                alt="AZISTO - Your on-demand assistant"
-                className="w-full max-w-[165px] object-contain"
-              />
-            </Link>
-
-            <NotificationBell />
-          </header>
+          <AppHeader
+            leftControl={
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-black"
+                aria-label="Go back"
+              >
+                <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+              </button>
+            }
+          />
 
           <section className="mt-8">
             <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
@@ -537,7 +519,7 @@ export default function CustomerJobsPage() {
           </section>
 
           <section className="mt-5">
-            <div className="grid grid-cols-3 gap-1 rounded-2xl border border-blue-100 bg-blue-50/70 p-1.5 shadow-sm">
+            <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-1.5 shadow-sm">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
@@ -545,7 +527,7 @@ export default function CustomerJobsPage() {
                   onClick={() => setSelectedTab(tab.key)}
                   className={`flex h-11 items-center justify-center gap-1 rounded-xl text-xs font-bold transition duration-200 ${
                     selectedTab === tab.key
-                      ? "bg-azisto-accent text-white shadow-md shadow-blue-200"
+                      ? "bg-[#1F1F1F] text-white shadow-md shadow-slate-300"
                       : "bg-white text-slate-700"
                   }`}
                 >
@@ -554,7 +536,7 @@ export default function CustomerJobsPage() {
                     className={`rounded-full px-1.5 py-0.5 text-[10px] ${
                       selectedTab === tab.key
                         ? "bg-white/20 text-white"
-                        : "bg-blue-50 text-azisto-accent"
+                        : "bg-slate-100 text-[#2563EB]"
                     }`}
                   >
                     {tabCounts[tab.key]}
@@ -577,9 +559,7 @@ export default function CustomerJobsPage() {
           </section>
 
           {isLoading ? (
-            <p className="mt-6 rounded-xl border border-azisto-border bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-              Loading your jobs...
-            </p>
+            <AppShimmer className="mt-6" rows={3} />
           ) : null}
 
           {errorMessage ? (
@@ -627,19 +607,19 @@ export default function CustomerJobsPage() {
             {visibleJobs.map((job) => (
               <article
                 key={job.jobId}
-                className="rounded-xl border border-azisto-primary bg-white p-4 shadow-sm"
+                className="az-customer-job-card rounded-[22px] border bg-white px-4 py-3.5"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">
                       {job.jobId}
                     </p>
-                    <h2 className="mt-1 text-lg font-bold text-black">
+                    <h2 className="mt-1 text-xl font-bold leading-tight text-black">
                       {job.selectedServiceCategory || "Service request"}
                     </h2>
                   </div>
                   <span
-                    className={getStatusChipClass(
+                    className={getCustomerStatusChipClass(
                       job.overallStatus || job.status || "open",
                     )}
                   >
@@ -650,50 +630,43 @@ export default function CustomerJobsPage() {
                 </div>
 
                 {job.tasks && job.tasks.length > 0 ? (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {job.tasks.map((task) => (
                       <div
                         key={task.taskId}
-                        className="rounded-xl border border-[#D8E6FF] bg-[#F8FAFF] p-3 text-sm"
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700"
                       >
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold uppercase tracking-[0.1em] text-azisto-accent">
-                              {task.taskId}
-                            </p>
-                            <p className="font-bold text-slate-800">
-                              {task.subcategory || task.category || "Task"}
-                            </p>
-                          </div>
-                          <span
-                            className={getStatusChipClass(task.status || "open")}
-                          >
-                            {getJobStatusLabel(task.status || "open")}
-                          </span>
-                        </div>
+                        <span className="truncate">
+                          {task.subcategory || task.category || "Task"}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          {getJobStatusLabel(task.status || "open")}
+                        </span>
                         {canCancelStatus(task.status) ? (
                           <button
                             type="button"
                             onClick={() => handleCancelJob(job, task)}
                             disabled={activeJobId === task.taskId}
-                            className="az-btn-danger-soft mt-3 flex h-9 w-full items-center justify-center rounded-lg text-xs font-bold"
+                            className="ml-0.5 text-[10px] font-bold text-red-600 disabled:opacity-50"
+                            aria-label={`Cancel ${
+                              task.subcategory || task.category || "task"
+                            }`}
                           >
-                            Cancel task
+                            Cancel
                           </button>
-                        ) : null}
-                        {task.status === "completed" ? (
+                        ) : task.status === "completed" ? (
                           task.reviewed ? (
-                            <p className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-center text-xs font-bold text-emerald-700">
-                              Review submitted
-                            </p>
+                            <span className="text-[10px] font-bold text-emerald-700">
+                              Reviewed
+                            </span>
                           ) : (
                             <Link
                               href={`/customer/jobs/${encodeURIComponent(
                                 job.jobId,
                               )}/review?taskId=${encodeURIComponent(task.taskId)}`}
-                              className="az-btn-primary mt-3 flex h-9 w-full items-center justify-center rounded-lg text-xs font-bold"
+                              className="text-[10px] font-bold text-black underline"
                             >
-                              Leave review
+                              Review
                             </Link>
                           )
                         ) : null}
@@ -701,7 +674,7 @@ export default function CustomerJobsPage() {
                     ))}
                   </div>
                 ) : job.selectedSubcategories.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {job.selectedSubcategories.slice(0, 3).map((item) => (
                       <span
                         key={item}
@@ -713,23 +686,43 @@ export default function CustomerJobsPage() {
                   </div>
                 ) : null}
 
-                <div className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
-                  <p>{[job.city, job.province].filter(Boolean).join(", ")}</p>
-                  <p>{formatScheduleLabel(job)}</p>
-                  <p>
-                    <span className="font-bold text-slate-800">Created:</span>{" "}
-                    {formatDate(job.createdAt)}
-                  </p>
-                  {job.hiredContractorId ? (
-                    <p>
-                      <span className="font-bold text-slate-800">
-                        Hired:
-                      </span>{" "}
-                      {job.hiredBusinessName ||
-                        job.hiredContractorName ||
-                        job.hiredContractorId}
+                <div className="mt-3 space-y-2 text-sm leading-5 text-slate-600">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <p className="flex items-center gap-2">
+                      <MapPin
+                        aria-hidden="true"
+                        className="h-4 w-4 shrink-0 text-black"
+                      />
+                      {[job.city, job.province].filter(Boolean).join(", ")}
                     </p>
-                  ) : null}
+                    {job.hiredContractorId ? (
+                      <p className="flex min-w-0 items-center gap-2">
+                        <UserRound
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 text-black"
+                        />
+                        <span className="truncate">
+                          {job.hiredBusinessName ||
+                            job.hiredContractorName ||
+                            job.hiredContractorId}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="flex items-center gap-2">
+                    <CalendarDays
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 text-black"
+                    />
+                    {formatScheduleLabel(job)}
+                  </p>
+                  <p className="flex items-center gap-2 text-xs">
+                    <Clock3
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0 text-black"
+                    />
+                    Posted {formatDate(job.createdAt)}
+                  </p>
                 </div>
 
                 <JobProofGallery
@@ -738,14 +731,14 @@ export default function CustomerJobsPage() {
                   tasks={job.tasks}
                 />
 
-                <div className="mt-4 grid gap-2">
+                <div className="mt-3 grid gap-2 border-t border-[var(--azisto-customer-border)] pt-3">
                   {(job.status === "open" ||
                     job.overallStatus === "partially_hired") ? (
                     <Link
                       href={`/customer/jobs/${encodeURIComponent(
                         job.jobId,
                       )}/interested`}
-                      className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                      className="az-btn-primary flex h-11 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       View interested contractors
                     </Link>
@@ -755,7 +748,7 @@ export default function CustomerJobsPage() {
                     type="button"
                     onClick={() => handleOpenMessages(job)}
                     disabled={activeJobId === job.jobId}
-                    className="az-btn-secondary flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-bold"
+                    className="az-btn-secondary flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold"
                   >
                     <MessageCircle aria-hidden="true" className="h-4 w-4" />
                     View messages
@@ -767,7 +760,7 @@ export default function CustomerJobsPage() {
                       type="button"
                       onClick={() => handleCancelJob(job)}
                       disabled={activeJobId === job.jobId}
-                      className="az-btn-danger-soft flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                      className="az-btn-danger-soft flex h-11 items-center justify-center rounded-xl text-sm font-bold"
                     >
                       Cancel job
                     </button>
@@ -778,7 +771,7 @@ export default function CustomerJobsPage() {
                       <button
                         type="button"
                         disabled
-                        className="flex h-12 cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold text-slate-400"
+                        className="flex h-11 cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-sm font-bold text-slate-400"
                       >
                         Cancel job
                       </button>
@@ -805,7 +798,7 @@ export default function CustomerJobsPage() {
                           href={`/customer/jobs/${encodeURIComponent(
                             job.jobId,
                           )}/review`}
-                          className="az-btn-primary flex h-12 items-center justify-center rounded-xl text-sm font-bold"
+                          className="az-btn-primary flex h-11 items-center justify-center rounded-xl text-sm font-bold"
                         >
                           Leave review
                         </Link>

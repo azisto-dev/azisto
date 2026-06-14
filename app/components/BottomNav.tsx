@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { subscribeBadgeCounts } from "@/lib/badgeCounts";
-import { azistoUi } from "@/lib/theme";
 import ContractorHirePopup from "@/app/components/ContractorHirePopup";
 
 type UserRole = "customer" | "contractor" | "unknown";
@@ -153,7 +152,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
                   isActive
                     ? isContractor
                       ? "text-[var(--azisto-contractor-burgundy)]"
-                      : "text-azisto-accent"
+                      : "text-[#1F1F1F]"
                     : isContractor
                       ? "text-[var(--azisto-contractor-muted)]"
                       : "text-azisto-muted"
@@ -165,11 +164,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
                   </span>
                 ) : null}
                 <NavIcon path={item.path} />
-                <span
-                  className={`mt-1 block ${
-                    isActive && !isContractor ? azistoUi.kicker : ""
-                  }`}
-                >
+                <span className="mt-1 block">
                   {item.label}
                 </span>
               </Link>
