@@ -33,7 +33,13 @@ export async function GET(request: NextRequest) {
         .get(),
       adminDb
         .collection("jobs")
-        .where("status", "in", ["hired", "accepted", "on_the_way", "in_progress"])
+        .where("status", "in", [
+          "hired",
+          "accepted",
+          "on_the_way",
+          "in_progress",
+          "completion_pending_customer",
+        ])
         .count()
         .get(),
       adminDb.collection("jobs").where("status", "==", "completed").count().get(),

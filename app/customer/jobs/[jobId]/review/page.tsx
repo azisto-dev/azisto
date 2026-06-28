@@ -306,7 +306,7 @@ export default function CustomerJobReviewPage() {
                     <Check className="h-4 w-4" />
                     Review submitted
                   </p>
-                  <div className="mt-2 text-xl text-[#F5B400]">
+                  <div className="mt-2 text-xl text-[#F59E0B]">
                     {"★".repeat(selectedTarget.review?.rating ?? 0)}
                   </div>
                   {selectedTarget.review?.reviewText ? (
@@ -330,7 +330,7 @@ export default function CustomerJobReviewPage() {
                         <Star
                           className={`h-9 w-9 ${
                             value <= rating
-                              ? "fill-[#F5B400] text-[#F5B400]"
+                              ? "fill-[#F59E0B] text-[#F59E0B]"
                               : "text-slate-300"
                           }`}
                         />

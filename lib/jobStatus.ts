@@ -3,6 +3,7 @@ export const contractorActiveStatuses = new Set([
   "accepted",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
   "hired",
 ]);
 
@@ -17,6 +18,7 @@ export const unavailableJobStatuses = new Set([
   "accepted",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
   "completed",
   "cancelled",
   "hired",
@@ -31,6 +33,7 @@ const statusLabels: Record<string, string> = {
   hired: "Accepted",
   on_the_way: "Contractor on the way",
   in_progress: "In progress",
+  completion_pending_customer: "Waiting for customer confirmation",
   completed: "Completed",
   cancelled: "Cancelled",
   rejected: "Rejected",

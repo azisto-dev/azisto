@@ -176,6 +176,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
       .slice(0, 20);
     const verificationStatus = readText(contractorData.verificationStatus);
+    const completedTasks = Math.max(
+      readNumber(contractorData.completedTasks),
+      readNumber(contractorData.completedJobs),
+      readNumber(contractorData.completedJobsCount),
+      reviewsByKey.size,
+    );
 
     return NextResponse.json({
       ok: true,
@@ -191,6 +197,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         ratingCount:
           readNumber(contractorData.ratingCount) ||
           readNumber(contractorData.reviewCount),
+        completedTasks,
         completedJobs: Math.max(
           readNumber(contractorData.completedJobs),
           readNumber(contractorData.completedJobsCount),

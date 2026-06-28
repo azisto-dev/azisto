@@ -26,6 +26,15 @@ import AppShimmer from "@/app/components/AppShimmer";
 import JobProofGallery from "@/app/components/JobProofGallery";
 import type { JobProofPhoto } from "@/lib/jobProofPhotos";
 
+type ActiveJobTask = {
+  taskId: string;
+  category: string;
+  subcategory: string;
+  status: string;
+  beforePhotos?: JobProofPhoto[];
+  afterPhotos?: JobProofPhoto[];
+};
+
 type ActiveJob = {
   jobId: string;
   overallStatus?: string;
@@ -43,11 +52,12 @@ type ActiveJob = {
   schedule: JobSchedule | null;
   beforePhotos: JobProofPhoto[];
   afterPhotos: JobProofPhoto[];
-  tasks?: Array<{
-    status: string;
-    beforePhotos?: JobProofPhoto[];
-    afterPhotos?: JobProofPhoto[];
-  }>;
+  tasks?: ActiveJobTask[];
+};
+
+type ActiveCompletionTarget = {
+  job: ActiveJob;
+  task?: ActiveJobTask;
 };
 
 async function fetchActiveJobs(
@@ -91,11 +101,48 @@ async function fetchActiveJobs(
         "hired",
         "on_the_way",
         "in_progress",
+        "completion_pending_customer",
         "partially_active",
         "partially_in_progress",
       ].includes(status),
     );
   });
+}
+
+async function submitCompletionDecision(
+  user: User,
+  jobId: string,
+  decision: "confirm" | "reject",
+  taskId?: string,
+) {
+  const response = await authenticatedFetch(
+    user,
+    `/api/jobs/${encodeURIComponent(jobId)}/completion-confirmation`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, taskId }),
+    },
+  );
+  const body = (await response.json().catch(() => null)) as {
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof body?.message === "string"
+        ? body.message
+        : "Unable to update the completion request.",
+    );
+  }
+}
+
+function getCustomerDisplayStatus(job: ActiveJob) {
+  return job.tasks?.some(
+    (task) => task.status === "completion_pending_customer",
+  )
+    ? "completion_pending_customer"
+    : job.overallStatus || job.status || "open";
 }
 
 async function updateStatus(
@@ -153,6 +200,9 @@ export default function CustomerActiveJobsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [refreshWarning, setRefreshWarning] = useState("");
+  const [cancelTarget, setCancelTarget] = useState<ActiveJob | null>(null);
+  const [isCompletionDecisionPending, setIsCompletionDecisionPending] =
+    useState(false);
   const isJobsRequestInFlightRef = useRef(false);
   const jobsRetryAfterRef = useRef(0);
 
@@ -255,17 +305,69 @@ export default function CustomerActiveJobsPage() {
       return;
     }
 
+    setCancelTarget(job);
+  }
+
+  async function confirmCancellation() {
+    if (!user || !cancelTarget) {
+      return;
+    }
+
     try {
-      setActiveJobId(job.jobId);
+      setActiveJobId(cancelTarget.jobId);
       setErrorMessage("");
-      await updateStatus(user, job.jobId, "cancelled");
+      await updateStatus(user, cancelTarget.jobId, "cancelled");
       await loadJobs(user, "manual");
+      setCancelTarget(null);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Unable to update job.",
       );
     } finally {
       setActiveJobId("");
+    }
+  }
+
+  const completionTarget =
+    jobs
+      .flatMap<ActiveCompletionTarget>((job) => {
+        const task = job.tasks?.find(
+          (item) => item.status === "completion_pending_customer",
+        );
+
+        if (task) {
+          return [{ job, task }];
+        }
+
+        return job.status === "completion_pending_customer"
+          ? [{ job, task: undefined }]
+          : [];
+      })
+      .at(0) ?? null;
+
+  async function handleCompletionDecision(decision: "confirm" | "reject") {
+    if (!user || !completionTarget || isCompletionDecisionPending) {
+      return;
+    }
+
+    try {
+      setIsCompletionDecisionPending(true);
+      setErrorMessage("");
+      await submitCompletionDecision(
+        user,
+        completionTarget.job.jobId,
+        decision,
+        completionTarget.task?.taskId,
+      );
+      await loadJobs(user, "manual");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update the completion request.",
+      );
+    } finally {
+      setIsCompletionDecisionPending(false);
     }
   }
 
@@ -317,8 +419,15 @@ export default function CustomerActiveJobsPage() {
                     <p className="text-xs font-bold uppercase tracking-[0.12em] az-job-id">{job.jobId}</p>
                     <h2 className="mt-1 text-lg font-bold">{job.selectedServiceCategory || "Service request"}</h2>
                   </div>
-                  <span className={getCustomerStatusChipClass(job.status)}>
-                    {getJobStatusLabel(job.status)}
+                  <span
+                    className={getCustomerStatusChipClass(
+                      getCustomerDisplayStatus(job),
+                    )}
+                  >
+                    {getCustomerDisplayStatus(job) ===
+                    "completion_pending_customer"
+                      ? "Awaiting your confirmation"
+                      : getJobStatusLabel(getCustomerDisplayStatus(job))}
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">Contractor: {job.hiredBusinessName || job.hiredContractorName || job.hiredContractorId}</p>
@@ -379,6 +488,68 @@ export default function CustomerActiveJobsPage() {
         </div>
         <BottomNav role="customer" />
       </div>
+      {completionTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5">
+          <section className="w-full max-w-sm rounded-[24px] border border-azisto-border bg-white p-5 shadow-2xl">
+            <h2 className="text-xl font-bold text-black">
+              Your current open job has been marked completed by contractor.
+            </h2>
+            {completionTarget.task ? (
+              <p className="mt-2 text-sm font-semibold text-slate-600">
+                Task:{" "}
+                {completionTarget.task.subcategory ||
+                  completionTarget.task.category ||
+                  "Selected task"}
+              </p>
+            ) : null}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isCompletionDecisionPending}
+                onClick={() => void handleCompletionDecision("reject")}
+                className="az-btn-secondary h-12 rounded-xl text-sm font-bold"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                disabled={isCompletionDecisionPending}
+                onClick={() => void handleCompletionDecision("confirm")}
+                className="az-btn-primary h-12 rounded-xl text-sm font-bold"
+              >
+                {isCompletionDecisionPending ? "Updating..." : "Confirm"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {cancelTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5">
+          <section className="w-full max-w-sm rounded-[24px] border border-azisto-border bg-white p-5 shadow-2xl">
+            <h2 className="text-xl font-bold text-black">
+              Are you sure you want to cancel the selected task?
+            </h2>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={Boolean(activeJobId)}
+                onClick={() => setCancelTarget(null)}
+                className="az-btn-secondary h-12 rounded-xl text-sm font-bold"
+              >
+                Keep task
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(activeJobId)}
+                onClick={() => void confirmCancellation()}
+                className="az-btn-danger-soft h-12 rounded-xl text-sm font-bold"
+              >
+                {activeJobId ? "Cancelling..." : "Cancel task"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

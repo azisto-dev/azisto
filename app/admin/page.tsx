@@ -553,7 +553,14 @@ export default function AdminConsolePage() {
                     </p>
                   </div>
                   <Meta label="Customer / contractor" value={`${text(item.customerName)} / ${text(item.contractorName)}`} />
-                  <Meta label="Location / created" value={`${text(item.city)} · ${formatDate(item.createdAt)}`} />
+                  <Meta
+                    label="Location / expiry"
+                    value={`${text(item.city)} · ${
+                      item.isExpired === true
+                        ? "Expired"
+                        : formatDate(item.expiresAt)
+                    }`}
+                  />
                   <div className="flex items-center gap-3">
                     <StatusPill value={item.status} />
                     <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -1014,6 +1021,14 @@ export default function AdminConsolePage() {
                     <dl className="mt-5 grid gap-4 sm:grid-cols-2">
                       <Meta label="Assigned contractor" value={job.contractorName} />
                       <Meta label="Created" value={formatDate(job.createdAt)} />
+                      <Meta
+                        label="Expiry"
+                        value={
+                          job.isExpired === true
+                            ? `Expired · ${formatDate(job.expiresAt)}`
+                            : formatDate(job.expiresAt)
+                        }
+                      />
                       <Meta label="Schedule" value={text(job.scheduleMode, "") === "specific" ? `${text(job.preferredDate)} · ${text(job.preferredTimeWindow)}` : text(job.urgency)} />
                       <Meta label="Reports" value={number(job.reportsCount)} />
                       <Meta label="Address" value={`${text(job.address, "")}, ${text(job.city, "")}, ${text(job.province, "")} ${text(job.postalCode, "")}`} />

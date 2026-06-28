@@ -69,6 +69,10 @@ type ContractorJobDetail = {
   isAssignedToCurrentContractor?: boolean;
   assignedTaskIds?: string[];
   contractorAssignedStatus?: string;
+  cancelledAt?: string;
+  cancelledVisibleUntil?: string;
+  hasExistingThread?: boolean;
+  existingThreadId?: string;
   beforePhotos: JobProofPhoto[];
   afterPhotos: JobProofPhoto[];
   tasks?: JobTask[];
@@ -83,6 +87,8 @@ type JobTask = {
   hiredContractorId: string;
   hiredContractorAuthUid?: string;
   contractorDecisionStatus?: string;
+  cancelledAt?: string;
+  cancelledVisibleUntil?: string;
   interestedContractorIds: string[];
   contractorServiceMatch?: boolean;
   beforePhotos: JobProofPhoto[];
@@ -241,7 +247,12 @@ async function submitJobReport(
   }
 }
 
-async function updateJobStatus(user: User, jobId: string, status: string) {
+async function updateJobStatus(
+  user: User,
+  jobId: string,
+  status: string,
+  taskId?: string,
+) {
   const token = await user.getIdToken();
   const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/status`, {
     method: "POST",
@@ -249,7 +260,7 @@ async function updateJobStatus(user: User, jobId: string, status: string) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, taskId }),
   });
   const responseBody = (await response.json().catch(() => null)) as {
     code?: unknown;
@@ -426,16 +437,22 @@ export default function ContractorJobDetailPage() {
     const jobDetails = await fetchContractorJob(user, jobId);
     const openTasks =
       jobDetails.tasks?.filter((task) => task.status === "open") ?? [];
+    const openSelectableTasks = openTasks.filter(
+      (task) => task.contractorServiceMatch !== false,
+    );
     const requestedTaskId = searchParams.get("taskId");
     const initialTaskIds =
       requestedTaskId &&
-      openTasks.some(
+      (openTasks.some(
         (task) =>
           task.taskId === requestedTaskId &&
           task.contractorServiceMatch !== false,
-      )
+      ) ||
+        jobDetails.assignedTaskIds?.includes(requestedTaskId))
         ? [requestedTaskId]
-        : jobDetails.assignedTaskIds ?? [];
+        : openSelectableTasks.length > 0
+          ? []
+          : jobDetails.assignedTaskIds ?? [];
 
     setJob(jobDetails);
     setSelectedTaskIds(initialTaskIds);
@@ -504,13 +521,21 @@ export default function ContractorJobDetailPage() {
   }
 
   async function handleMessageCustomer() {
-    if (!currentUser || isOpeningThread) {
+    if (!currentUser || !job || isOpeningThread) {
       return;
     }
 
     try {
       setIsOpeningThread(true);
       setInterestMessage("");
+
+      if (job.existingThreadId) {
+        router.push(
+          `/messages/${encodeURIComponent(job.existingThreadId)}`,
+        );
+        return;
+      }
+
       const selectedTaskLabels =
         job?.tasks
           ?.filter((task) => selectedTaskIds.includes(task.taskId))
@@ -549,7 +574,12 @@ export default function ContractorJobDetailPage() {
       setIsUpdatingStatus(true);
       setLifecycleMessage("");
       setIsLifecycleError(false);
-      await updateJobStatus(currentUser, jobId, status);
+      await updateJobStatus(
+        currentUser,
+        jobId,
+        status,
+        selectedTaskIds.length === 1 ? selectedTaskIds[0] : undefined,
+      );
       await loadJob(currentUser);
       setLifecycleMessage(successMessage);
     } catch (error) {
@@ -559,6 +589,48 @@ export default function ContractorJobDetailPage() {
       setIsUpdatingStatus(false);
     }
   }
+
+  const selectedLifecycleStatus =
+    selectedTaskIds.length === 1
+      ? job?.tasks?.find((task) => task.taskId === selectedTaskIds[0])?.status
+      : "";
+  const contractorLifecycleStatus =
+    selectedLifecycleStatus ||
+    job?.contractorAssignedStatus ||
+    job?.status ||
+    "open";
+  const isFullyCancelledJob = Boolean(
+    job &&
+      (job.tasks && job.tasks.length > 0
+        ? job.tasks.every((task) => task.status === "cancelled")
+        : job.status === "cancelled"),
+  );
+  const isCancelledContext =
+    contractorLifecycleStatus === "cancelled" || isFullyCancelledJob;
+  const canMessageCustomer =
+    Boolean(
+      hasSubmittedInterest ||
+        job?.isAssignedToCurrentContractor ||
+        ["hired", "accepted", "on_the_way", "in_progress", "completion_pending_customer", "completed"].includes(
+          contractorLifecycleStatus,
+        ),
+    ) &&
+    (!isCancelledContext || job?.hasExistingThread === true);
+  const hasOpenSelectableTasks = Boolean(
+    job?.tasks?.some(
+      (task) =>
+        task.status === "open" && task.contractorServiceMatch !== false,
+    ),
+  );
+  const canSubmitInterestForOpenTasks = Boolean(
+    job &&
+      !isFullyCancelledJob &&
+      !isCancelledContext &&
+      job.status === "open" &&
+      hasOpenSelectableTasks &&
+      (!job.isAssignedToCurrentContractor ||
+        job.contractorAssignedStatus === "completed"),
+  );
 
   async function handleContractorDecision(
     decision: "accepted" | "rejected",
@@ -682,9 +754,15 @@ export default function ContractorJobDetailPage() {
                       "Location not provided"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold capitalize text-[var(--azisto-contractor-text)]">
+                    <span
+                      className={
+                        contractorLifecycleStatus === "cancelled"
+                          ? "rounded-full border border-red-300 bg-red-50 px-3 py-1 text-xs font-bold text-red-700"
+                          : "rounded-full border border-[var(--azisto-contractor-border)] bg-white/80 px-3 py-1 text-xs font-bold capitalize text-[var(--azisto-contractor-text)]"
+                      }
+                    >
                       {getJobStatusLabel(
-                        job.contractorAssignedStatus || job.status || "open",
+                        contractorLifecycleStatus,
                       )}
                     </span>
                   </div>
@@ -711,6 +789,7 @@ export default function ContractorJobDetailPage() {
                   <div className="mt-3 space-y-2">
                     {job.tasks.map((task) => {
                       const isOpen = task.status === "open";
+                      const isCancelled = task.status === "cancelled";
                       const canSelectTask = isOpen && task.contractorServiceMatch !== false;
                       const isSelected = selectedTaskIds.includes(task.taskId);
 
@@ -720,7 +799,11 @@ export default function ContractorJobDetailPage() {
                           type="button"
                           aria-pressed={isSelected}
                           aria-label={
-                            canSelectTask
+                            isCancelled
+                              ? `${
+                                  task.subcategory || task.category || "Task"
+                                } was cancelled`
+                              : canSelectTask
                               ? `${isSelected ? "Deselect" : "Select"} ${
                                   task.subcategory || task.category || "task"
                                 }`
@@ -757,20 +840,31 @@ export default function ContractorJobDetailPage() {
                               <span className="block break-all text-xs font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                                 {task.taskId}
                               </span>
-                              <span className="mt-1 block font-bold">
+                              <span
+                                className={`mt-1 block font-bold ${
+                                  isCancelled
+                                    ? "text-slate-400 line-through"
+                                    : ""
+                                }`}
+                              >
                                 {task.subcategory || task.category || "Task"}
                               </span>
                             </span>
                           </span>
                           <span className="ml-10 flex flex-wrap gap-2">
                             <span
-                              className={`${getStatusChipClass(
-                                task.status || "open",
-                              )} whitespace-normal text-left`}
+                              className={
+                                isCancelled
+                                  ? "inline-flex rounded-full border border-red-300 bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700"
+                                  : `${getStatusChipClass(
+                                      task.status || "open",
+                                    )} whitespace-normal text-left`
+                              }
                             >
                               {getJobStatusLabel(task.status || "open")}
                             </span>
-                            {task.contractorServiceMatch === false ? (
+                            {!isCancelled &&
+                            task.contractorServiceMatch === false ? (
                               <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
                                 Not in profile
                               </span>
@@ -1101,16 +1195,16 @@ export default function ContractorJobDetailPage() {
                 </p>
               ) : null}
 
-              {(job.status === "open" &&
-                !job.isAssignedToCurrentContractor) ||
-              job.isAssignedToCurrentContractor ||
-              hasSubmittedInterest ||
-              ["hired", "accepted", "on_the_way", "in_progress", "completed"].includes(
-                job.contractorAssignedStatus || job.status,
-              ) ? (
+              {canSubmitInterestForOpenTasks ||
+              (!isCancelledContext &&
+                (job.isAssignedToCurrentContractor ||
+                  hasSubmittedInterest ||
+                  ["hired", "accepted", "on_the_way", "in_progress", "completion_pending_customer", "completed"].includes(
+                    contractorLifecycleStatus,
+                  ))) ||
+              (isCancelledContext && job.hasExistingThread) ? (
                 <div className="az-contractor-action-bar relative mt-6 rounded-[24px] p-2">
-                  {job.status === "open" &&
-                  !job.isAssignedToCurrentContractor ? (
+                  {canSubmitInterestForOpenTasks ? (
                     <button
                       type="button"
                       onClick={handleInterestSubmit}
@@ -1133,7 +1227,7 @@ export default function ContractorJobDetailPage() {
                     </button>
                   ) : null}
 
-                  {(job.contractorAssignedStatus || job.status) ===
+                  {contractorLifecycleStatus ===
                   "hired_pending_contractor" ? (
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -1156,7 +1250,7 @@ export default function ContractorJobDetailPage() {
                   ) : null}
 
                   {["accepted", "hired"].includes(
-                    job.contractorAssignedStatus || job.status,
+                    contractorLifecycleStatus,
                   ) ? (
                     <button
                       type="button"
@@ -1173,7 +1267,7 @@ export default function ContractorJobDetailPage() {
                     </button>
                   ) : null}
 
-                  {(job.contractorAssignedStatus || job.status) ===
+                  {contractorLifecycleStatus ===
                   "on_the_way" ? (
                     <button
                       type="button"
@@ -1190,14 +1284,14 @@ export default function ContractorJobDetailPage() {
                     </button>
                   ) : null}
 
-                  {(job.contractorAssignedStatus || job.status) ===
+                  {contractorLifecycleStatus ===
                   "in_progress" ? (
                     <button
                       type="button"
                       onClick={() =>
                         handleLifecycleStatus(
                           "completed",
-                          "Job marked completed.",
+                          "Waiting for customer confirmation.",
                         )
                       }
                       disabled={isUpdatingStatus}
@@ -1207,11 +1301,14 @@ export default function ContractorJobDetailPage() {
                     </button>
                   ) : null}
 
-                  {hasSubmittedInterest ||
-                  job.isAssignedToCurrentContractor ||
-                  ["hired", "accepted", "on_the_way", "in_progress", "completed"].includes(
-                    job.contractorAssignedStatus || job.status,
-                  ) ? (
+                  {contractorLifecycleStatus ===
+                  "completion_pending_customer" ? (
+                    <p className="rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-bold text-amber-800">
+                      Waiting for customer confirmation
+                    </p>
+                  ) : null}
+
+                  {canMessageCustomer ? (
                     <button
                       type="button"
                       onClick={handleMessageCustomer}

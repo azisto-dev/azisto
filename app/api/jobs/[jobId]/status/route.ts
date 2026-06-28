@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import {
+  FieldValue,
+  Timestamp,
+  type QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -7,7 +11,9 @@ import {
 } from "@/lib/firebaseAdmin";
 import { createNotification } from "@/lib/notifications";
 import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
+import { getParentJobStatus } from "@/lib/jobLifecycle";
 import { ENABLE_JOB_PHOTO_ENFORCEMENT } from "@/lib/jobProofPhotos";
+import { CANCELLED_VISIBILITY_MS } from "@/lib/jobCancellation";
 
 export const runtime = "nodejs";
 
@@ -26,6 +32,7 @@ const lifecycleStatuses = new Set([
   "accepted",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
   "completed",
   "cancelled",
   "hired",
@@ -36,6 +43,7 @@ const acceptedStatuses = new Set([
   "hired",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
   "completed",
 ]);
 
@@ -96,7 +104,14 @@ function isAllowedContractorTransition(fromStatus: string, toStatus: string) {
   );
 }
 
-function getStatusUpdate(status: string, changedByUid: string) {
+function getStatusUpdate(
+  status: string,
+  changedByUid: string,
+  cancellationMetadata?: {
+    cancelledAt: Timestamp;
+    cancelledVisibleUntil: Timestamp;
+  },
+) {
   const update: Record<string, unknown> = {
     status,
     updatedAt: FieldValue.serverTimestamp(),
@@ -110,94 +125,28 @@ function getStatusUpdate(status: string, changedByUid: string) {
     update.startedAt = FieldValue.serverTimestamp();
   }
 
+  if (status === "completion_pending_customer") {
+    update.completionRequestedAt = FieldValue.serverTimestamp();
+    update.completionRequestedByUid = changedByUid;
+    update.matchingStatus = "closed";
+  }
+
   if (status === "completed") {
     update.completedAt = FieldValue.serverTimestamp();
     update.matchingStatus = "closed";
   }
 
   if (status === "cancelled") {
-    update.cancelledAt = FieldValue.serverTimestamp();
+    update.cancelledAt =
+      cancellationMetadata?.cancelledAt ?? FieldValue.serverTimestamp();
+    update.cancelledVisibleUntil =
+      cancellationMetadata?.cancelledVisibleUntil ??
+      Timestamp.fromMillis(Date.now() + CANCELLED_VISIBILITY_MS);
     update.cancelledByUid = changedByUid;
     update.matchingStatus = "closed";
   }
 
   return update;
-}
-
-function getParentStatus(taskStatuses: string[]) {
-  if (taskStatuses.length === 0) {
-    return { status: "open", overallStatus: "open", matchingStatus: "open" };
-  }
-
-  if (taskStatuses.every((status) => status === "cancelled")) {
-    return {
-      status: "cancelled",
-      overallStatus: "cancelled",
-      matchingStatus: "closed",
-    };
-  }
-
-  if (
-    taskStatuses.every(
-      (status) => status === "completed" || status === "cancelled",
-    )
-  ) {
-    return {
-      status: "completed",
-      overallStatus: "completed",
-      matchingStatus: "closed",
-    };
-  }
-
-  if (taskStatuses.includes("open")) {
-    const hasAssignedTask = taskStatuses.some(
-      (status) => status !== "open" && status !== "cancelled",
-    );
-
-    return {
-      status: "open",
-      overallStatus: hasAssignedTask ? "partially_hired" : "open",
-      matchingStatus: "open",
-    };
-  }
-
-  if (taskStatuses.includes("in_progress")) {
-    return {
-      status: "in_progress",
-      overallStatus: "in_progress",
-      matchingStatus: "closed",
-    };
-  }
-
-  if (taskStatuses.includes("on_the_way")) {
-    return {
-      status: "on_the_way",
-      overallStatus: "on_the_way",
-      matchingStatus: "closed",
-    };
-  }
-
-  if (
-    taskStatuses.some(
-      (status) => status === "accepted" || status === "hired",
-    )
-  ) {
-    return {
-      status: "accepted",
-      overallStatus: "accepted",
-      matchingStatus: "closed",
-    };
-  }
-
-  if (taskStatuses.includes("hired_pending_contractor")) {
-    return {
-      status: "hired_pending_contractor",
-      overallStatus: "hired_pending_contractor",
-      matchingStatus: "closed",
-    };
-  }
-
-  return { status: "open", overallStatus: "open", matchingStatus: "open" };
 }
 
 function getTaskStatus(
@@ -221,6 +170,15 @@ function getNotificationCopy(status: string, jobId: string) {
       type: "job_started",
       title: "Job started",
       message: `Work has started on job ${jobId}.`,
+    };
+  }
+
+  if (status === "completion_pending_customer") {
+    return {
+      type: "completion_pending_customer",
+      title: "Completion confirmation needed",
+      message:
+        "Your current open job has been marked completed by the contractor.",
     };
   }
 
@@ -264,6 +222,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = (await request.json()) as StatusRequestBody;
     const requestedStatus = readText(body.status);
     const taskId = readText(body.taskId);
+    const cancelledAt =
+      requestedStatus === "cancelled" ? Timestamp.now() : null;
+    const cancellationMetadata = cancelledAt
+      ? {
+          cancelledAt,
+          cancelledVisibleUntil: Timestamp.fromMillis(
+            cancelledAt.toMillis() + CANCELLED_VISIBILITY_MS,
+          ),
+        }
+      : undefined;
 
     if (!lifecycleStatuses.has(requestedStatus)) {
       return NextResponse.json(
@@ -341,7 +309,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
             cancellationTargets.forEach((taskSnapshot) => {
               transaction.set(
                 taskSnapshot.ref,
-                getStatusUpdate("cancelled", decodedToken.uid),
+                getStatusUpdate(
+                  "cancelled",
+                  decodedToken.uid,
+                  cancellationMetadata,
+                ),
                 { merge: true },
               );
             });
@@ -354,14 +326,36 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 ? "cancelled"
                 : getTaskStatus(taskSnapshot, currentStatus),
             );
-            const parentStatus = getParentStatus(updatedTaskStatuses);
+            const parentStatus = getParentJobStatus(updatedTaskStatuses);
+
+            if (
+              parentStatus.status === "cancelled" &&
+              cancellationMetadata
+            ) {
+              allTasks.forEach((taskSnapshot) => {
+                if (!targetIds.has(taskSnapshot.id)) {
+                  transaction.set(
+                    taskSnapshot.ref,
+                    {
+                      cancelledVisibleUntil:
+                        cancellationMetadata.cancelledVisibleUntil,
+                    },
+                    { merge: true },
+                  );
+                }
+              });
+            }
 
             transaction.set(
               jobDocument,
               {
                 ...parentStatus,
                 ...(parentStatus.status === "cancelled"
-                  ? getStatusUpdate("cancelled", decodedToken.uid)
+                  ? getStatusUpdate(
+                      "cancelled",
+                      decodedToken.uid,
+                      cancellationMetadata,
+                    )
                   : { updatedAt: FieldValue.serverTimestamp() }),
               },
               { merge: true },
@@ -381,7 +375,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
             transaction.set(
               jobDocument,
               {
-                ...getStatusUpdate("cancelled", decodedToken.uid),
+                ...getStatusUpdate(
+                  "cancelled",
+                  decodedToken.uid,
+                  cancellationMetadata,
+                ),
                 overallStatus: "cancelled",
               },
               { merge: true },
@@ -462,12 +460,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
         const transitionFromStatus =
           readText(targetTasks[0]?.get("status")) || currentStatus;
+        const nextStatus =
+          requestedStatus === "completed"
+            ? "completion_pending_customer"
+            : requestedStatus;
 
         if (
-          !isAllowedContractorTransition(
-            transitionFromStatus,
-            requestedStatus,
-          )
+          targetTasks.some((taskSnapshot) =>
+            !isAllowedContractorTransition(
+              readText(taskSnapshot.get("status")) || currentStatus,
+              requestedStatus,
+            ),
+          ) ||
+          (isLegacyParentAssignment &&
+            !isAllowedContractorTransition(currentStatus, requestedStatus))
         ) {
           throw Object.assign(
             new Error("That job status change is not allowed."),
@@ -518,13 +524,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
         }
 
         historyFromStatus = transitionFromStatus;
+        appliedStatus = nextStatus;
         completionContractorId =
           readText(targetTasks[0]?.get("hiredContractorId")) ||
           readText(jobSnapshot.get("hiredContractorId"));
         targetTasks.forEach((taskSnapshot) => {
           transaction.set(
             taskSnapshot.ref,
-            getStatusUpdate(requestedStatus, decodedToken.uid),
+            getStatusUpdate(nextStatus, decodedToken.uid),
             { merge: true },
           );
         });
@@ -535,10 +542,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
           );
           const updatedTaskStatuses = allTasks.map((taskSnapshot) =>
             targetIds.has(taskSnapshot.id)
-              ? requestedStatus
+              ? nextStatus
               : getTaskStatus(taskSnapshot, currentStatus),
           );
-          const parentStatus = getParentStatus(updatedTaskStatuses);
+          const parentStatus = getParentJobStatus(updatedTaskStatuses);
           completedParentJob = parentStatus.status === "completed";
 
           transaction.set(
@@ -552,12 +559,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
             { merge: true },
           );
         } else {
-          completedParentJob = requestedStatus === "completed";
+          completedParentJob = nextStatus === "completed";
           transaction.set(
             jobDocument,
             {
-              ...getStatusUpdate(requestedStatus, decodedToken.uid),
-              overallStatus: requestedStatus,
+              ...getStatusUpdate(nextStatus, decodedToken.uid),
+              overallStatus: nextStatus,
             },
             { merge: true },
           );
@@ -621,6 +628,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
             recipientRole: notificationRecipientRole,
             ...notification,
             jobId,
+            pushPayload:
+              appliedStatus === "on_the_way"
+                ? {
+                    body: "Your contractor is on the way.",
+                    url: "/customer/jobs",
+                  }
+                : appliedStatus === "completion_pending_customer"
+                  ? {
+                      title: "Confirm completion",
+                      body:
+                        "Your job was marked completed. Please confirm or reject.",
+                      url: "/customer/jobs",
+                    }
+                  : undefined,
           }),
         ),
       );

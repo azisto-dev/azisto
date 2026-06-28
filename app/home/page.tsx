@@ -37,6 +37,10 @@ import ContractorJobFilters, {
   type ContractorJobFilterOptions,
   type ContractorJobFilterPreferences,
 } from "@/app/components/ContractorJobFilters";
+import {
+  searchServiceCatalog,
+  type ServiceSearchResult,
+} from "@/lib/serviceCatalog";
 
 const services = [
   {
@@ -110,12 +114,14 @@ type ContractorHomeJob = {
   preferredTimeWindow: string;
   urgency: string;
   schedule: JobSchedule | null;
+  status: string;
   createdAt: string;
 };
 
 type ContractorHomeTask = {
   taskId: string;
   label: string;
+  status: string;
 };
 
 type ContractorHomeJobCard = ContractorHomeJob & {
@@ -186,10 +192,11 @@ function groupContractorHomeJobs(jobs: ContractorHomeJob[]) {
         taskIds: job.taskId ? [job.taskId] : [],
         taskLabels: [taskLabel],
         tasks: job.taskId
-          ? [{ taskId: job.taskId, label: taskLabel }]
+          ? [{ taskId: job.taskId, label: taskLabel, status: job.status }]
           : job.selectedSubcategories.map((subcategory) => ({
               taskId: "",
               label: subcategory,
+              status: job.status,
             })),
         selectedSubcategories: [taskLabel],
       });
@@ -198,7 +205,11 @@ function groupContractorHomeJobs(jobs: ContractorHomeJob[]) {
 
     if (job.taskId && !existingJob.taskIds.includes(job.taskId)) {
       existingJob.taskIds.push(job.taskId);
-      existingJob.tasks.push({ taskId: job.taskId, label: taskLabel });
+      existingJob.tasks.push({
+        taskId: job.taskId,
+        label: taskLabel,
+        status: job.status,
+      });
     }
 
     if (!existingJob.taskLabels.includes(taskLabel)) {
@@ -208,6 +219,10 @@ function groupContractorHomeJobs(jobs: ContractorHomeJob[]) {
 
     if (job.createdAt > existingJob.createdAt) {
       existingJob.createdAt = job.createdAt;
+    }
+
+    if (job.status === "open") {
+      existingJob.status = "open";
     }
   });
 
@@ -252,6 +267,17 @@ function SearchIcon() {
       />
     </svg>
   );
+}
+
+function getServiceSearchHref(result: ServiceSearchResult) {
+  const params = new URLSearchParams();
+
+  if (result.groupKey) {
+    params.set("group", result.groupKey);
+  }
+
+  const query = params.toString();
+  return `/service/${result.serviceSlug}${query ? `?${query}` : ""}`;
 }
 
 function getFirstName(name: string) {
@@ -379,6 +405,7 @@ function readContractorHomeData(value: unknown): ContractorHomeData {
             preferredTime: readString(jobData.preferredTime),
             preferredTimeWindow: readString(jobData.preferredTimeWindow),
             urgency: readString(jobData.urgency),
+            status: readString(jobData.status),
             schedule:
               typeof jobData.schedule === "object" && jobData.schedule !== null
                 ? (jobData.schedule as JobSchedule)
@@ -613,6 +640,7 @@ export default function HomePage() {
   );
   const [isRoleLoading, setIsRoleLoading] = useState(true);
   const [greetingName, setGreetingName] = useState("");
+  const [serviceSearchQuery, setServiceSearchQuery] = useState("");
   const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [contractorHome, setContractorHome] =
     useState<ContractorHomeData | null>(null);
@@ -645,6 +673,7 @@ export default function HomePage() {
     lastGlobalContractorHomeSuccessAt,
   );
   const notificationsHref = role === "unknown" ? "/login" : "/notifications";
+  const serviceSearchResults = searchServiceCatalog(serviceSearchQuery);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -1048,16 +1077,33 @@ export default function HomePage() {
   }
 
   async function handleClearContractorFilters() {
-    setContractorFilters(emptyContractorFilters);
-    setIsFilterSheetOpen(false);
+    if (!currentUser) {
+      setContractorFilters(emptyContractorFilters);
+      setIsFilterSheetOpen(false);
+      return;
+    }
 
-    if (currentUser) {
-      await loadContractorWorkspace(
+    setIsSavingFilters(true);
+
+    try {
+      const savedFilters = await saveContractorFilterPreferences(
         currentUser,
         emptyContractorFilters,
-        {},
+      );
+      setContractorFilters(savedFilters);
+      setIsFilterSheetOpen(false);
+      await loadContractorWorkspace(
+        currentUser,
+        savedFilters,
+        { forceRefresh: true },
         "clear-filters",
       );
+    } catch (error) {
+      setContractorHomeError(
+        error instanceof Error ? error.message : "Unable to clear filters.",
+      );
+    } finally {
+      setIsSavingFilters(false);
     }
   }
 
@@ -1341,7 +1387,13 @@ export default function HomePage() {
               ) : null}
 
               <div className="az-contractor-panel mt-4 max-h-[360px] space-y-2 overflow-y-auto p-2 pr-1">
-                {contractorAvailableJobCards.map((job) => (
+                {contractorAvailableJobCards.map((job) => {
+                  const isFullyCancelled =
+                    job.tasks.length > 0
+                      ? job.tasks.every((task) => task.status === "cancelled")
+                      : job.status === "cancelled";
+
+                  return (
                   <article
                     key={job.jobId}
                     className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
@@ -1355,17 +1407,25 @@ export default function HomePage() {
                           <p className="text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--azisto-contractor-burgundy)]">
                             {job.jobId}
                           </p>
-                          {isRecentlyPosted(job.createdAt) ? (
+                          {job.status === "open" &&
+                          isRecentlyPosted(job.createdAt) ? (
                             <span className="rounded-full border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-700">
                               Recently posted
                             </span>
                           ) : null}
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
-                        {[job.city, job.province].filter(Boolean).join(", ") ||
-                          "Location pending"}
-                      </span>
+                      {isFullyCancelled ? (
+                        <span className="shrink-0 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">
+                          Cancelled
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
+                          {[job.city, job.province]
+                            .filter(Boolean)
+                            .join(", ") || "Location pending"}
+                        </span>
+                      )}
                     </div>
 
                     {job.tasks.length > 0 ? (
@@ -1378,8 +1438,21 @@ export default function HomePage() {
                             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                               {task.taskId || `Task ${index + 1}`}
                             </span>
-                            <span className="text-[11px] font-bold text-[var(--azisto-contractor-text)]">
-                              {task.label}
+                            <span className="flex items-center gap-1.5 text-right">
+                              <span
+                                className={`text-[11px] font-bold ${
+                                  task.status === "cancelled"
+                                    ? "text-slate-400 line-through"
+                                    : "text-[var(--azisto-contractor-text)]"
+                                }`}
+                              >
+                                {task.label}
+                              </span>
+                              {task.status === "cancelled" ? (
+                                <span className="rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                                  Cancelled
+                                </span>
+                              ) : null}
                             </span>
                           </div>
                         ))}
@@ -1402,14 +1475,24 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    <Link
-                      href={getContractorJobHref(job.jobId)}
-                      className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-white text-xs font-bold text-[#5C0032]"
-                    >
-                      View job
-                    </Link>
+                    {isFullyCancelled ? (
+                      <span
+                        aria-disabled="true"
+                        className="mt-3 flex h-10 cursor-not-allowed items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-400"
+                      >
+                        Job cancelled
+                      </span>
+                    ) : (
+                      <Link
+                        href={getContractorJobHref(job.jobId)}
+                        className="az-btn-contractor-outline mt-3 flex h-10 items-center justify-center rounded-full border-[#5C0032] bg-white text-xs font-bold text-[#5C0032]"
+                      >
+                        View job
+                      </Link>
+                    )}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           </div>
@@ -1473,22 +1556,62 @@ export default function HomePage() {
             </p>
           ) : null}
 
-          <div className="mt-5 flex h-14 items-center gap-3 rounded-lg border border-azisto-border bg-white px-4 text-sm text-slate-500 shadow-sm">
-            <Link
-              href={role === "unknown" ? "/login" : "/service/home-care"}
-              className="flex min-w-0 flex-1 items-center justify-between gap-3"
-            >
-              <span className="truncate">What do you need help with?</span>
+          <div className="relative mt-5">
+            <div className="flex h-14 items-center gap-3 rounded-lg border border-azisto-border bg-white px-4 text-sm text-slate-500 shadow-sm">
+              <input
+                type="search"
+                value={serviceSearchQuery}
+                onChange={(event) => setServiceSearchQuery(event.target.value)}
+                placeholder="What do you need help with?"
+                aria-label="Search services"
+                className="min-w-0 flex-1 bg-transparent text-sm text-black outline-none placeholder:text-slate-500"
+              />
               <SearchIcon />
-            </Link>
 
-            <Link
-              href="/ai-assistant"
-              className="azisto-ai-glow az-ai-pill flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold"
-              aria-label="Open AZISTO AI assistant"
-            >
-              ✨ AI
-            </Link>
+              <Link
+                href="/ai-assistant"
+                className="azisto-ai-glow az-ai-pill flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold"
+                aria-label="Open AZISTO AI assistant"
+              >
+                ✨ AI
+              </Link>
+            </div>
+
+            {serviceSearchQuery.trim() ? (
+              <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-2xl border border-azisto-border bg-white shadow-xl">
+                {serviceSearchResults.length > 0 ? (
+                  serviceSearchResults.map((result) => (
+                    <Link
+                      key={`${result.serviceSlug}:${result.groupKey}:${result.label}`}
+                      href={
+                        role === "unknown"
+                          ? "/login"
+                          : getServiceSearchHref(result)
+                      }
+                      className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                    >
+                      <span>
+                        <span className="block text-sm font-bold text-black">
+                          {result.label}
+                        </span>
+                        {result.label !== result.serviceName ? (
+                          <span className="mt-0.5 block text-xs font-semibold text-slate-500">
+                            {result.serviceName}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        View
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="px-4 py-4 text-sm font-semibold text-slate-500">
+                    No matching services found.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <section className="mt-6 grid grid-cols-3 gap-3">
@@ -1498,13 +1621,21 @@ export default function HomePage() {
                 href={`/service/${service.slug}`}
                 className="flex min-h-[86px] flex-col items-center justify-start text-center"
               >
-                <img
-                  src={service.image}
-                  alt={service.imageAlt}
-                  className={`h-16 w-16 object-contain ${
-                    service.imageClassName ?? ""
-                  }`}
-                />
+                <span className="relative block h-16 w-16">
+                  <img
+                    src={service.image}
+                    alt={service.imageAlt}
+                    className={`h-16 w-16 object-contain ${
+                      service.imageClassName ?? ""
+                    }`}
+                  />
+                  {service.slug === "car-care" ? (
+                    <span aria-hidden="true" className="pointer-events-none absolute inset-0">
+                      <span className="az-car-care-led az-car-care-led-left" />
+                      <span className="az-car-care-led az-car-care-led-right" />
+                    </span>
+                  ) : null}
+                </span>
                 <span className="mt-2 text-xs font-bold leading-tight text-black">
                   {service.name}
                 </span>
@@ -1533,7 +1664,7 @@ export default function HomePage() {
               </div>
 
               <p className="text-sm font-semibold text-black">
-                <span className="text-[#F5B400]">★</span> 4.9{" "}
+                <span className="text-[#F59E0B]">★</span> 4.9{" "}
                 <span className="font-normal text-slate-500">
                   (2.3k reviews)
                 </span>

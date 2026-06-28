@@ -472,6 +472,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
           : notificationMessage,
       jobId: readText(threadSnapshot.get("jobId")),
       threadId,
+      pushPayload: {
+        body: "You received a new message.",
+        url: `/messages/${encodeURIComponent(threadId)}`,
+      },
     });
 
     return NextResponse.json({ ok: true, messageId });

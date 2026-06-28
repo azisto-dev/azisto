@@ -8,6 +8,7 @@ import {
   serializeTimestamp,
   sortByNewest,
 } from "@/lib/adminConsole";
+import { getJobExpiresAtMs, isJobExpired } from "@/lib/jobExpiry";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,11 @@ export async function GET(request: NextRequest) {
           city: readText(data.city),
           province: readText(data.province),
           status: readText(data.overallStatus) || readText(data.status),
+          expiresAt: getJobExpiresAtMs(data)
+            ? new Date(getJobExpiresAtMs(data)).toISOString()
+            : "",
+          isExpired: isJobExpired(data),
+          repostedAt: serializeTimestamp(data.repostedAt),
           createdAt: serializeTimestamp(data.createdAt),
           completedAt: serializeTimestamp(data.completedAt),
           scheduleMode: readText(data.scheduleMode),

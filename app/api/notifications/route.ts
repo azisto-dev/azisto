@@ -185,15 +185,26 @@ export async function PATCH(request: NextRequest) {
         notificationSnapshot.exists &&
         notificationSnapshot.get("recipientAuthUid") === decodedToken.uid
       ) {
+        const shouldClear = action === "clear";
         await notificationSnapshot.ref.set(
           {
             read: true,
             readAt: FieldValue.serverTimestamp(),
+            ...(shouldClear
+              ? {
+                  clearedAt: FieldValue.serverTimestamp(),
+                  clearedByUid: decodedToken.uid,
+                }
+              : {}),
           },
           { merge: true },
         );
 
-        return NextResponse.json({ ok: true, updated: 1 });
+        return NextResponse.json({
+          ok: true,
+          updated: 1,
+          cleared: shouldClear ? 1 : 0,
+        });
       }
 
       return NextResponse.json({ ok: true, updated: 0 });

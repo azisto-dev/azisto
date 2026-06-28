@@ -12,7 +12,6 @@ import {
   MapPin,
   MessageCircle,
   RefreshCw,
-  UserRound,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { fetchSessionProfile } from "@/lib/sessionProfile";
@@ -35,6 +34,7 @@ import AppHeader from "@/app/components/AppHeader";
 import AppShimmer from "@/app/components/AppShimmer";
 import JobProofGallery from "@/app/components/JobProofGallery";
 import type { JobProofPhoto } from "@/lib/jobProofPhotos";
+import { createRebookRequest } from "@/lib/customerRebookClient";
 
 type CustomerJob = {
   jobId: string;
@@ -57,6 +57,9 @@ type CustomerJob = {
   hiredContractorName: string;
   hiredBusinessName: string;
   createdAt: string;
+  expiresAt?: string;
+  repostedAt?: string;
+  expiryNoticeSentAt?: string;
   beforePhotos: JobProofPhoto[];
   afterPhotos: JobProofPhoto[];
   reviewed: boolean;
@@ -76,6 +79,12 @@ type CustomerJobTask = {
   afterPhotos: JobProofPhoto[];
   reviewed: boolean;
   createdAt: string;
+  expiresAt?: string;
+};
+
+type CustomerCompletionTarget = {
+  job: CustomerJob;
+  task?: CustomerJobTask;
 };
 
 type JobTab = "active" | "open" | "past";
@@ -85,6 +94,7 @@ const activeJobStatuses = new Set([
   "hired",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
   "partially_active",
   "partially_in_progress",
 ]);
@@ -121,9 +131,31 @@ function formatDate(value: string) {
   );
 }
 
+function formatExpiry(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  const remainingMs = new Date(value).getTime() - Date.now();
+
+  if (remainingMs <= 0) {
+    return "Expired";
+  }
+
+  const remainingHours = Math.max(1, Math.ceil(remainingMs / 3_600_000));
+
+  if (remainingHours < 24) {
+    return `Expires in ${remainingHours} hour${remainingHours === 1 ? "" : "s"}`;
+  }
+
+  const remainingDays = Math.ceil(remainingHours / 24);
+  return `Expires in ${remainingDays} day${remainingDays === 1 ? "" : "s"}`;
+}
+
 function getCustomerLifecycleStatus(job: CustomerJob) {
   const taskStatuses = job.tasks?.map((task) => task.status) ?? [];
   const priority = [
+    "completion_pending_customer",
     "in_progress",
     "on_the_way",
     "accepted",
@@ -136,6 +168,20 @@ function getCustomerLifecycleStatus(job: CustomerJob) {
     job.status ||
     "open"
   );
+}
+
+function getCustomerDisplayStatus(job: CustomerJob) {
+  return job.tasks?.some(
+    (task) => task.status === "completion_pending_customer",
+  )
+    ? "completion_pending_customer"
+    : job.overallStatus || job.status || "open";
+}
+
+function getCustomerJobStatusLabel(status: string) {
+  return status === "completion_pending_customer"
+    ? "Awaiting your confirmation"
+    : getJobStatusLabel(status);
 }
 
 function isAcceptedStatus(status: string) {
@@ -177,6 +223,15 @@ function getJobTab(job: CustomerJob): JobTab {
   }
 
   return "open";
+}
+
+function getJobRebookContractorId(job: CustomerJob) {
+  return (
+    job.hiredContractorId ||
+    job.tasks?.find((task) => task.status === "completed" && task.hiredContractorId)
+      ?.hiredContractorId ||
+    ""
+  );
 }
 
 async function fetchCustomerJobs(
@@ -242,6 +297,55 @@ async function updateJobStatus(
   return responseBody;
 }
 
+async function submitCompletionDecision(
+  user: User,
+  jobId: string,
+  decision: "confirm" | "reject",
+  taskId?: string,
+) {
+  const response = await authenticatedFetch(
+    user,
+    `/api/jobs/${encodeURIComponent(jobId)}/completion-confirmation`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ decision, taskId }),
+    },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : "Unable to update the completion request.",
+    );
+  }
+}
+
+async function repostJob(user: User, jobId: string) {
+  const response = await authenticatedFetch(
+    user,
+    `/api/jobs/${encodeURIComponent(jobId)}/repost`,
+    { method: "POST" },
+  );
+  const responseBody = (await response.json().catch(() => null)) as {
+    message?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof responseBody?.message === "string"
+        ? responseBody.message
+        : "Unable to repost this job.",
+    );
+  }
+}
+
 async function createMessageThread(user: User, job: CustomerJob) {
   const token = await user.getIdToken();
   const response = await fetch("/api/messages/threads", {
@@ -288,6 +392,10 @@ export default function CustomerJobsPage() {
   const [refreshWarning, setRefreshWarning] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<JobTab>("active");
+  const [cancelTarget, setCancelTarget] =
+    useState<CustomerCompletionTarget | null>(null);
+  const [isCompletionDecisionPending, setIsCompletionDecisionPending] =
+    useState(false);
   const isJobsRequestInFlightRef = useRef(false);
   const jobsRetryAfterRef = useRef(0);
   const hasSelectedInitialTabRef = useRef(false);
@@ -434,6 +542,16 @@ export default function CustomerJobsPage() {
       return;
     }
 
+    setCancelTarget({ job, task });
+  }
+
+  async function confirmCancellation() {
+    if (!currentUser || !cancelTarget || activeJobId) {
+      return;
+    }
+
+    const { job, task } = cancelTarget;
+
     try {
       setActiveJobId(task?.taskId || job.jobId);
       setErrorMessage("");
@@ -446,10 +564,56 @@ export default function CustomerJobsPage() {
       );
       await loadJobs(currentUser, "manual");
       setSuccessMessage(task ? "Task cancelled." : "Job cancelled.");
+      setCancelTarget(null);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
       setActiveJobId("");
+    }
+  }
+
+  const completionTarget: CustomerCompletionTarget | null =
+    jobs
+      .flatMap((job) => {
+        const pendingTask = job.tasks?.find(
+          (task) => task.status === "completion_pending_customer",
+        );
+
+        if (pendingTask) {
+          return [{ job, task: pendingTask }];
+        }
+
+        return job.status === "completion_pending_customer"
+          ? [{ job }]
+          : [];
+      })
+      .at(0) ?? null;
+
+  async function handleCompletionDecision(decision: "confirm" | "reject") {
+    if (!currentUser || !completionTarget || isCompletionDecisionPending) {
+      return;
+    }
+
+    try {
+      setIsCompletionDecisionPending(true);
+      setErrorMessage("");
+      setSuccessMessage("");
+      await submitCompletionDecision(
+        currentUser,
+        completionTarget.job.jobId,
+        decision,
+        completionTarget.task?.taskId,
+      );
+      await loadJobs(currentUser, "manual");
+      setSuccessMessage(
+        decision === "confirm"
+          ? "Completion confirmed."
+          : "Completion rejected. The contractor has been notified.",
+      );
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsCompletionDecisionPending(false);
     }
   }
 
@@ -468,6 +632,49 @@ export default function CustomerJobsPage() {
       setErrorMessage("");
       const threadId = await createMessageThread(currentUser, job);
       router.push(`/messages/${encodeURIComponent(threadId)}`);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setActiveJobId("");
+    }
+  }
+
+  async function handleRepostJob(job: CustomerJob) {
+    if (!currentUser || activeJobId) {
+      return;
+    }
+
+    try {
+      setActiveJobId(job.jobId);
+      setErrorMessage("");
+      setSuccessMessage("");
+      await repostJob(currentUser, job.jobId);
+      await loadJobs(currentUser, "manual");
+      setSelectedTab("open");
+      setSuccessMessage("Job reposted for another 7 days.");
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setActiveJobId("");
+    }
+  }
+
+  async function handleBookAgain(job: CustomerJob) {
+    if (!currentUser || activeJobId) {
+      return;
+    }
+
+    const contractorId = getJobRebookContractorId(job);
+
+    try {
+      setActiveJobId(job.jobId);
+      setErrorMessage("");
+      setSuccessMessage("");
+      const href = await createRebookRequest(currentUser, {
+        sourceJobId: job.jobId,
+        contractorId,
+      });
+      router.push(href);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -527,7 +734,7 @@ export default function CustomerJobsPage() {
                   onClick={() => setSelectedTab(tab.key)}
                   className={`flex h-11 items-center justify-center gap-1 rounded-xl text-xs font-bold transition duration-200 ${
                     selectedTab === tab.key
-                      ? "bg-[#1F1F1F] text-white shadow-md shadow-slate-300"
+                      ? "bg-[#1E3A8A] text-white shadow-md shadow-blue-200"
                       : "bg-white text-slate-700"
                   }`}
                 >
@@ -620,11 +827,11 @@ export default function CustomerJobsPage() {
                   </div>
                   <span
                     className={getCustomerStatusChipClass(
-                      job.overallStatus || job.status || "open",
+                      getCustomerDisplayStatus(job),
                     )}
                   >
-                    {getJobStatusLabel(
-                      job.overallStatus || job.status || "open",
+                    {getCustomerJobStatusLabel(
+                      getCustomerDisplayStatus(job),
                     )}
                   </span>
                 </div>
@@ -640,7 +847,7 @@ export default function CustomerJobsPage() {
                           {task.subcategory || task.category || "Task"}
                         </span>
                         <span className="text-[10px] font-semibold text-slate-500">
-                          {getJobStatusLabel(task.status || "open")}
+                          {getCustomerJobStatusLabel(task.status || "open")}
                         </span>
                         {canCancelStatus(task.status) ? (
                           <button
@@ -695,16 +902,12 @@ export default function CustomerJobsPage() {
                       />
                       {[job.city, job.province].filter(Boolean).join(", ")}
                     </p>
-                    {job.hiredContractorId ? (
+                    {getJobRebookContractorId(job) ? (
                       <p className="flex min-w-0 items-center gap-2">
-                        <UserRound
-                          aria-hidden="true"
-                          className="h-4 w-4 shrink-0 text-black"
-                        />
                         <span className="truncate">
                           {job.hiredBusinessName ||
                             job.hiredContractorName ||
-                            job.hiredContractorId}
+                            getJobRebookContractorId(job)}
                         </span>
                       </p>
                     ) : null}
@@ -723,6 +926,17 @@ export default function CustomerJobsPage() {
                     />
                     Posted {formatDate(job.createdAt)}
                   </p>
+                  {job.expiresAt ? (
+                    <p
+                      className={`text-xs font-bold ${
+                        formatExpiry(job.expiresAt) === "Expired"
+                          ? "text-red-600"
+                          : "text-amber-700"
+                      }`}
+                    >
+                      {formatExpiry(job.expiresAt)}
+                    </p>
+                  ) : null}
                 </div>
 
                 <JobProofGallery
@@ -742,6 +956,28 @@ export default function CustomerJobsPage() {
                     >
                       View interested contractors
                     </Link>
+                  ) : null}
+
+                  {["open", "expired"].includes(job.status) ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleRepostJob(job)}
+                        disabled={activeJobId === job.jobId}
+                        className="az-btn-secondary flex h-11 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-60"
+                      >
+                        {activeJobId === job.jobId
+                          ? "Reposting..."
+                          : "Repost"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className="flex h-11 cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-500"
+                      >
+                        Edit job coming soon
+                      </button>
+                    </div>
                   ) : null}
 
                   <button
@@ -805,6 +1041,21 @@ export default function CustomerJobsPage() {
                       )}
                     </>
                   ) : null}
+
+                  {selectedTab === "past" && getJobRebookContractorId(job) ? (
+                    <div className="grid gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleBookAgain(job)}
+                        disabled={activeJobId === job.jobId}
+                        className="az-btn-primary flex h-11 items-center justify-center rounded-xl px-2 text-xs font-bold disabled:opacity-60"
+                      >
+                        {activeJobId === job.jobId
+                          ? "Preparing..."
+                          : "Book again"}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             ))}
@@ -812,6 +1063,91 @@ export default function CustomerJobsPage() {
         </div>
         <BottomNav role="customer" />
       </div>
+      {completionTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="completion-confirmation-title"
+            className="w-full max-w-sm rounded-[24px] border border-azisto-border bg-white p-5 shadow-2xl"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.14em] az-kicker">
+              Completion confirmation
+            </p>
+            <h2
+              id="completion-confirmation-title"
+              className="mt-2 text-xl font-bold text-black"
+            >
+              Your current open job has been marked completed by contractor.
+            </h2>
+            {completionTarget.task ? (
+              <p className="mt-2 text-sm font-semibold text-slate-600">
+                Task:{" "}
+                {completionTarget.task.subcategory ||
+                  completionTarget.task.category ||
+                  "Selected task"}
+              </p>
+            ) : null}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isCompletionDecisionPending}
+                onClick={() => void handleCompletionDecision("reject")}
+                className="az-btn-secondary h-12 rounded-xl text-sm font-bold disabled:opacity-60"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                disabled={isCompletionDecisionPending}
+                onClick={() => void handleCompletionDecision("confirm")}
+                className="az-btn-primary h-12 rounded-xl text-sm font-bold disabled:opacity-60"
+              >
+                {isCompletionDecisionPending ? "Updating..." : "Confirm"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {cancelTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-5">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-task-title"
+            className="w-full max-w-sm rounded-[24px] border border-azisto-border bg-white p-5 shadow-2xl"
+          >
+            <h2 id="cancel-task-title" className="text-xl font-bold text-black">
+              Are you sure you want to cancel the selected task?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {cancelTarget.task
+                ? cancelTarget.task.subcategory ||
+                  cancelTarget.task.category ||
+                  "Only this task will be cancelled."
+                : "This job request will be cancelled."}
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={Boolean(activeJobId)}
+                onClick={() => setCancelTarget(null)}
+                className="az-btn-secondary h-12 rounded-xl text-sm font-bold disabled:opacity-60"
+              >
+                Keep task
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(activeJobId)}
+                onClick={() => void confirmCancellation()}
+                className="az-btn-danger-soft h-12 rounded-xl text-sm font-bold disabled:opacity-60"
+              >
+                {activeJobId ? "Cancelling..." : "Cancel task"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

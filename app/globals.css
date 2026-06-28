@@ -8,24 +8,25 @@
   --azisto-primary: #1E3A8A;
   --azisto-primary-hover: #273F7A;
   --azisto-accent: #2563EB;
-  --azisto-gold: #C8A96B;
+  --azisto-gold: #F59E0B;
   --azisto-border: #E5E7EB;
   --azisto-muted: #6B7280;
   --azisto-success: #10B981;
   --azisto-warning: #F59E0B;
   --azisto-danger: #EF4444;
-  --azisto-customer-charcoal: #171717;
-  --azisto-customer-azure: #42675D;
-  --azisto-customer-gold: #C7A35A;
-  --azisto-customer-background: #F4F5F0;
+  --azisto-customer-charcoal: #111111;
+  --azisto-customer-button: #1E3A8A;
+  --azisto-customer-azure: #2563EB;
+  --azisto-customer-gold: #F59E0B;
+  --azisto-customer-background: #FAFAF8;
   --azisto-customer-surface: #FFFFFF;
-  --azisto-customer-surface-muted: #F0F1ED;
-  --azisto-customer-soft-gray: #F0F1ED;
-  --azisto-customer-border: #E1E3DC;
-  --azisto-customer-muted: #696B65;
-  --azisto-customer-accent-soft: #E8EFEB;
+  --azisto-customer-surface-muted: #FAFAF8;
+  --azisto-customer-soft-gray: #F3F4F6;
+  --azisto-customer-border: #E5E7EB;
+  --azisto-customer-muted: #6B7280;
+  --azisto-customer-accent-soft: rgb(37 99 235 / 0.1);
   --azisto-customer-message-blue: #E5F1FF;
-  --azisto-customer-error: #D64545;
+  --azisto-customer-error: #EF4444;
   --azisto-contractor-bg: #FFFFFF;
   --azisto-contractor-card: #FFFFFF;
   --azisto-contractor-border: #E8E2DC;
@@ -135,6 +136,21 @@ body {
 
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes azisto-car-led-flash {
+  0%,
+  18%,
+  100% {
+    opacity: 0;
+    transform: scaleX(0.82);
+  }
+
+  38%,
+  58% {
+    opacity: 1;
+    transform: scaleX(1.12);
   }
 }
 
@@ -252,26 +268,51 @@ body {
   }
 
   .az-customer-shell .az-btn-primary {
-    border-color: var(--azisto-customer-charcoal);
-    background: var(--azisto-customer-charcoal);
+    border-color: var(--azisto-customer-button);
+    background: var(--azisto-customer-button);
     color: #FFFFFF;
-    box-shadow: 0 7px 18px rgb(23 23 23 / 0.16);
+    box-shadow: 0 7px 18px rgb(30 58 138 / 0.18);
   }
 
   .az-customer-shell .az-btn-primary:hover {
-    border-color: #111111;
-    background: #111111;
+    border-color: var(--azisto-primary-hover);
+    background: var(--azisto-primary-hover);
+  }
+
+  .az-car-care-led {
+    position: absolute;
+    top: 48.5%;
+    z-index: 1;
+    height: 7%;
+    width: 21%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, #FFFFFF 28%, #FFFFFF 72%, transparent);
+    box-shadow:
+      0 0 4px 1px rgb(255 255 255 / 0.95),
+      0 0 9px 3px rgb(225 247 255 / 0.9);
+    opacity: 0;
+    animation: azisto-car-led-flash 950ms ease-out 420ms 1 both;
+  }
+
+  .az-car-care-led-left {
+    left: 20%;
+    rotate: 7deg;
+  }
+
+  .az-car-care-led-right {
+    right: 19%;
+    rotate: -7deg;
   }
 
   .az-customer-shell .az-btn-secondary {
-    border-color: var(--azisto-customer-border);
-    background: var(--azisto-customer-surface-muted);
+    border-color: var(--azisto-customer-muted);
+    background: var(--azisto-customer-surface);
     color: var(--azisto-customer-charcoal);
     box-shadow: none;
   }
 
   .az-customer-shell .az-btn-secondary:hover {
-    background: #E7E9E3;
+    background: var(--azisto-customer-background);
   }
 
   .az-customer-page {
@@ -286,12 +327,12 @@ body {
   }
 
   .az-btn-royal-blue {
-    @apply border border-[#4169E1] bg-[#4169E1] text-white shadow-sm shadow-[#4169E1]/20 transition hover:border-[#3154C9] hover:bg-[#3154C9] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+    @apply border border-azisto-accent bg-azisto-accent text-white shadow-sm shadow-blue-200/70 transition hover:border-blue-700 hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
   }
 
   .az-btn-royal-animated {
-    @apply border border-[#1E3A8A] text-white shadow-sm shadow-[#4169E1]/25 transition hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
-    background-image: linear-gradient(120deg, #4169E1, #1E3A8A, #050505);
+    @apply border border-azisto-primary text-white shadow-sm shadow-blue-200/70 transition hover:shadow-md disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none;
+    background-image: linear-gradient(120deg, #2563EB, #1E3A8A, #273F7A);
     background-size: 220% 220%;
     animation: azisto-royal-black-fade 3.2s ease-in-out infinite;
   }
@@ -409,7 +450,6 @@ body {
   }
 
   .az-contractor-job-card {
-    border-color: var(--azisto-contractor-burgundy);
     box-shadow:
       0 8px 24px rgb(0 0 0 / 0.08),
       inset 0 1px 0 rgb(255 255 255 / 0.74);
@@ -582,23 +622,33 @@ body {
   }
 
   .az-status-success {
-    @apply border-emerald-100 bg-emerald-50 text-emerald-700;
+    border-color: rgb(16 185 129 / 0.18);
+    background: rgb(16 185 129 / 0.1);
+    color: var(--azisto-success);
   }
 
   .az-status-warning {
-    @apply border-amber-100 bg-amber-50 text-amber-700;
+    border-color: rgb(245 158 11 / 0.22);
+    background: rgb(245 158 11 / 0.1);
+    color: var(--azisto-warning);
   }
 
   .az-status-info {
-    @apply border-azisto-gold/30 bg-white text-azisto-text;
+    border-color: rgb(37 99 235 / 0.16);
+    background: rgb(37 99 235 / 0.1);
+    color: var(--azisto-accent);
   }
 
   .az-status-danger {
-    @apply border-red-100 bg-red-50 text-red-600;
+    border-color: rgb(239 68 68 / 0.18);
+    background: rgb(239 68 68 / 0.1);
+    color: var(--azisto-danger);
   }
 
   .az-status-neutral {
-    @apply border-azisto-border bg-white text-slate-700;
+    border-color: var(--azisto-border);
+    background: var(--azisto-card);
+    color: var(--azisto-muted);
   }
 
   .az-live-dot {
@@ -607,25 +657,25 @@ body {
   }
 
   .az-feed-card {
-    @apply border border-sky-100 bg-gradient-to-br from-white via-white to-sky-50/70 shadow-sm shadow-sky-100/70 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[#4169E1]/35 hover:shadow-lg hover:shadow-sky-100 active:scale-[0.99];
+    @apply border border-blue-100 bg-gradient-to-br from-white via-white to-blue-50/70 shadow-sm shadow-blue-100/70 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-azisto-accent/35 hover:shadow-lg hover:shadow-blue-100 active:scale-[0.99];
     animation: azisto-soft-fade-in 260ms ease-out both;
   }
 
   .az-new-job-glow {
-    @apply ring-1 ring-[#4169E1]/20;
-    box-shadow: 0 12px 28px rgb(65 105 225 / 0.12);
+    @apply ring-1 ring-azisto-accent/20;
+    box-shadow: 0 12px 28px rgb(37 99 235 / 0.12);
   }
 
   .az-task-chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-[#0F172A] transition hover:border-[#4169E1]/40 hover:bg-sky-100;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-azisto-text transition hover:border-azisto-accent/40 hover:bg-blue-100;
   }
 
   .az-task-select {
-    @apply flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .az-task-select-active {
-    @apply border-[#4169E1] bg-sky-50 text-[#0F172A] shadow-sm shadow-sky-100;
+    @apply border-azisto-accent bg-blue-50 text-azisto-text shadow-sm shadow-blue-100;
   }
 
   .az-task-select-idle {
@@ -634,7 +684,7 @@ body {
 
   .az-shimmer {
     @apply relative overflow-hidden;
-    background: #E7E9E3;
+    background: #E5E7EB;
   }
 
   .az-shimmer::after {
@@ -681,17 +731,74 @@ body {
 
 .az-customer-shell .border-azisto-border,
 .az-customer-shell .border-blue-100,
+.az-customer-shell .border-sky-100,
 .az-customer-shell .border-slate-200 {
   border-color: var(--azisto-customer-border);
 }
 
-.az-customer-shell .bg-blue-50 {
+.az-customer-shell .bg-blue-50,
+.az-customer-shell .bg-sky-50 {
   background: var(--azisto-customer-accent-soft);
+}
+
+.az-customer-shell .border-emerald-100,
+.az-customer-shell .border-emerald-200 {
+  border-color: rgb(16 185 129 / 0.18);
+}
+
+.az-customer-shell .bg-emerald-50 {
+  background: rgb(16 185 129 / 0.1);
+}
+
+.az-customer-shell .text-emerald-600,
+.az-customer-shell .text-emerald-700,
+.az-customer-shell .text-emerald-800 {
+  color: var(--azisto-success);
+}
+
+.az-customer-shell .border-amber-100,
+.az-customer-shell .border-amber-200 {
+  border-color: rgb(245 158 11 / 0.22);
+}
+
+.az-customer-shell .bg-amber-50 {
+  background: rgb(245 158 11 / 0.1);
+}
+
+.az-customer-shell .text-amber-500,
+.az-customer-shell .text-amber-600,
+.az-customer-shell .text-amber-700,
+.az-customer-shell .text-amber-800,
+.az-customer-shell .border-red-100,
+.az-customer-shell .border-red-200,
+.az-customer-shell .border-red-300 {
+  border-color: rgb(239 68 68 / 0.18);
+}
+
+.az-customer-shell .bg-red-50 {
+  background: rgb(239 68 68 / 0.1);
+}
+
+.az-customer-shell .text-red-500,
+.az-customer-shell .text-red-600,
+.az-customer-shell .text-red-700,
+.az-customer-shell .text-red-800 {
+  color: var(--azisto-danger);
 }
 
 .az-customer-shell .bg-slate-50,
 .az-customer-shell .bg-slate-100 {
   background: var(--azisto-customer-surface-muted);
+}
+
+.az-customer-shell .focus\:border-azisto-gold:focus,
+.az-customer-shell .focus\:border-azisto-accent:focus {
+  border-color: var(--azisto-accent);
+}
+
+.az-customer-shell .focus\:ring-azisto-gold\/20:focus,
+.az-customer-shell .focus\:ring-blue-100:focus {
+  --tw-ring-color: rgb(37 99 235 / 0.18);
 }
 
 .az-customer-shell .shadow-sm {
@@ -712,7 +819,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .az-shimmer::after {
+  .az-shimmer::after,
+  .az-car-care-led {
     animation: none;
   }
 }

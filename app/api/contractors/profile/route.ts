@@ -429,6 +429,22 @@ export async function GET(request: NextRequest) {
       .collection("reviews")
       .where("contractorId", "==", contractorId)
       .get();
+    const completedTaskReviewKeys = new Set(
+      reviewsSnapshot.docs
+        .map((reviewSnapshot) => {
+          const jobId = readText(reviewSnapshot.get("jobId"));
+          const taskId = readText(reviewSnapshot.get("taskId"));
+
+          return jobId ? `${jobId}:${taskId || "job"}` : "";
+        })
+        .filter(Boolean),
+    );
+    const completedTasks = Math.max(
+      readNumber(contractorData.completedTasks),
+      readNumber(contractorData.completedJobs),
+      readNumber(contractorData.completedJobsCount),
+      completedTaskReviewKeys.size,
+    );
     const recentReviews = reviewsSnapshot.docs
       .map((reviewSnapshot) => ({
         reviewId: reviewSnapshot.id,
@@ -460,6 +476,7 @@ export async function GET(request: NextRequest) {
       ratingCount:
         readNumber(contractorData.ratingCount) ||
         readNumber(contractorData.reviewCount),
+      completedTasks,
       completedJobs: Math.max(
         readNumber(contractorData.completedJobs),
         readNumber(contractorData.completedJobsCount),

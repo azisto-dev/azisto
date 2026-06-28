@@ -28,6 +28,7 @@ type ContractorReviewSummary = {
   ratingAverage: number;
   ratingCount: number;
   completedJobs: number;
+  completedTasks?: number;
   verified: boolean;
 };
 
@@ -79,7 +80,7 @@ async function fetchPublicReviews(user: User, contractorId: string) {
 function RatingStars({ rating }: { rating: number }) {
   return (
     <span
-      className="flex items-center gap-0.5 text-[#F5B400]"
+      className="flex items-center gap-0.5 text-[#F59E0B]"
       aria-label={`${rating.toFixed(1)} out of 5 stars`}
     >
       {Array.from({ length: 5 }).map((_, index) => (
@@ -88,8 +89,8 @@ function RatingStars({ rating }: { rating: number }) {
           aria-hidden="true"
           className={`h-4 w-4 ${
             index < Math.round(rating)
-              ? "fill-[#F5B400]"
-              : "fill-transparent text-[#F5B400]/35"
+              ? "fill-[#F59E0B]"
+              : "fill-transparent text-[#F59E0B]/35"
           }`}
         />
       ))}
@@ -211,6 +212,14 @@ export default function CustomerContractorReviewsPage() {
                     <p className="mt-1 text-xs font-semibold text-slate-500">
                       {data.contractor.ratingCount} review
                       {data.contractor.ratingCount === 1 ? "" : "s"}
+                      {" · "}
+                      {data.contractor.completedTasks ??
+                        data.contractor.completedJobs}{" "}
+                      completed task
+                      {(data.contractor.completedTasks ??
+                        data.contractor.completedJobs) === 1
+                        ? ""
+                        : "s"}
                     </p>
                   </div>
                 </div>
@@ -226,10 +235,11 @@ export default function CustomerContractorReviewsPage() {
                   </div>
                   <div className="rounded-xl bg-emerald-50 p-3">
                     <p className="text-xl font-bold text-emerald-700">
-                      {data.contractor.completedJobs}
+                      {data.contractor.completedTasks ??
+                        data.contractor.completedJobs}
                     </p>
                     <p className="text-xs font-semibold text-slate-500">
-                      Jobs Completed
+                      Tasks Completed
                     </p>
                   </div>
                 </div>
@@ -270,7 +280,7 @@ export default function CustomerContractorReviewsPage() {
                           </div>
                           <span className="flex items-center gap-1 text-sm font-bold text-slate-900">
                             {review.rating.toFixed(1)}
-                            <Star className="h-4 w-4 fill-[#F5B400] text-[#F5B400]" />
+                            <Star className="h-4 w-4 fill-[#F59E0B] text-[#F59E0B]" />
                           </span>
                         </div>
                         <div className="mt-2">

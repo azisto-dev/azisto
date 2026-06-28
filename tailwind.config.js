@@ -13,7 +13,7 @@ export default {
           primary: "#1E3A8A",
           primaryHover: "#273F7A",
           accent: "#2563EB",
-          gold: "#C8A96B",
+          gold: "#F59E0B",
           background: "#FAFAF8",
           card: "#FFFFFF",
           border: "#E5E7EB",

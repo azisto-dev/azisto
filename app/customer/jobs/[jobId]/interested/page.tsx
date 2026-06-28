@@ -29,6 +29,7 @@ type InterestedContractor = {
   ratingAverage: number;
   ratingCount: number;
   completedJobs: number;
+  completedTasks?: number;
   verified: boolean;
 };
 
@@ -363,7 +364,7 @@ export default function CustomerInterestedContractorsPage() {
                         {contractor.ratingAverage > 0
                           ? contractor.ratingAverage.toFixed(1)
                           : "New"}
-                        <Star className="h-3.5 w-3.5 fill-[#F5B400] text-[#F5B400]" />
+                        <Star className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
                       </p>
                       <p className="text-[10px] font-semibold text-slate-500">
                         Rating
@@ -385,10 +386,10 @@ export default function CustomerInterestedContractorsPage() {
                     </Link>
                     <div className="rounded-xl bg-emerald-50 px-2 py-2 text-center">
                       <p className="text-sm font-bold text-slate-900">
-                        {contractor.completedJobs}
+                        {contractor.completedTasks ?? contractor.completedJobs}
                       </p>
                       <p className="text-[10px] font-semibold text-slate-500">
-                        Jobs Completed
+                        Tasks Completed
                       </p>
                     </div>
                   </div>
@@ -411,7 +412,7 @@ export default function CustomerInterestedContractorsPage() {
                         {contractor.taskLabels.map((taskLabel) => (
                           <span
                             key={taskLabel}
-                            className="rounded-full border border-[#F5B400] bg-amber-50 px-3 py-1 text-xs font-bold text-slate-800"
+                            className="rounded-full border border-[#F59E0B] bg-amber-50 px-3 py-1 text-xs font-bold text-slate-800"
                           >
                             ✓ {taskLabel}
                           </span>
@@ -436,7 +437,7 @@ export default function CustomerInterestedContractorsPage() {
                   type="button"
                   onClick={() => handleHireContractor(contractor)}
                   disabled={Boolean(hiringContractorId)}
-                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-[#F5B400] bg-white text-sm font-bold text-[#1F1F1F] shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-[#F59E0B] bg-white text-sm font-bold text-[#1E3A8A] shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                 >
                   {hiringContractorId === contractor.contractorId
                     ? "Hiring..."

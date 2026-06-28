@@ -362,15 +362,15 @@ export default function CustomerOnboardingPage() {
                       onClick={() => setPreferredContactMethod(method)}
                       className={`flex h-12 items-center justify-between rounded-xl border px-4 text-sm font-bold transition ${
                         isSelected
-                          ? "border-[#F5B400] bg-white text-[#1F1F1F] shadow-sm"
-                          : "border-[#F5B400] bg-white text-slate-700"
+                          ? "border-[#F59E0B] bg-white text-[#1E3A8A] shadow-sm"
+                          : "border-[#F59E0B] bg-white text-slate-700"
                       }`}
                     >
                       <span>{method}</span>
                       <span
                         className={`h-4 w-4 rounded-full border ${
                           isSelected
-                            ? "border-[#F5B400] bg-[#F5B400]"
+                            ? "border-[#F59E0B] bg-[#F59E0B]"
                             : "border-slate-300 bg-white"
                         }`}
                       />

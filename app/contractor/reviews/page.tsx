@@ -26,7 +26,7 @@ type ReviewSummary = {
   contractorName: string;
   ratingAverage: number;
   ratingCount: number;
-  completedJobs: number;
+  completedTasks: number;
   recentReviews: ContractorReview[];
 };
 
@@ -47,6 +47,7 @@ async function fetchReviewSummary(user: User) {
   });
   const body = (await response.json().catch(() => null)) as {
     message?: unknown;
+    completedJobs?: unknown;
   } & Partial<ReviewSummary>;
 
   if (!response.ok) {
@@ -67,8 +68,12 @@ async function fetchReviewSummary(user: User) {
     ratingAverage:
       typeof body.ratingAverage === "number" ? body.ratingAverage : 0,
     ratingCount: typeof body.ratingCount === "number" ? body.ratingCount : 0,
-    completedJobs:
-      typeof body.completedJobs === "number" ? body.completedJobs : 0,
+    completedTasks:
+      typeof body.completedTasks === "number"
+        ? body.completedTasks
+        : typeof body.completedJobs === "number"
+          ? body.completedJobs
+          : 0,
     recentReviews: Array.isArray(body.recentReviews)
       ? body.recentReviews
       : [],
@@ -181,10 +186,10 @@ export default function ContractorReviewsPage() {
                   </div>
                   <div className="rounded-2xl bg-emerald-50 p-3">
                     <p className="text-xl font-bold text-emerald-700">
-                      {summary.completedJobs}
+                      {summary.completedTasks}
                     </p>
                     <p className="text-xs font-semibold text-[var(--azisto-contractor-muted)]">
-                      Completed jobs
+                      Completed tasks
                     </p>
                   </div>
                 </div>
@@ -200,7 +205,7 @@ export default function ContractorReviewsPage() {
                       No reviews yet
                     </p>
                     <p className="mt-2 text-sm text-[var(--azisto-contractor-muted)]">
-                      Customer feedback will appear after completed jobs.
+                      Customer feedback will appear after completed tasks.
                     </p>
                   </div>
                 ) : (

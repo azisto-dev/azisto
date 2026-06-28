@@ -1,17 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, Sparkles } from "lucide-react";
+import { onAuthStateChanged } from "firebase/auth";
 import AppHeader from "@/app/components/AppHeader";
+import BottomNav from "@/app/components/BottomNav";
+import { auth } from "@/lib/firebase";
+import { fetchSessionProfile } from "@/lib/sessionProfile";
 
 export default function AiAssistantPage() {
   const [message, setMessage] = useState("");
+  const [role, setRole] = useState<"customer" | "contractor" | "unknown">(
+    "unknown",
+  );
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setRole("unknown");
+        return;
+      }
+
+      try {
+        const profile = await fetchSessionProfile(user);
+        setRole(profile.role);
+      } catch {
+        setRole("unknown");
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   return (
     <main className="az-customer-shell min-h-screen bg-azisto-background text-black md:bg-azisto-background md:px-6 md:py-8">
       <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col bg-white shadow-none md:min-h-[780px] md:overflow-hidden md:rounded-[28px] md:shadow-2xl md:ring-1 md:ring-azisto-border">
-        <div className="flex-1 px-5 pb-6 pt-5">
+        <div className="azisto-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-24 pt-5">
           <AppHeader
             leftControl={
               <Link
@@ -25,7 +50,7 @@ export default function AiAssistantPage() {
           />
 
           <section className="mt-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 text-[#F5B400] shadow-lg shadow-amber-100">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 text-[#F59E0B] shadow-lg shadow-amber-100">
               <Sparkles aria-hidden="true" className="h-6 w-6" />
             </div>
             <h1 className="mt-5 text-3xl font-bold leading-tight text-black">
@@ -58,6 +83,7 @@ export default function AiAssistantPage() {
             </button>
           </section>
         </div>
+        <BottomNav role={role} />
       </div>
     </main>
   );

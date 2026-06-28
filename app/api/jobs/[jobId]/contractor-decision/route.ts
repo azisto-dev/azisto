@@ -10,6 +10,7 @@ import {
   canAcceptJobsForSubscription,
   getSubscriptionSummary,
 } from "@/lib/subscriptions";
+import { getParentJobStatus } from "@/lib/jobLifecycle";
 
 export const runtime = "nodejs";
 
@@ -66,37 +67,6 @@ async function findContractorProfile(firebaseUid: string) {
 
   const legacyDocument = await contractors.doc(firebaseUid).get();
   return legacyDocument.exists ? legacyDocument : null;
-}
-
-function getParentStatus(taskStatuses: string[]) {
-  if (taskStatuses.some((status) => status === "open")) {
-    return { status: "open", overallStatus: "partially_hired" };
-  }
-
-  if (taskStatuses.some((status) => status === "hired_pending_contractor")) {
-    return {
-      status: "hired_pending_contractor",
-      overallStatus: "hired_pending_contractor",
-    };
-  }
-
-  if (taskStatuses.some((status) => status === "in_progress")) {
-    return { status: "in_progress", overallStatus: "in_progress" };
-  }
-
-  if (taskStatuses.some((status) => status === "on_the_way")) {
-    return { status: "on_the_way", overallStatus: "on_the_way" };
-  }
-
-  if (
-    taskStatuses.some(
-      (status) => status === "accepted" || status === "hired",
-    )
-  ) {
-    return { status: "accepted", overallStatus: "accepted" };
-  }
-
-  return { status: "open", overallStatus: "open" };
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -256,7 +226,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
         const parentStatus =
           nextTaskStatuses.length > 0
-            ? getParentStatus(nextTaskStatuses)
+            ? getParentJobStatus(nextTaskStatuses)
             : { status: "accepted", overallStatus: "accepted" };
 
         transaction.set(
@@ -299,7 +269,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
         const parentStatus =
           nextTaskStatuses.length > 0
-            ? getParentStatus(nextTaskStatuses)
+            ? getParentJobStatus(nextTaskStatuses)
             : { status: "open", overallStatus: "open" };
         const clearParentAssignment =
           readText(jobSnapshot.get("hiredContractorId")) === contractorId;

@@ -7,6 +7,8 @@ import {
 import { getCompatibleLifecycleStatus } from "@/lib/jobStatus";
 import { readJobProofPhotos } from "@/lib/jobProofPhotos";
 import { getParentJobIdFromTaskId } from "@/lib/contractorJobHref";
+import { isJobExpired } from "@/lib/jobExpiry";
+import { isCancellationVisible } from "@/lib/jobCancellation";
 
 export const runtime = "nodejs";
 
@@ -195,6 +197,8 @@ async function serializeJob(data: Record<string, unknown>) {
     hiredBusinessName:
       typeof data.hiredBusinessName === "string" ? data.hiredBusinessName : "",
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
+    cancelledAt: serializeTimestamp(data.cancelledAt),
+    cancelledVisibleUntil: serializeTimestamp(data.cancelledVisibleUntil),
     beforePhotos: readJobProofPhotos(data.beforePhotos),
     afterPhotos: readJobProofPhotos(data.afterPhotos),
     createdAt: serializeTimestamp(data.createdAt),
@@ -212,6 +216,8 @@ function serializeTask(data: Record<string, unknown>) {
     hiredContractorId: readText(data.hiredContractorId),
     hiredContractorAuthUid: readText(data.hiredContractorAuthUid),
     contractorDecisionStatus: readText(data.contractorDecisionStatus),
+    cancelledAt: serializeTimestamp(data.cancelledAt),
+    cancelledVisibleUntil: serializeTimestamp(data.cancelledVisibleUntil),
     interestedContractorIds: readStringList(data.interestedContractorIds),
     interestedContractorAuthUids: readStringList(
       data.interestedContractorAuthUids,
@@ -312,13 +318,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const job = await serializeJob(jobSnapshot.data() ?? {});
     const tasksSnapshot = await jobSnapshot.ref.collection("tasks").get();
     const contractorData = contractorProfile.data() ?? {};
+    const contractorId =
+      typeof contractorProfile.get("contractorId") === "string"
+        ? contractorProfile.get("contractorId")
+        : contractorProfile.id;
+    const contractorCompletedTaskOnParent = tasksSnapshot.docs.some(
+      (taskSnapshot) =>
+        readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
+        readText(taskSnapshot.get("status")) === "completed",
+    );
     const savedTasks = tasksSnapshot.docs
       .map((taskSnapshot) => ({
         ...serializeTask(taskSnapshot.data()),
-        contractorServiceMatch: canPerformTask(
-          contractorData,
-          taskSnapshot.data(),
-        ),
+        contractorServiceMatch:
+          canPerformTask(contractorData, taskSnapshot.data()) ||
+          (contractorCompletedTaskOnParent &&
+            readText(taskSnapshot.get("status")) === "open"),
       }))
       .sort((firstTask, secondTask) =>
         firstTask.taskId.localeCompare(secondTask.taskId),
@@ -338,17 +353,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
             interestedContractorAuthUids: [],
             beforePhotos: [],
             afterPhotos: [],
+            cancelledAt: job.cancelledAt,
+            cancelledVisibleUntil: job.cancelledVisibleUntil,
             createdAt: job.createdAt,
             updatedAt: job.updatedAt,
-            contractorServiceMatch: canPerformTask(contractorData, {
-              category: job.selectedServiceCategory,
-              subcategory,
-            }),
+            contractorServiceMatch:
+              canPerformTask(contractorData, {
+                category: job.selectedServiceCategory,
+                subcategory,
+              }) ||
+              (contractorCompletedTaskOnParent && job.status === "open"),
           }));
-    const contractorId =
-      typeof contractorProfile.get("contractorId") === "string"
-        ? contractorProfile.get("contractorId")
-        : contractorProfile.id;
     const assignedTasks = allTasks.filter(
       (task) =>
         task.hiredContractorAuthUid === decodedToken.uid ||
@@ -361,12 +376,30 @@ export async function GET(request: NextRequest, context: RouteContext) {
           decodedToken.uid,
         ),
     );
-    const tasks =
-      assignedTasks.length > 0
-        ? assignedTasks
-        : interestedTasks.length > 0
-          ? interestedTasks
-          : allTasks.filter((task) => task.status === "open");
+    const visibleCancelledTasks = allTasks.filter(
+      (task) =>
+        task.status === "cancelled" &&
+        Date.parse(task.cancelledVisibleUntil) > Date.now(),
+    );
+    const openTasks = allTasks.filter((task) => task.status === "open");
+    const taskMap = new Map<string, (typeof allTasks)[number]>();
+    const addVisibleTask = (task: (typeof allTasks)[number]) => {
+      taskMap.set(task.taskId, task);
+    };
+
+    if (assignedTasks.length > 0 || interestedTasks.length > 0) {
+      assignedTasks.forEach(addVisibleTask);
+      interestedTasks.forEach(addVisibleTask);
+      openTasks.forEach(addVisibleTask);
+      visibleCancelledTasks.forEach(addVisibleTask);
+    } else {
+      openTasks.forEach(addVisibleTask);
+      visibleCancelledTasks.forEach(addVisibleTask);
+    }
+
+    const tasks = Array.from(taskMap.values()).sort((firstTask, secondTask) =>
+      firstTask.taskId.localeCompare(secondTask.taskId),
+    );
     const callerIsHiredContractor =
       jobSnapshot.get("hiredContractorAuthUid") === decodedToken.uid ||
       jobSnapshot.get("hiredContractorId") === contractorId ||
@@ -378,6 +411,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const hasOpenTask = allTasks.some((task) => task.status === "open");
     const assignedTaskIds = assignedTasks.map((task) => task.taskId);
     const savedContractorAssignedStatus =
+      assignedTasks.find(
+        (task) => task.status === "completion_pending_customer",
+      )?.status ||
       assignedTasks.find((task) => task.status === "in_progress")?.status ||
       assignedTasks.find((task) => task.status === "on_the_way")?.status ||
       assignedTasks.find(
@@ -392,8 +428,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const contractorAssignedStatus = getCompatibleLifecycleStatus(
       savedContractorAssignedStatus,
     );
+    const jobIsExpired = isJobExpired(jobSnapshot.data() ?? {});
+    const parentCancellationVisible = isCancellationVisible(
+      jobSnapshot.data() ?? {},
+    );
+    const hasVisibleCancellation =
+      parentCancellationVisible || visibleCancelledTasks.length > 0;
+    const hasVisibleAvailability =
+      hasVisibleCancellation ||
+      (!jobIsExpired && (job.status === "open" || hasOpenTask));
 
-    if (job.status !== "open" && !hasOpenTask && !callerIsHiredContractor) {
+    if (!callerIsHiredContractor && !hasVisibleAvailability) {
       return NextResponse.json(
         {
           code: "job-not-open",
@@ -403,6 +448,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const messageThreadsSnapshot = await adminDb
+      .collection("messages")
+      .where("participants", "array-contains", decodedToken.uid)
+      .get();
+    const existingThread = messageThreadsSnapshot.docs.find(
+      (threadSnapshot) =>
+        readText(threadSnapshot.get("jobId")) === jobSnapshot.id,
+    );
+
     return NextResponse.json({
       ok: true,
       job: {
@@ -411,6 +465,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         isAssignedToCurrentContractor: callerIsHiredContractor,
         assignedTaskIds,
         contractorAssignedStatus,
+        hasExistingThread: Boolean(existingThread),
+        existingThreadId: existingThread?.id ?? "",
       },
     });
   } catch (error) {

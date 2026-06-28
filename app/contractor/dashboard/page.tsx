@@ -49,6 +49,7 @@ type AvailableJob = {
 type AvailableJobTask = {
   taskId: string;
   label: string;
+  status: string;
 };
 
 type AvailableJobCard = AvailableJob & {
@@ -104,10 +105,11 @@ function groupAvailableJobs(jobs: AvailableJob[]) {
         taskIds: job.taskId ? [job.taskId] : [],
         taskLabels: [taskLabel],
         tasks: job.taskId
-          ? [{ taskId: job.taskId, label: taskLabel }]
+          ? [{ taskId: job.taskId, label: taskLabel, status: job.status }]
           : job.selectedSubcategories.map((subcategory) => ({
               taskId: "",
               label: subcategory,
+              status: job.status,
             })),
         selectedSubcategories: [taskLabel],
       });
@@ -116,12 +118,20 @@ function groupAvailableJobs(jobs: AvailableJob[]) {
 
     if (job.taskId && !existingJob.taskIds.includes(job.taskId)) {
       existingJob.taskIds.push(job.taskId);
-      existingJob.tasks.push({ taskId: job.taskId, label: taskLabel });
+      existingJob.tasks.push({
+        taskId: job.taskId,
+        label: taskLabel,
+        status: job.status,
+      });
     }
 
     if (!existingJob.taskLabels.includes(taskLabel)) {
       existingJob.taskLabels.push(taskLabel);
       existingJob.selectedSubcategories.push(taskLabel);
+    }
+
+    if (job.status === "open") {
+      existingJob.status = "open";
     }
   });
 
@@ -393,7 +403,7 @@ export default function ContractorDashboardPage() {
             </p>
           </section>
 
-          <div className="az-contractor-card mt-5 grid grid-cols-3 gap-1 p-1">
+          <div className="az-contractor-card mt-4 grid grid-cols-3 gap-1 p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -517,7 +527,13 @@ export default function ContractorDashboardPage() {
                 <EmptyState message="No available jobs right now" />
               ) : null}
 
-              {availableJobCards.map((job) => (
+              {availableJobCards.map((job) => {
+                const isFullyCancelled =
+                  job.tasks.length > 0
+                    ? job.tasks.every((task) => task.status === "cancelled")
+                    : job.status === "cancelled";
+
+                return (
                 <article
                   key={job.jobId}
                   className="az-contractor-card-compact az-contractor-job-card px-3 py-2.5"
@@ -531,10 +547,17 @@ export default function ContractorDashboardPage() {
                         {job.jobId}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
-                      {[job.city, job.province].filter(Boolean).join(", ") ||
-                        "Location pending"}
-                    </span>
+                    {isFullyCancelled ? (
+                      <span className="shrink-0 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">
+                        Cancelled
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-right text-[13px] font-semibold capitalize leading-5 text-[var(--azisto-contractor-text)] shadow-sm">
+                        {[job.city, job.province]
+                          .filter(Boolean)
+                          .join(", ") || "Location pending"}
+                      </span>
+                    )}
                   </div>
 
                   {job.tasks.length > 0 ? (
@@ -547,8 +570,21 @@ export default function ContractorDashboardPage() {
                           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--azisto-contractor-burgundy)]">
                             {task.taskId || `Task ${index + 1}`}
                           </span>
-                          <span className="text-[11px] font-bold text-slate-800">
-                            {task.label}
+                          <span className="flex items-center gap-1.5 text-right">
+                            <span
+                              className={`text-[11px] font-bold ${
+                                task.status === "cancelled"
+                                  ? "text-slate-400 line-through"
+                                  : "text-slate-800"
+                              }`}
+                            >
+                              {task.label}
+                            </span>
+                            {task.status === "cancelled" ? (
+                              <span className="rounded-full border border-red-300 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                                Cancelled
+                              </span>
+                            ) : null}
                           </span>
                         </div>
                       ))}
@@ -576,14 +612,24 @@ export default function ContractorDashboardPage() {
                     </div>
                   </div>
 
-                  <Link
-                    href={getContractorJobHref(job.jobId)}
-                    className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
-                  >
-                    View job
-                  </Link>
+                  {isFullyCancelled ? (
+                    <span
+                      aria-disabled="true"
+                      className="mt-3 flex h-10 cursor-not-allowed items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-400"
+                    >
+                      Job cancelled
+                    </span>
+                  ) : (
+                    <Link
+                      href={getContractorJobHref(job.jobId)}
+                      className="az-btn-contractor mt-3 flex h-10 items-center justify-center rounded-full text-xs font-bold"
+                    >
+                      View job
+                    </Link>
+                  )}
                 </article>
-              ))}
+                );
+              })}
             </section>
           ) : null}
 

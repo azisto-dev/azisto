@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -17,6 +17,10 @@ import {
   matchesServiceCity,
   sanitizeServiceCities,
 } from "@/lib/serviceAreas";
+import {
+  JOB_EXPIRY_DURATION_MS,
+  isJobExpired,
+} from "@/lib/jobExpiry";
 
 export const runtime = "nodejs";
 
@@ -149,6 +153,15 @@ async function notifyMatchingContractors(input: {
         title: "New matching job",
         message: `${input.serviceCategory} job posted near your service area.`,
         jobId: input.jobId,
+        pushPayload: {
+          body: `${input.serviceCategory} job posted in ${input.jobCity}`,
+          url:
+            match.matchingTaskIds.length > 0
+              ? `/contractor/jobs/${encodeURIComponent(
+                  input.jobId,
+                )}?taskId=${encodeURIComponent(match.matchingTaskIds[0])}`
+              : "/home",
+        },
         data: {
           taskIds: match.matchingTaskIds,
           serviceCategory: input.serviceCategory,
@@ -274,7 +287,9 @@ async function countOpenCustomerJobs(firebaseUid: string) {
     .get();
 
   return jobsSnapshot.docs.filter(
-    (documentSnapshot) => documentSnapshot.get("status") === "open",
+    (documentSnapshot) =>
+      documentSnapshot.get("status") === "open" &&
+      !isJobExpired(documentSnapshot.data()),
   ).length;
 }
 
@@ -469,6 +484,9 @@ export async function POST(request: NextRequest) {
     const preferredTime = "";
     const locationCapturedAt =
       locationMode === "live" ? FieldValue.serverTimestamp() : null;
+    const expiresAt = Timestamp.fromMillis(
+      Date.now() + JOB_EXPIRY_DURATION_MS,
+    );
     const schedule =
       scheduleMode === "specific"
         ? {
@@ -517,6 +535,9 @@ export async function POST(request: NextRequest) {
       taskCount: taskSubcategories.length,
       status: needsReview ? "review_required" : "open",
       matchingStatus: needsReview ? "paused" : "pending",
+      expiresAt,
+      expiryNoticeSentAt: null,
+      repostedAt: null,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
@@ -552,6 +573,9 @@ export async function POST(request: NextRequest) {
         urgency: scheduleMode === "urgency" ? urgency : null,
         schedule,
         status: "open",
+        expiresAt,
+        expiryNoticeSentAt: null,
+        repostedAt: null,
         interestedContractorIds: [],
         interestedContractorAuthUids: [],
         hiredContractorId: null,

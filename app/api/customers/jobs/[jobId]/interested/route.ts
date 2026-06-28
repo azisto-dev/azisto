@@ -107,6 +107,7 @@ function serializeInterestedContractor(data: Record<string, unknown>) {
     ratingAverage: 0,
     ratingCount: 0,
     completedJobs: 0,
+    completedTasks: 0,
     verified: false,
   };
 }
@@ -250,7 +251,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
           const verificationStatus =
             readText(contractorData.verificationStatus) ||
             contractor.verificationStatus;
-
           return {
             ...contractor,
             contractorName:
@@ -271,6 +271,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
               readNumber(contractorData.ratingCount) ||
               readNumber(contractorData.reviewCount),
             completedJobs: Math.max(
+              readNumber(contractorData.completedJobs),
+              readNumber(contractorData.completedJobsCount),
+            ),
+            completedTasks: Math.max(
+              readNumber(contractorData.completedTasks),
               readNumber(contractorData.completedJobs),
               readNumber(contractorData.completedJobsCount),
             ),

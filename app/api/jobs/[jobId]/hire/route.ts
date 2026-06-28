@@ -285,6 +285,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       title: "You were selected",
       message: "You have been selected for a job. Please accept or decline.",
       jobId,
+      pushPayload: {
+        body: "A customer selected you for a job.",
+      },
     });
 
     return NextResponse.json({ ok: true, selectedTaskIds: taskIds });

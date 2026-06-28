@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import {
   adminAuth,
   adminDb,
@@ -9,6 +10,13 @@ import {
   firebaseQuotaMessage,
   isQuotaExceededMessage,
 } from "@/lib/apiErrors";
+import {
+  getJobExpiresAtMs,
+  isJobExpired,
+  isJobExpiringSoon,
+} from "@/lib/jobExpiry";
+import { getParentJobStatus } from "@/lib/jobLifecycle";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 
@@ -61,6 +69,11 @@ function serializeTimestamp(value: unknown) {
   }
 
   return "";
+}
+
+function serializeExpiry(data: Record<string, unknown>) {
+  const expiresAtMs = getJobExpiresAtMs(data);
+  return expiresAtMs ? new Date(expiresAtMs).toISOString() : "";
 }
 
 function getErrorDetails(error: unknown) {
@@ -127,6 +140,9 @@ function serializeJob(data: Record<string, unknown>, reviewed = false) {
     beforePhotos: readJobProofPhotos(data.beforePhotos),
     afterPhotos: readJobProofPhotos(data.afterPhotos),
     reviewed,
+    expiresAt: serializeExpiry(data),
+    expiryNoticeSentAt: serializeTimestamp(data.expiryNoticeSentAt),
+    repostedAt: serializeTimestamp(data.repostedAt),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -145,6 +161,8 @@ function serializeTask(data: Record<string, unknown>, reviewed = false) {
     beforePhotos: readJobProofPhotos(data.beforePhotos),
     afterPhotos: readJobProofPhotos(data.afterPhotos),
     reviewed,
+    expiresAt: serializeExpiry(data),
+    repostedAt: serializeTimestamp(data.repostedAt),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -203,12 +221,136 @@ export async function GET(request: NextRequest) {
           const tasksSnapshot = await documentSnapshot.ref.collection("tasks").get();
           const jobId =
             readText(documentSnapshot.get("jobId")) || documentSnapshot.id;
+          const parentData = documentSnapshot.data();
+          const taskDataById = new Map(
+            tasksSnapshot.docs.map((taskSnapshot) => [
+              taskSnapshot.id,
+              taskSnapshot.data(),
+            ]),
+          );
+          const expiryWrites: Promise<FirebaseFirestore.WriteResult>[] = [];
+
+          tasksSnapshot.docs.forEach((taskSnapshot) => {
+            const taskData = taskSnapshot.data();
+
+            if (
+              readText(taskData.status) === "open" &&
+              isJobExpired({ ...parentData, ...taskData })
+            ) {
+              taskDataById.set(taskSnapshot.id, {
+                ...taskData,
+                status: "expired",
+                matchingStatus: "closed",
+              });
+              expiryWrites.push(
+                taskSnapshot.ref.set(
+                  {
+                    status: "expired",
+                    matchingStatus: "closed",
+                    expiredAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                  },
+                  { merge: true },
+                ),
+              );
+            }
+          });
+
+          let effectiveParentData = parentData;
+          const effectiveTaskStatuses = tasksSnapshot.docs.map(
+            (taskSnapshot) =>
+              readText(taskDataById.get(taskSnapshot.id)?.status) || "open",
+          );
+
+          if (effectiveTaskStatuses.length > 0) {
+            const nextParentStatus = getParentJobStatus(effectiveTaskStatuses);
+
+            if (
+              nextParentStatus.status !== readText(parentData.status) ||
+              nextParentStatus.overallStatus !==
+                readText(parentData.overallStatus)
+            ) {
+              effectiveParentData = {
+                ...parentData,
+                ...nextParentStatus,
+              };
+              expiryWrites.push(
+                documentSnapshot.ref.set(
+                  {
+                    ...nextParentStatus,
+                    ...(nextParentStatus.status === "expired"
+                      ? { expiredAt: FieldValue.serverTimestamp() }
+                      : {}),
+                    updatedAt: FieldValue.serverTimestamp(),
+                  },
+                  { merge: true },
+                ),
+              );
+            }
+          } else if (
+            readText(parentData.status) === "open" &&
+            isJobExpired(parentData)
+          ) {
+            effectiveParentData = {
+              ...parentData,
+              status: "expired",
+              overallStatus: "expired",
+              matchingStatus: "closed",
+            };
+            expiryWrites.push(
+              documentSnapshot.ref.set(
+                {
+                  status: "expired",
+                  overallStatus: "expired",
+                  matchingStatus: "closed",
+                  expiredAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+                { merge: true },
+              ),
+            );
+          }
+
+          if (
+            ["open", "partially_hired"].includes(
+              readText(effectiveParentData.status),
+            ) &&
+            isJobExpiringSoon(effectiveParentData) &&
+            !effectiveParentData.expiryNoticeSentAt
+          ) {
+            await createNotification({
+              dedupeKey: `job_expiry_notice_${jobId}`,
+              recipientAuthUid: decodedToken.uid,
+              recipientRole: "customer",
+              type: "job_expiry_notice",
+              title: "Job expiring soon",
+              message:
+                "Your posted job is expiring soon. Do you want to repost it or make any changes?",
+              jobId,
+            });
+            await documentSnapshot.ref.set(
+              {
+                expiryNoticeSentAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
+            effectiveParentData = {
+              ...effectiveParentData,
+              expiryNoticeSentAt: new Date(),
+            };
+          }
+
+          if (expiryWrites.length > 0) {
+            await Promise.all(expiryWrites);
+          }
+
           const tasks = tasksSnapshot.docs
             .map((taskSnapshot) => {
               const taskId =
                 readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
               return serializeTask(
-                taskSnapshot.data(),
+                taskDataById.get(taskSnapshot.id) ?? taskSnapshot.data(),
                 reviewedTargets.has(`${jobId}:${taskId}`),
               );
             })
@@ -224,8 +366,8 @@ export async function GET(request: NextRequest) {
               completedTasks.every((task) => task.reviewed));
 
           return {
-            ...serializeJob(documentSnapshot.data(), reviewed),
-            overallStatus: readText(documentSnapshot.get("overallStatus")),
+            ...serializeJob(effectiveParentData, reviewed),
+            overallStatus: readText(effectiveParentData.overallStatus),
             requiresMultipleContractors:
               documentSnapshot.get("requiresMultipleContractors") === true,
             taskCount:

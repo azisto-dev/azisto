@@ -438,6 +438,10 @@ export default function ContractorSubscriptionPage() {
                             <Check className="h-4 w-4 text-emerald-600" />
                             Browsing and interest submissions do not count
                           </p>
+                          <p className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-emerald-600" />
+                            Cancel anytime
+                          </p>
                         </div>
 
                         <button

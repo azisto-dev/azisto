@@ -95,29 +95,29 @@ const services: ServicePageItem[] = serviceCatalog.map((service) => {
 
 const iconBadgeStyles = {
   amber:
-    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-100 shadow-amber-100/80",
+    "border-[#F59E0B]/25 bg-[#F59E0B]/10 shadow-sm",
   blue:
-    "border-[#F5B400]/30 bg-white shadow-amber-100/60",
+    "border-[#2563EB]/20 bg-[#2563EB]/10 shadow-sm",
   cyan:
-    "border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-100 shadow-cyan-100/80",
+    "border-[#2563EB]/20 bg-[#2563EB]/10 shadow-sm",
   emerald:
-    "border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-green-100 shadow-emerald-100/80",
+    "border-[#10B981]/20 bg-[#10B981]/10 shadow-sm",
   green:
-    "border-green-100 bg-gradient-to-br from-lime-50 via-white to-green-100 shadow-green-100/80",
+    "border-[#10B981]/20 bg-[#10B981]/10 shadow-sm",
   indigo:
-    "border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-100 shadow-indigo-100/80",
+    "border-[#1E3A8A]/20 bg-[#1E3A8A]/10 shadow-sm",
   orange:
-    "border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-100 shadow-orange-100/80",
+    "border-[#F59E0B]/25 bg-[#F59E0B]/10 shadow-sm",
   pink:
-    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-stone-100 shadow-amber-100/80",
+    "border-[#F59E0B]/25 bg-[#F59E0B]/10 shadow-sm",
   purple:
-    "border-purple-100 bg-gradient-to-br from-purple-50 via-white to-fuchsia-100 shadow-purple-100/80",
+    "border-[#2563EB]/20 bg-[#2563EB]/10 shadow-sm",
   rose:
-    "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-stone-100 shadow-amber-100/80",
+    "border-[#EF4444]/20 bg-[#EF4444]/10 shadow-sm",
   slate:
-    "border-azisto-border bg-gradient-to-br from-slate-50 via-white to-slate-100 shadow-slate-100/80",
+    "border-[#E5E7EB] bg-[#FAFAF8] shadow-sm",
   yellow:
-    "border-yellow-100 bg-gradient-to-br from-yellow-50 via-white to-amber-100 shadow-yellow-100/80",
+    "border-[#F59E0B]/25 bg-[#F59E0B]/10 shadow-sm",
 };
 
 type IconTheme = keyof typeof iconBadgeStyles;
@@ -372,8 +372,16 @@ export default function ServiceDetailPage() {
       typeof window !== "undefined"
         ? window.sessionStorage.getItem(getServiceGroupStorageKey(slug))
         : "";
+    const requestedGroupKey =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("group") ?? ""
+        : "";
     const nextGroupKey =
-      savedGroupKey && groupEntries.some(([groupKey]) => groupKey === savedGroupKey)
+      requestedGroupKey &&
+      groupEntries.some(([groupKey]) => groupKey === requestedGroupKey)
+        ? requestedGroupKey
+        : savedGroupKey &&
+            groupEntries.some(([groupKey]) => groupKey === savedGroupKey)
         ? savedGroupKey
         : defaultGroupKey;
 
@@ -494,7 +502,7 @@ export default function ServiceDetailPage() {
                     }}
                     className={`flex h-11 items-center justify-center rounded-xl border text-sm font-bold shadow-sm transition duration-200 ${
                       isSelected
-                        ? "border-[#1F1F1F] bg-[#1F1F1F] text-white shadow-[0_6px_16px_rgba(31,31,31,0.16)]"
+                        ? "border-[#1E3A8A] bg-[#1E3A8A] text-white shadow-[0_6px_16px_rgba(30,58,138,0.18)]"
                         : "border-azisto-border bg-white/45 text-slate-600"
                     }`}
                   >
@@ -543,11 +551,9 @@ export default function ServiceDetailPage() {
               );
             })}
           </section>
-        </div>
 
-        <div className="sticky bottom-0 border-t border-azisto-border bg-white/95 px-5 py-4 backdrop-blur">
           {selectedCount > 1 ? (
-            <div className="mb-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-semibold leading-5 text-slate-700">
+            <div className="mt-5 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-semibold leading-5 text-slate-700">
               <Info
                 aria-hidden="true"
                 className="mt-0.5 h-4 w-4 shrink-0 text-azisto-accent"
@@ -558,12 +564,23 @@ export default function ServiceDetailPage() {
               </p>
             </div>
           ) : null}
-          <Link
-            href={`/request?${requestParams.toString()}`}
-            className="az-btn-primary flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
-          >
-            {continueLabel}
-          </Link>
+
+          {selectedCount === 0 ? (
+            <button
+              type="button"
+              disabled
+              className="mt-5 flex h-14 w-full cursor-not-allowed items-center justify-center rounded-xl border border-slate-200 bg-slate-200 text-sm font-bold text-slate-400"
+            >
+              {continueLabel}
+            </button>
+          ) : (
+            <Link
+              href={`/request?${requestParams.toString()}`}
+              className="az-btn-primary mt-5 flex h-14 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              {continueLabel}
+            </Link>
+          )}
         </div>
         <BottomNav role="customer" />
       </div>

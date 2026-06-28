@@ -8,6 +8,8 @@ import {
   matchesServiceCity,
   sanitizeServiceCities,
 } from "@/lib/serviceAreas";
+import { isJobExpired } from "@/lib/jobExpiry";
+import { isCancellationVisible } from "@/lib/jobCancellation";
 
 export const runtime = "nodejs";
 
@@ -169,6 +171,8 @@ async function serializeJob(data: Record<string, unknown>) {
     matchingStatus:
       typeof data.matchingStatus === "string" ? data.matchingStatus : "",
     hiredContractorId: readText(data.hiredContractorId),
+    cancelledAt: serializeTimestamp(data.cancelledAt),
+    cancelledVisibleUntil: serializeTimestamp(data.cancelledVisibleUntil),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -208,9 +212,40 @@ async function serializeTaskCard(
     schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
     status: readText(taskData.status) || readText(parentData.status),
     hiredContractorId: readText(taskData.hiredContractorId),
+    cancelledAt: taskData.cancelledAt ?? parentData.cancelledAt,
+    cancelledVisibleUntil:
+      taskData.cancelledVisibleUntil ?? parentData.cancelledVisibleUntil,
     createdAt: taskData.createdAt ?? parentData.createdAt,
     updatedAt: taskData.updatedAt ?? parentData.updatedAt,
   });
+}
+
+function isAvailableParent(data: Record<string, unknown>) {
+  if (readText(data.status) === "cancelled") {
+    return isCancellationVisible(data);
+  }
+
+  return (
+    readText(data.status) === "open" &&
+    readText(data.matchingStatus) !== "paused" &&
+    !readText(data.hiredContractorId) &&
+    !isJobExpired(data)
+  );
+}
+
+function isAvailableTask(
+  parentData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+) {
+  if (readText(taskData.status) === "cancelled") {
+    return isCancellationVisible(taskData);
+  }
+
+  return (
+    readText(taskData.status) === "open" &&
+    !readText(taskData.hiredContractorId) &&
+    !isJobExpired({ ...parentData, ...taskData })
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -250,25 +285,22 @@ export async function GET(request: NextRequest) {
     const serviceCities = sanitizeServiceCities(
       preferencesData.serviceCities ?? preferencesData.cities,
     );
-    const openJobsSnapshot = await adminDb
-      .collection("jobs")
-      .where("status", "==", "open")
-      .get();
-    const filteredJobDocs = openJobsSnapshot.docs.filter((documentSnapshot) => {
-        const data = documentSnapshot.data();
-
-        return (
-          readText(data.matchingStatus) !== "paused" &&
-          !readText(data.hiredContractorId)
-        );
-      });
+    const [openJobsSnapshot, cancelledJobsSnapshot] = await Promise.all([
+      adminDb.collection("jobs").where("status", "==", "open").get(),
+      adminDb.collection("jobs").where("status", "==", "cancelled").get(),
+    ]);
+    const filteredJobDocs = [
+      ...openJobsSnapshot.docs,
+      ...cancelledJobsSnapshot.docs,
+    ].filter((documentSnapshot) =>
+      isAvailableParent(documentSnapshot.data()),
+    );
     const jobs = (
       await Promise.all(
         filteredJobDocs.map(async (documentSnapshot) => {
           const parentData = documentSnapshot.data();
           const tasksSnapshot = await documentSnapshot.ref
             .collection("tasks")
-            .where("status", "==", "open")
             .get();
 
           if (tasksSnapshot.empty) {
@@ -277,7 +309,9 @@ export async function GET(request: NextRequest) {
 
           return Promise.all(
             tasksSnapshot.docs
-              .filter((taskSnapshot) => !readText(taskSnapshot.get("hiredContractorId")))
+              .filter((taskSnapshot) =>
+                isAvailableTask(parentData, taskSnapshot.data()),
+              )
               .map((taskSnapshot) =>
                 serializeTaskCard(parentData, taskSnapshot.data()),
               ),

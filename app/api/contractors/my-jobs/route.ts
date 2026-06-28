@@ -4,6 +4,7 @@ import {
   adminDb,
   assertFirebaseAdminConfig,
 } from "@/lib/firebaseAdmin";
+import { isJobExpired } from "@/lib/jobExpiry";
 
 export const runtime = "nodejs";
 
@@ -298,7 +299,8 @@ export async function GET(request: NextRequest) {
 
       if (
         jobStatus !== "open" ||
-        rejectedContractorIds.includes(contractorId)
+        rejectedContractorIds.includes(contractorId) ||
+        isJobExpired(jobSnapshot.data())
       ) {
         continue;
       }
@@ -325,7 +327,14 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        if (taskStatus !== "open" || taskHiredContractorId) {
+        if (
+          taskStatus !== "open" ||
+          taskHiredContractorId ||
+          isJobExpired({
+            ...(jobSnapshot.data() ?? {}),
+            ...(taskSnapshot.data() ?? {}),
+          })
+        ) {
           continue;
         }
 

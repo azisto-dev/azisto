@@ -152,7 +152,7 @@ export default function BottomNav({ role }: { role: UserRole }) {
                   isActive
                     ? isContractor
                       ? "text-[var(--azisto-contractor-burgundy)]"
-                      : "text-[#1F1F1F]"
+                      : "text-[#1E3A8A]"
                     : isContractor
                       ? "text-[var(--azisto-contractor-muted)]"
                       : "text-azisto-muted"

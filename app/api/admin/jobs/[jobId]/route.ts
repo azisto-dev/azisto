@@ -10,6 +10,7 @@ import {
   sortByNewest,
 } from "@/lib/adminConsole";
 import { readJobProofPhotos } from "@/lib/jobProofPhotos";
+import { getJobExpiresAtMs, isJobExpired } from "@/lib/jobExpiry";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
         province: readText(data.province),
         postalCode: readText(data.postalCode),
         status: readText(data.overallStatus) || readText(data.status),
+        expiresAt: getJobExpiresAtMs(data)
+          ? new Date(getJobExpiresAtMs(data)).toISOString()
+          : "",
+        isExpired: isJobExpired(data),
+        repostedAt: serializeTimestamp(data.repostedAt),
         matchingStatus: readText(data.matchingStatus),
         scheduleMode: readText(data.scheduleMode),
         preferredDate: readText(data.preferredDate),

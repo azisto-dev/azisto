@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { Calendar, Camera, ChevronLeft, Clock, LocateFixed, MapPin } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import BottomNav from "@/app/components/BottomNav";
 import AppHeader from "@/app/components/AppHeader";
 import AppShimmer from "@/app/components/AppShimmer";
+import { authenticatedFetch } from "@/lib/authenticatedFetch";
 
 const scheduleModeOptions = [
   {
@@ -54,6 +55,8 @@ type SelectedSubcategoryGroup = {
   group: string;
 };
 
+type AddressField = "address" | "city" | "province" | "postalCode";
+
 const initialJobRequestForm: JobRequestForm = {
   jobDescription: "",
   address: "",
@@ -63,6 +66,32 @@ const initialJobRequestForm: JobRequestForm = {
   preferredDate: "",
   preferredTimeWindow: "",
 };
+
+function getInitialFormFromSearchParams(
+  searchParams: ReturnType<typeof useSearchParams>,
+): JobRequestForm {
+  return {
+    ...initialJobRequestForm,
+    jobDescription: searchParams.get("description") ?? "",
+    address: searchParams.get("address") ?? "",
+    city: searchParams.get("city") ?? "",
+    province: searchParams.get("province") ?? "",
+    postalCode: searchParams.get("postalCode") ?? "",
+  };
+}
+
+function getPrefilledAddressFields(
+  searchParams: ReturnType<typeof useSearchParams>,
+) {
+  const addressFields: AddressField[] = [
+    "address",
+    "city",
+    "province",
+    "postalCode",
+  ];
+
+  return addressFields.filter((field) => Boolean(searchParams.get(field)));
+}
 
 function getTodayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -188,7 +217,10 @@ function RequestForm() {
       };
     })
     .filter((item) => item.subcategory && item.group);
-  const [form, setForm] = useState<JobRequestForm>(initialJobRequestForm);
+  const isRebook = searchParams.get("rebook") === "1";
+  const [form, setForm] = useState<JobRequestForm>(() =>
+    getInitialFormFromSearchParams(searchParams),
+  );
   const [locationMode, setLocationMode] = useState<LocationMode>("manual");
   const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(null);
   const [locationStatus, setLocationStatus] = useState<
@@ -201,22 +233,79 @@ function RequestForm() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const editedAddressFieldsRef = useRef<Set<AddressField>>(
+    new Set(getPrefilledAddressFields(searchParams)),
+  );
   const todayDate = getTodayDateString();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      setAuthLoading(false);
 
       if (!user) {
+        setAuthLoading(false);
         router.replace("/login?reason=submit-request");
+        return;
+      }
+
+      try {
+        const response = await authenticatedFetch(user, "/api/profile");
+        const responseBody = (await response.json().catch(() => null)) as {
+          profile?: unknown;
+        } | null;
+        const profile =
+          typeof responseBody?.profile === "object" &&
+          responseBody.profile !== null
+            ? (responseBody.profile as Record<string, unknown>)
+            : {};
+
+        if (profile.role !== "customer") {
+          return;
+        }
+
+        setForm((currentForm) => {
+          const nextForm = { ...currentForm };
+          const addressFields: AddressField[] = [
+            "address",
+            "city",
+            "province",
+            "postalCode",
+          ];
+
+          addressFields.forEach((field) => {
+            const profileValue =
+              typeof profile[field] === "string" ? profile[field].trim() : "";
+
+            if (
+              profileValue &&
+              !editedAddressFieldsRef.current.has(field) &&
+              !currentForm[field]
+            ) {
+              nextForm[field] = profileValue;
+            }
+          });
+
+          return nextForm;
+        });
+      } catch (error) {
+        console.error("Request address autofill failed:", error);
+      } finally {
+        setAuthLoading(false);
       }
     });
 
     return unsubscribe;
   }, [router]);
 
-  function updateField(field: keyof JobRequestForm, value: string) {
+  function updateField(
+    field: keyof JobRequestForm,
+    value: string,
+    isUserEditedAddress = false,
+  ) {
+    if (isUserEditedAddress) {
+      editedAddressFieldsRef.current.add(field as AddressField);
+    }
+
     setForm((currentForm) => ({
       ...currentForm,
       [field]: value,
@@ -373,8 +462,9 @@ function RequestForm() {
               Tell us about the job
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Share the basics now. AZISTO will use this to prepare your request
-              before matching you with help.
+              {isRebook
+                ? "We pre-filled what we could from your previous booking. Edit anything before submitting."
+                : "Share the basics now. AZISTO will use this to prepare your request before matching you with help."}
             </p>
           </section>
 
@@ -528,7 +618,7 @@ function RequestForm() {
                       type="text"
                       value={form.address}
                       onChange={(event) =>
-                        updateField("address", event.target.value)
+                        updateField("address", event.target.value, true)
                       }
                       className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                       placeholder="Enter service address"
@@ -542,7 +632,7 @@ function RequestForm() {
                         type="text"
                         value={form.city}
                         onChange={(event) =>
-                          updateField("city", event.target.value)
+                          updateField("city", event.target.value, true)
                         }
                         className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                         placeholder="City"
@@ -555,7 +645,7 @@ function RequestForm() {
                         type="text"
                         value={form.province}
                         onChange={(event) =>
-                          updateField("province", event.target.value)
+                          updateField("province", event.target.value, true)
                         }
                         className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                         placeholder="BC"
@@ -569,7 +659,7 @@ function RequestForm() {
                       type="text"
                       value={form.postalCode}
                       onChange={(event) =>
-                        updateField("postalCode", event.target.value)
+                        updateField("postalCode", event.target.value, true)
                       }
                       className="h-14 w-full rounded-xl border border-azisto-border bg-white px-4 text-sm text-black outline-none transition placeholder:text-slate-400 az-focus-field"
                       placeholder="Postal code"

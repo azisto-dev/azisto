@@ -21,6 +21,8 @@ import {
   hasActiveContractorSubscription,
   isContractorEligibleForJobNotifications,
 } from "@/lib/contractorJobMatching";
+import { isJobExpired } from "@/lib/jobExpiry";
+import { isCancellationVisible } from "@/lib/jobCancellation";
 
 export const runtime = "nodejs";
 
@@ -304,6 +306,8 @@ async function serializeAvailableJob(
     schedule: readSchedule(data.schedule),
     status: readText(data.status),
     matchingStatus: readText(data.matchingStatus),
+    cancelledAt: serializeTimestamp(data.cancelledAt),
+    cancelledVisibleUntil: serializeTimestamp(data.cancelledVisibleUntil),
     createdAt: serializeTimestamp(data.createdAt),
     updatedAt: serializeTimestamp(data.updatedAt),
   };
@@ -346,6 +350,9 @@ async function serializeAvailableTask(
         readText(taskData.scheduleMode) || readText(parentData.scheduleMode),
       schedule: readSchedule(taskData.schedule) || readSchedule(parentData.schedule),
       status: readText(taskData.status) || readText(parentData.status),
+      cancelledAt: taskData.cancelledAt ?? parentData.cancelledAt,
+      cancelledVisibleUntil:
+        taskData.cancelledVisibleUntil ?? parentData.cancelledVisibleUntil,
       createdAt: taskData.createdAt ?? parentData.createdAt,
       updatedAt: taskData.updatedAt ?? parentData.updatedAt,
     },
@@ -354,10 +361,30 @@ async function serializeAvailableTask(
 }
 
 function isBaseAvailableJob(data: Record<string, unknown>) {
+  if (readText(data.status) === "cancelled") {
+    return isCancellationVisible(data);
+  }
+
   return (
     readText(data.status) === "open" &&
     readText(data.matchingStatus) !== "paused" &&
-    !readText(data.hiredContractorId)
+    !readText(data.hiredContractorId) &&
+    !isJobExpired(data)
+  );
+}
+
+function isBaseAvailableTask(
+  parentData: Record<string, unknown>,
+  taskData: Record<string, unknown>,
+) {
+  if (readText(taskData.status) === "cancelled") {
+    return isCancellationVisible(taskData);
+  }
+
+  return (
+    readText(taskData.status) === "open" &&
+    !readText(taskData.hiredContractorId) &&
+    !isJobExpired({ ...parentData, ...taskData })
   );
 }
 
@@ -481,12 +508,17 @@ async function backfillRecentMatchingJobNotifications(input: {
       jobId: string;
       createdAt: string;
       serviceCategory: string;
+      city: string;
       subcategories: Set<string>;
       taskIds: Set<string>;
     }
   >();
 
   input.availableJobs.forEach((job) => {
+    if (job.status !== "open") {
+      return;
+    }
+
     const createdAtTime = Date.parse(job.createdAt);
 
     if (!Number.isFinite(createdAtTime) || createdAtTime < oneDayAgo) {
@@ -514,6 +546,7 @@ async function backfillRecentMatchingJobNotifications(input: {
         jobId: parentJobId,
         createdAt: job.createdAt,
         serviceCategory: job.selectedServiceCategory,
+        city: job.city,
         subcategories: new Set<string>(),
         taskIds: new Set<string>(),
       };
@@ -561,6 +594,15 @@ async function backfillRecentMatchingJobNotifications(input: {
       title: "New matching job",
       message: `${job.serviceCategory} job posted near your service area.`,
       jobId: job.jobId,
+      pushPayload: {
+        body: `${job.serviceCategory} job posted in ${job.city}`,
+        url:
+          job.taskIds.size > 0
+            ? `/contractor/jobs/${encodeURIComponent(
+                job.jobId,
+              )}?taskId=${encodeURIComponent(Array.from(job.taskIds)[0])}`
+            : "/home",
+      },
       data: {
         taskIds: Array.from(job.taskIds),
         serviceCategory: job.serviceCategory,
@@ -641,6 +683,7 @@ export async function GET(request: NextRequest) {
     const activePreferences = activePreferenceOverride ?? savedPreferences;
     const [
       openJobsSnapshot,
+      cancelledJobsSnapshot,
       hiredJobsSnapshot,
       hiredTaskParentsSnapshot,
       unreadMessagesCount,
@@ -649,6 +692,11 @@ export async function GET(request: NextRequest) {
         adminDb
           .collection("jobs")
           .where("status", "==", "open")
+          .limit(20)
+          .get(),
+        adminDb
+          .collection("jobs")
+          .where("status", "==", "cancelled")
           .limit(20)
           .get(),
         adminDb
@@ -667,15 +715,13 @@ export async function GET(request: NextRequest) {
     const customerFirstNames = new Map<string, string>();
     const baseAvailableJobs = (
       await Promise.all(
-        openJobsSnapshot.docs
+        [...openJobsSnapshot.docs, ...cancelledJobsSnapshot.docs]
           .filter((jobSnapshot) => isBaseAvailableJob(jobSnapshot.data()))
           .map(async (jobSnapshot) => {
             const parentData = jobSnapshot.data();
             await getCustomerFirstName(parentData, customerFirstNames);
             const tasksSnapshot = await jobSnapshot.ref
               .collection("tasks")
-              .where("status", "==", "open")
-              .limit(10)
               .get();
 
             if (tasksSnapshot.empty) {
@@ -686,7 +732,9 @@ export async function GET(request: NextRequest) {
 
             return Promise.all(
               tasksSnapshot.docs
-                .filter((taskSnapshot) => !readText(taskSnapshot.get("hiredContractorId")))
+                .filter((taskSnapshot) =>
+                  isBaseAvailableTask(parentData, taskSnapshot.data()),
+                )
                 .map((taskSnapshot) =>
                   serializeAvailableTask(
                     parentData,
@@ -724,7 +772,11 @@ export async function GET(request: NextRequest) {
 
     const interestedJobsCount = new Set(
       baseAvailableJobs
-        .filter((job) => job.interestedContractorIds.includes(contractorId))
+        .filter(
+          (job) =>
+            job.status === "open" &&
+            job.interestedContractorIds.includes(contractorId),
+        )
         .map((job) => job.parentJobId || job.jobId),
     ).size;
     const today = getTodayDateString();
@@ -737,6 +789,7 @@ export async function GET(request: NextRequest) {
           "hired",
           "on_the_way",
           "in_progress",
+          "completion_pending_customer",
         ].includes(readText(job.status)),
       );
     let taskActiveJob: Record<string, unknown> | undefined;
@@ -753,6 +806,7 @@ export async function GET(request: NextRequest) {
               "hired",
               "on_the_way",
               "in_progress",
+              "completion_pending_customer",
             ].includes(readText(taskSnapshot.get("status"))),
         );
 
@@ -800,8 +854,8 @@ export async function GET(request: NextRequest) {
       activeJobBlockingNewInterest: Boolean(serializedActiveJob),
       availableJobsCount: filteredJobs.length,
       totalAvailableJobsCount: baseAvailableJobs.length,
-      newTodayCount: baseAvailableJobs.filter((job) =>
-        job.createdAt.startsWith(today),
+      newTodayCount: baseAvailableJobs.filter(
+        (job) => job.status === "open" && job.createdAt.startsWith(today),
       ).length,
       interestedJobsCount,
       availableJobs,

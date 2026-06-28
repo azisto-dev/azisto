@@ -13,6 +13,7 @@ const activeStatuses = new Set([
   "hired",
   "on_the_way",
   "in_progress",
+  "completion_pending_customer",
 ]);
 
 function getBearerToken(authorizationHeader: string | null) {
