@@ -293,11 +293,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const openTasks = tasksSnapshot.docs.filter(
       (taskSnapshot) => readText(taskSnapshot.get("status")) === "open",
     );
-    const contractorCompletedTaskOnParent = tasksSnapshot.docs.some(
-      (taskSnapshot) =>
-        readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
-        readText(taskSnapshot.get("status")) === "completed",
-    );
     const selectedTasks = openTasks.filter((taskSnapshot) => {
       const taskId = readText(taskSnapshot.get("taskId")) || taskSnapshot.id;
 
@@ -305,10 +300,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return false;
       }
 
-      return (
-        contractorCompletedTaskOnParent ||
-        canPerformTask(contractorProfile.data() ?? {}, taskSnapshot.data())
-      );
+      return canPerformTask(contractorProfile.data() ?? {}, taskSnapshot.data());
     });
 
     if (selectedTasks.length !== requestedTaskIds.length) {

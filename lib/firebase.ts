@@ -9,9 +9,9 @@ import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCrGWLXtr2_wCczVUnovilqTokF_zcJqI4",
-  authDomain: "azisto.firebaseapp.com",
-  projectId: "azisto",
-  storageBucket: "azisto.firebasestorage.app",
+  authDomain: "azist0.firebaseapp.com",
+  projectId: "azist0",
+  storageBucket: "azist0.firebasestorage.app",
   messagingSenderId: "608836048713",
   appId: "1:608836048713:web:825be31d0e06b05ca2ac98",
 };

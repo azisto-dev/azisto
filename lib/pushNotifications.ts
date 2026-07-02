@@ -18,6 +18,7 @@ export type PushNotificationStatus =
 
 const pushTokenStorageKey = "azisto:fcmToken";
 const serviceWorkerPath = "/firebase-messaging-sw.js";
+const vapidKeyPattern = /^[A-Za-z0-9_-]{80,}$/;
 
 function hasBrowserPushApis() {
   return (
@@ -80,6 +81,12 @@ export async function enablePushNotifications(user: User) {
 
   if (!vapidKey) {
     throw new Error("Push notifications are not configured yet.");
+  }
+
+  if (!vapidKeyPattern.test(vapidKey)) {
+    throw new Error(
+      "Firebase VAPID key looks incomplete. Add the full Web Push certificate public key to NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
+    );
   }
 
   const permission = await Notification.requestPermission();

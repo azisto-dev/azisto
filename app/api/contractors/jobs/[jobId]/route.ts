@@ -322,18 +322,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       typeof contractorProfile.get("contractorId") === "string"
         ? contractorProfile.get("contractorId")
         : contractorProfile.id;
-    const contractorCompletedTaskOnParent = tasksSnapshot.docs.some(
-      (taskSnapshot) =>
-        readText(taskSnapshot.get("hiredContractorId")) === contractorId &&
-        readText(taskSnapshot.get("status")) === "completed",
-    );
     const savedTasks = tasksSnapshot.docs
       .map((taskSnapshot) => ({
         ...serializeTask(taskSnapshot.data()),
-        contractorServiceMatch:
-          canPerformTask(contractorData, taskSnapshot.data()) ||
-          (contractorCompletedTaskOnParent &&
-            readText(taskSnapshot.get("status")) === "open"),
+        contractorServiceMatch: canPerformTask(
+          contractorData,
+          taskSnapshot.data(),
+        ),
       }))
       .sort((firstTask, secondTask) =>
         firstTask.taskId.localeCompare(secondTask.taskId),
@@ -357,12 +352,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
             cancelledVisibleUntil: job.cancelledVisibleUntil,
             createdAt: job.createdAt,
             updatedAt: job.updatedAt,
-            contractorServiceMatch:
-              canPerformTask(contractorData, {
-                category: job.selectedServiceCategory,
-                subcategory,
-              }) ||
-              (contractorCompletedTaskOnParent && job.status === "open"),
+            contractorServiceMatch: canPerformTask(contractorData, {
+              category: job.selectedServiceCategory,
+              subcategory,
+            }),
           }));
     const assignedTasks = allTasks.filter(
       (task) =>
